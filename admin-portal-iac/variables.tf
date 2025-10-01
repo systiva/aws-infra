@@ -1,0 +1,263 @@
+# Variables for admin portal infrastructure
+variable "aws_region" {
+  description = "AWS region for resources"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "aws_profile" {
+  description = "AWS profile to use (configured for 'fct_fct.admin' profile - no SSO login required)"
+  type        = string
+  default     = "fct_fct.admin"
+}
+
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+  default     = "admin-portal"
+}
+
+variable "environment" {
+  description = "Environment name (dev, staging, prod)"
+  type        = string
+  default     = "dev"
+  
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "Environment must be dev, staging, or prod."
+  }
+}
+
+# Networking Configuration
+variable "vpc_cidr" {
+  description = "CIDR block for VPC"
+  type        = string
+  default     = "10.1.0.0/16"
+}
+
+variable "public_subnet_cidrs" {
+  description = "CIDR blocks for public subnets"
+  type        = list(string)
+  default     = ["10.1.1.0/24", "10.1.2.0/24"]
+}
+
+variable "private_subnet_cidrs" {
+  description = "CIDR blocks for private subnets"
+  type        = list(string)
+  default     = ["10.1.11.0/24", "10.1.12.0/24"]
+}
+
+variable "enable_nat_gateway" {
+  description = "Enable NAT Gateway for private subnet internet access"
+  type        = bool
+  default     = true
+}
+
+variable "enable_flow_logs" {
+  description = "Enable VPC Flow Logs"
+  type        = bool
+  default     = false
+}
+
+variable "enable_dns_hostnames" {
+  description = "Enable DNS hostnames in VPC"
+  type        = bool
+  default     = true
+}
+
+variable "enable_dns_support" {
+  description = "Enable DNS support in VPC"
+  type        = bool
+  default     = true
+}
+
+# Lambda Configuration
+variable "lambda_runtime" {
+  description = "Runtime for Lambda functions"
+  type        = string
+  default     = "nodejs18.x"
+}
+
+variable "lambda_timeout" {
+  description = "Timeout for Lambda functions in seconds"
+  type        = number
+  default     = 30
+}
+
+variable "lambda_memory_size" {
+  description = "Memory size for Lambda functions in MB"
+  type        = number
+  default     = 512
+}
+
+# API Gateway Configuration
+variable "enable_api_gateway" {
+  description = "Enable API Gateway creation (disable if SCP restrictions)"
+  type        = bool
+  default     = false  # Set to false due to SCP restrictions
+}
+
+variable "api_gateway_type" {
+  description = "Type of API Gateway (PRIVATE, REGIONAL, EDGE)"
+  type        = string
+  default     = "PRIVATE"
+  validation {
+    condition     = contains(["PRIVATE", "REGIONAL", "EDGE"], var.api_gateway_type)
+    error_message = "API Gateway type must be PRIVATE, REGIONAL, or EDGE."
+  }
+}
+
+variable "api_gateway_stage_name" {
+  description = "API Gateway stage name"
+  type        = string
+  default     = "prod"
+}
+
+# S3 Configuration
+variable "s3_admin_portal_bucket_name" {
+  description = "Custom S3 bucket name for admin portal (leave empty for auto-generated)"
+  type        = string
+  default     = ""
+}
+
+# Alternative Access Method (when API Gateway is disabled)
+variable "enable_lambda_function_urls" {
+  description = "Enable Lambda Function URLs for direct access"
+  type        = bool
+  default     = true
+}
+
+variable "lambda_function_url_cors" {
+  description = "CORS configuration for Lambda Function URLs"
+  type = object({
+    allow_credentials = bool
+    allow_origins     = list(string)
+    allow_methods     = list(string)
+    allow_headers     = list(string)
+    expose_headers    = list(string)
+    max_age          = number
+  })
+  default = {
+    allow_credentials = false
+    allow_origins     = ["*"]
+    allow_methods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers     = ["*"]
+    expose_headers    = []
+    max_age          = 300
+  }
+}
+
+# VPC Endpoints Configuration
+variable "enable_vpc_endpoints" {
+  description = "Enable VPC endpoints for AWS services"
+  type        = bool
+  default     = true
+}
+
+variable "vpc_endpoint_services" {
+  description = "List of AWS services to create VPC endpoints for"
+  type        = list(string)
+  default = [
+    "s3",
+    "dynamodb",
+    "lambda",
+    "states",  # Step Functions
+    "ssm",
+    "kms"
+  ]
+}
+
+# External Dependencies (independent configuration)
+variable "tenant_registry_table_name" {
+  description = "Name of the DynamoDB tenant registry table (can be independent or reference existing)"
+  type        = string
+  default     = ""  # Will be auto-generated if empty
+}
+
+variable "tenant_public_table_name" {
+  description = "Name of the DynamoDB table in tenant account for public tenant data"
+  type        = string
+  default     = "TENANT_PUBLIC"
+}
+
+variable "step_functions_arn" {
+  description = "ARN of Step Functions state machine for tenant operations (optional - legacy)"
+  type        = string
+  default     = ""
+}
+
+variable "create_tenant_step_function_arn" {
+  description = "ARN of the Create Tenant Step Functions state machine"
+  type        = string
+  default     = ""
+}
+
+variable "delete_tenant_step_function_arn" {
+  description = "ARN of the Delete Tenant Step Functions state machine"
+  type        = string
+  default     = ""
+}
+
+# Cross-Account Access Configuration
+variable "tenant_account_role_name" {
+  description = "Role name to assume in tenant accounts"
+  type        = string
+  default     = "TenantAdminRole"
+}
+
+variable "trusted_tenant_account_ids" {
+  description = "List of trusted tenant account IDs for cross-account access"
+  type        = list(string)
+  default     = []
+}
+
+# Monitoring and Logging
+variable "enable_cloudwatch_logs" {
+  description = "Enable CloudWatch logs for Lambda functions"
+  type        = bool
+  default     = true
+}
+
+variable "log_retention_days" {
+  description = "CloudWatch logs retention period in days"
+  type        = number
+  default     = 14
+}
+
+variable "enable_xray_tracing" {
+  description = "Enable AWS X-Ray tracing"
+  type        = bool
+  default     = false
+}
+
+# Security Configuration
+variable "enable_waf" {
+  description = "Enable AWS WAF for API protection"
+  type        = bool
+  default     = false  # Disabled due to API Gateway restrictions
+}
+
+# Common tags for all resources
+variable "common_tags" {
+  description = "Common tags to apply to all resources"
+  type        = map(string)
+  default = {
+    ManagedBy    = "terraform"
+    Owner        = "platform-team"
+    CostCenter   = "engineering"
+    Component    = "admin-portal"
+  }
+}
+
+# Admin Account Infrastructure Reference
+variable "admin_account_state_bucket" {
+  description = "S3 bucket name containing admin account Terraform state"
+  type        = string
+  default     = ""  # Will be auto-calculated if not provided
+}
+
+variable "admin_account_state_key" {
+  description = "S3 key for admin account Terraform state"
+  type        = string
+  default     = "admin-account-iac/terraform.tfstate"
+}

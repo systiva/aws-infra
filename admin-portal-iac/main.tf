@@ -1,0 +1,293 @@
+# Admin Portal Infrastructure - Private Architecture with Lambda Web Server
+terraform {
+  required_version = ">= 1.5"
+  
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.4"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
+  }
+
+  # Backend configuration for remote state
+  backend "s3" {
+    # Configuration will be provided via backend config file
+  }
+}
+
+# Configure AWS Provider - No default tags due to SCP restrictions
+provider "aws" {
+  region  = var.aws_region
+  profile = var.aws_profile
+}
+
+# Random suffix for unique resource names
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+# Data sources
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+# Local values for resource naming and configuration
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+  region     = data.aws_region.current.name
+  
+  # Resource naming convention
+  name_prefix = "${var.project_name}-${var.environment}"
+  
+  # S3 bucket names (must be globally unique)
+  admin_portal_bucket_name = var.s3_admin_portal_bucket_name != "" ? var.s3_admin_portal_bucket_name : "${local.name_prefix}-portal-${random_id.suffix.hex}"
+  
+  # Common tags for all resources
+  common_tags = merge(var.common_tags, {
+    Environment   = var.environment
+    Project       = var.project_name
+    Region        = var.aws_region
+    AccountId     = local.account_id
+    TerraformPath = basename(abspath(path.root))
+  })
+}
+
+
+
+# Networking infrastructure (VPC, subnets, gateways)
+module "networking" {
+  source = "./modules/networking"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Network configuration
+  vpc_cidr             = var.vpc_cidr
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  private_subnet_cidrs = var.private_subnet_cidrs
+  
+  # Features
+  enable_nat_gateway   = var.enable_nat_gateway
+  enable_flow_logs     = var.enable_flow_logs
+  enable_dns_hostnames = var.enable_dns_hostnames
+  enable_dns_support   = var.enable_dns_support
+  
+  # Tags
+  common_tags = local.common_tags
+}
+module "admin_portal_web_server" {
+  source = "./modules/admin-portal-web-server"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Lambda configuration
+  runtime     = var.lambda_runtime
+  timeout     = var.lambda_timeout
+  memory_size = var.lambda_memory_size
+  
+  # Function URL configuration
+  enable_function_url = var.enable_lambda_function_urls
+  
+  # S3 configuration for React build files
+  portal_bucket_name = local.admin_portal_bucket_name
+  
+  # Backend API URL (placeholder - will be updated via API Gateway)
+  admin_backend_url = "/api/v1"  # Relative URL - API Gateway will handle routing
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.networking]
+}
+
+# Admin Backend Lambda (API endpoints)
+module "admin_backend" {
+  source = "./modules/admin-backend"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Lambda configuration
+  runtime     = var.lambda_runtime
+  timeout     = var.lambda_timeout
+  memory_size = var.lambda_memory_size
+  
+  # Function URL configuration  
+  enable_function_url = var.enable_lambda_function_urls
+  
+  # Local DynamoDB table names (independent of admin-account-iac)
+  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  step_functions_arn         = var.step_functions_arn
+  
+  # Step Functions ARNs for tenant lifecycle management
+  create_tenant_step_function_arn = var.create_tenant_step_function_arn
+  delete_tenant_step_function_arn = var.delete_tenant_step_function_arn
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.networking]
+}
+
+# Worker Lambda Functions for Infrastructure Operations
+module "create_infra_worker" {
+  source = "./modules/create-infra-worker"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Lambda configuration
+  runtime     = var.lambda_runtime
+  timeout     = 300  # 5 minutes for infrastructure operations
+  memory_size = 512
+  
+  # DynamoDB table for tenant registry
+  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  tenant_public_table_name   = var.tenant_public_table_name
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.networking]
+}
+
+module "delete_infra_worker" {
+  source = "./modules/delete-infra-worker"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Lambda configuration
+  runtime     = var.lambda_runtime
+  timeout     = 300  # 5 minutes for infrastructure operations
+  memory_size = 512
+  
+  # DynamoDB table for tenant registry
+  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.networking]
+}
+
+module "poll_infra_worker" {
+  source = "./modules/poll-infra-worker"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Lambda configuration
+  runtime     = var.lambda_runtime
+  timeout     = 60   # 1 minute for polling operations
+  memory_size = 256
+  
+  # DynamoDB table for tenant registry
+  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.networking]
+}
+
+# Private API Gateway for application access
+module "api_gateway" {
+  count  = var.enable_api_gateway ? 1 : 0
+  source = "./modules/api-gateway"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # API Gateway configuration
+  stage_name        = var.api_gateway_stage_name
+  api_gateway_type  = var.api_gateway_type
+  
+  # VPC Endpoint for private API Gateway access (only needed for PRIVATE type)
+  vpc_endpoint_id = var.api_gateway_type == "PRIVATE" ? module.vpc_endpoints.vpc_endpoint_ids["execute-api"] : null
+  
+  # Lambda integrations
+  admin_portal_lambda_invoke_arn      = module.admin_portal_web_server.lambda_function_invoke_arn
+  admin_backend_lambda_invoke_arn     = module.admin_backend.lambda_function_invoke_arn
+  admin_portal_lambda_function_name   = module.admin_portal_web_server.lambda_function_name
+  admin_backend_lambda_function_name  = module.admin_backend.lambda_function_name
+  
+  # Tags
+  common_tags = local.common_tags
+}
+#   common_tags = local.common_tags
+# }
+
+# VPC Endpoints for AWS services (private access)
+module "vpc_endpoints" {
+  source = "./modules/vpc-endpoints"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # VPC configuration from new networking module
+  vpc_id             = module.networking.vpc_id
+  private_subnet_ids = module.networking.private_subnet_ids
+  
+  # VPC endpoint services to create
+  vpc_endpoint_services = var.vpc_endpoint_services
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.networking]
+}
+
+# S3 bucket for React build files
+resource "aws_s3_bucket" "admin_portal" {
+  bucket        = local.admin_portal_bucket_name
+  force_destroy = var.environment == "dev" ? true : false
+
+  tags = merge(local.common_tags, {
+    Name        = "${local.name_prefix}-admin-portal"
+    Purpose     = "Admin Portal React Build Files"
+    Type        = "S3Bucket"
+  })
+}
+
+resource "aws_s3_bucket_versioning" "admin_portal" {
+  bucket = aws_s3_bucket.admin_portal.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "admin_portal" {
+  bucket = aws_s3_bucket.admin_portal.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "admin_portal" {
+  bucket = aws_s3_bucket.admin_portal.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}

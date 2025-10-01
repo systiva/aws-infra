@@ -1,0 +1,24 @@
+{
+  "name": "admin-portal-web-server",
+  "version": "1.0.0",
+  "description": "A simple web server for serving static files from S3 in an AWS Lambda function.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1234.0",
+    "serverless-http": "^2.7.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.4",
+    "mocha": "^8.4.0",
+    "pino": "^7.0.0",
+    "pino-http": "^6.0.0",
+    "pino-pretty": "^6.0.0",
+    "faker": "^5.5.3"
+  },
+  "author": "",
+  "license": "ISC"
+}
