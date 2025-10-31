@@ -34,6 +34,13 @@ resource "random_id" "suffix" {
   byte_length = 4
 }
 
+# Generate random JWT signing key for enhanced tokens
+resource "random_password" "jwt_signing_key" {
+  count   = var.enable_ims_service && var.enable_cognito ? 1 : 0
+  length  = 64
+  special = true
+}
+
 # Data sources
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -227,6 +234,11 @@ module "api_gateway" {
   admin_portal_lambda_function_name   = module.admin_portal_web_server.lambda_function_name
   admin_backend_lambda_function_name  = module.admin_backend.lambda_function_name
   
+  # JWT Authorizer configuration
+  enable_jwt_authorizer                   = var.enable_jwt_authorizer && var.enable_cognito
+  jwt_authorizer_lambda_invoke_arn       = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_invoke_arn : ""
+  jwt_authorizer_lambda_function_name    = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_name : ""
+  
   # Tags
   common_tags = local.common_tags
 }
@@ -290,4 +302,126 @@ resource "aws_s3_bucket_public_access_block" "admin_portal" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+# ==============================================
+# Identity Management System Components
+# ==============================================
+
+# Cognito User Pool for Authentication
+module "cognito" {
+  count  = var.enable_cognito ? 1 : 0
+  source = "./modules/cognito"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Cognito configuration
+  admin_create_user_only           = var.cognito_admin_create_user_only
+  access_token_validity_minutes    = var.cognito_access_token_validity_minutes
+  id_token_validity_minutes        = var.cognito_id_token_validity_minutes
+  refresh_token_validity_days      = var.cognito_refresh_token_validity_days
+  callback_urls                    = var.cognito_callback_urls
+  logout_urls                      = var.cognito_logout_urls
+  
+  # Tags
+  common_tags = local.common_tags
+}
+
+# JWT Authorizer Lambda
+module "jwt_authorizer" {
+  count  = var.enable_jwt_authorizer && var.enable_cognito ? 1 : 0
+  source = "./modules/jwt-authorizer"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Cognito configuration
+  user_pool_id        = module.cognito[0].user_pool_id
+  user_pool_arn       = module.cognito[0].user_pool_arn
+  user_pool_client_id = module.cognito[0].user_pool_client_id
+  jwt_signing_key     = random_password.jwt_signing_key[0].result
+  
+  # Lambda configuration
+  lambda_zip_path     = "${path.root}/lambda-packages/jwt-authorizer.zip"
+  runtime             = var.lambda_runtime
+  timeout             = var.lambda_timeout
+  memory_size         = 256
+  log_retention_days  = var.log_retention_days
+  log_level          = var.jwt_authorizer_log_level
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.cognito]
+}
+
+# Identity Management Service (IMS) Lambda
+module "ims_service" {
+  count  = var.enable_ims_service && var.enable_cognito ? 1 : 0
+  source = "./modules/ims-service"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Lambda configuration
+  lambda_zip_path   = "${path.root}/lambda-packages/ims-service.zip"
+  handler           = "index.handler"
+  runtime           = var.lambda_runtime
+  timeout           = var.ims_lambda_timeout
+  memory_size       = var.ims_lambda_memory_size
+  log_retention_days = var.log_retention_days
+  log_level         = var.ims_log_level
+  
+  # Function URL configuration
+  enable_function_url = var.enable_lambda_function_urls
+  
+  # Cognito configuration
+  user_pool_id        = module.cognito[0].user_pool_id
+  user_pool_arn       = module.cognito[0].user_pool_arn
+  user_pool_client_id = module.cognito[0].user_pool_client_id
+  user_pool_client_secret = module.cognito[0].user_pool_client_secret
+  jwt_signing_key     = random_password.jwt_signing_key[0].result
+  
+  # DynamoDB configuration
+  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  tenant_registry_table_arn  = "arn:aws:dynamodb:${local.region}:${local.account_id}:table/${var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"}"
+  
+  # VPC configuration (optional)
+  vpc_config = null  # Can be configured later if VPC access is needed
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.cognito, module.networking]
+}
+
+# Platform Bootstrap (Platform Admin User + RBAC Setup)
+module "platform_bootstrap" {
+  count  = var.enable_platform_bootstrap && var.enable_cognito ? 1 : 0
+  source = "./modules/platform-bootstrap"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Cognito configuration
+  user_pool_id = module.cognito[0].user_pool_id
+  
+  # DynamoDB configuration (using tenant registry table)
+  rbac_table_name      = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  rbac_table_hash_key  = "PK"
+  rbac_table_range_key = "SK"
+  
+  # Platform admin configuration
+  platform_admin_email = var.platform_admin_email
+  temporary_password    = var.temporary_password
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.cognito]
 }

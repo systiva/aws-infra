@@ -6,6 +6,131 @@ output "vpc_id" {
   value       = module.networking.vpc_id
 }
 
+# ==============================================
+# Identity Management System Outputs
+# ==============================================
+
+# Cognito Outputs
+output "cognito_user_pool_id" {
+  description = "ID of the Cognito User Pool"
+  value       = var.enable_cognito ? module.cognito[0].user_pool_id : null
+}
+
+output "cognito_user_pool_arn" {
+  description = "ARN of the Cognito User Pool"
+  value       = var.enable_cognito ? module.cognito[0].user_pool_arn : null
+}
+
+output "cognito_user_pool_client_id" {
+  description = "ID of the Cognito User Pool Client"
+  value       = var.enable_cognito ? module.cognito[0].user_pool_client_id : null
+}
+
+output "cognito_user_pool_domain" {
+  description = "Domain of the Cognito User Pool"
+  value       = var.enable_cognito ? module.cognito[0].user_pool_domain : null
+}
+
+output "cognito_hosted_ui_url" {
+  description = "URL of the Cognito Hosted UI"
+  value       = var.enable_cognito ? module.cognito[0].user_pool_hosted_ui_url : null
+}
+
+output "cognito_jwks_url" {
+  description = "URL for JWT verification keys"
+  value       = var.enable_cognito ? module.cognito[0].user_pool_jwks_url : null
+}
+
+# JWT Authorizer Outputs
+output "jwt_authorizer_function_arn" {
+  description = "ARN of the JWT Authorizer Lambda function"
+  value       = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_arn : null
+}
+
+output "jwt_authorizer_function_name" {
+  description = "Name of the JWT Authorizer Lambda function"
+  value       = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_name : null
+}
+
+# IMS Service Outputs
+output "ims_service_function_arn" {
+  description = "ARN of the IMS Service Lambda function"
+  value       = var.enable_ims_service && var.enable_cognito ? module.ims_service[0].lambda_function_arn : null
+}
+
+output "ims_service_function_name" {
+  description = "Name of the IMS Service Lambda function"
+  value       = var.enable_ims_service && var.enable_cognito ? module.ims_service[0].lambda_function_name : null
+}
+
+output "ims_service_function_url" {
+  description = "Function URL of the IMS Service Lambda (if enabled)"
+  value       = var.enable_ims_service && var.enable_cognito && var.enable_lambda_function_urls ? module.ims_service[0].lambda_function_url : null
+}
+
+# ==============================================
+# Platform Bootstrap Outputs
+# ==============================================
+
+# Platform Admin Credentials
+output "platform_admin_username" {
+  description = "Username of the default platform administrator"
+  value       = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_username : null
+}
+
+output "platform_admin_password" {
+  description = "Password of the default platform administrator"
+  value       = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_password : null
+  sensitive   = true
+}
+
+output "platform_admin_email" {
+  description = "Email of the default platform administrator"
+  value       = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_email : null
+}
+
+output "platform_admin_user_id" {
+  description = "Cognito User ID (UUID) of the default platform administrator"
+  value       = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_cognito_user_id : null
+}
+
+# RBAC Setup Summary
+output "rbac_setup_summary" {
+  description = "Summary of RBAC configuration"
+  value       = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].rbac_setup_summary : null
+}
+
+# Deployment Summary (Updated)
+output "deployment_summary" {
+  description = "Summary of deployed resources"
+  value = {
+    vpc_created               = module.networking.vpc_id
+    lambda_functions_deployed = concat([
+      module.admin_portal_web_server.lambda_function_name,
+      module.admin_backend.lambda_function_name,
+      module.create_infra_worker.lambda_function_name,
+      module.delete_infra_worker.lambda_function_name,
+      module.poll_infra_worker.lambda_function_name
+    ], 
+    var.enable_jwt_authorizer && var.enable_cognito ? [module.jwt_authorizer[0].lambda_function_name] : [],
+    var.enable_ims_service && var.enable_cognito ? [module.ims_service[0].lambda_function_name] : []
+    )
+    access_url = var.enable_lambda_function_urls ? module.admin_portal_web_server.function_url : "No public access configured"
+    tenant_registry_table = var.tenant_registry_table_name
+    rbac_table = var.tenant_registry_table_name
+    vpc_endpoints_created = module.vpc_endpoints.endpoint_services_created
+    architecture_type = "Independent Lambda-based with Identity Management and JWT Authorization"
+    identity_management = var.enable_cognito ? {
+      cognito_user_pool_id = module.cognito[0].user_pool_id
+      ims_service_enabled = var.enable_ims_service
+      jwt_authorizer_enabled = var.enable_jwt_authorizer
+      rbac_enabled = true
+      platform_admin_created = var.enable_platform_bootstrap
+      rbac_table_shared = "Using tenant registry table for RBAC data"
+    } : null
+  }
+}
+
 output "vpc_cidr_block" {
   description = "CIDR block of the VPC"
   value       = module.networking.vpc_cidr_block
@@ -122,13 +247,22 @@ output "infrastructure_summary" {
     vpc_id                = module.networking.vpc_id
     private_subnet_ids    = module.networking.private_subnet_ids
     tenant_registry_table = var.tenant_registry_table_name
+    rbac_table           = var.tenant_registry_table_name  # Same table used for RBAC
     lambda_functions      = {
       admin_portal        = module.admin_portal_web_server.lambda_function_name
       admin_backend       = module.admin_backend.lambda_function_name
       create_infra_worker = module.create_infra_worker.lambda_function_name
       delete_infra_worker = module.delete_infra_worker.lambda_function_name
       poll_infra_worker   = module.poll_infra_worker.lambda_function_name
+      ims_service         = var.enable_ims_service && var.enable_cognito ? module.ims_service[0].lambda_function_name : null
+      jwt_authorizer      = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_name : null
     }
+    identity_services = var.enable_cognito ? {
+      cognito_user_pool_id = module.cognito[0].user_pool_id
+      platform_admin_created = var.enable_platform_bootstrap
+      rbac_system_ready = true
+      rbac_table_shared = "RBAC data stored in tenant registry table"
+    } : null
   }
 }
 
@@ -137,28 +271,38 @@ output "resource_counts" {
   description = "Count of resources by type"
   value = {
     networking_resources  = "15+ (VPC, subnets, gateways, route tables, security groups)"
-    lambda_functions     = 5  # Updated count
+    lambda_functions     = var.enable_cognito ? (var.enable_ims_service && var.enable_jwt_authorizer ? 7 : 6) : 5
     s3_buckets           = 2
     vpc_endpoints        = length(var.vpc_endpoint_services)
-    dynamodb_tables      = "Created in bootstrap"
+    dynamodb_tables      = 1  # Tenant registry table (also used for RBAC)
+    cognito_user_pools   = var.enable_cognito ? 1 : 0
+    cognito_users        = var.enable_platform_bootstrap ? 1 : 0
+    rbac_entries         = var.enable_platform_bootstrap ? "32+ (Groups, Roles, Permissions, Mappings)" : 0
   }
 }
 
-# Deployment Summary
-output "deployment_summary" {
-  description = "Summary of deployed resources and access information"
-  value = {
-    vpc_created               = module.networking.vpc_id
-    lambda_functions_deployed = [
-      module.admin_portal_web_server.lambda_function_name,
-      module.admin_backend.lambda_function_name,
-      module.create_infra_worker.lambda_function_name,
-      module.delete_infra_worker.lambda_function_name,
-      module.poll_infra_worker.lambda_function_name
+# ==============================================
+# Platform Admin Quick Start Information
+# ==============================================
+
+output "platform_admin_quick_start" {
+  description = "Quick start information for platform administrator"
+  value = var.enable_platform_bootstrap && var.enable_cognito ? {
+    message = "Platform administrator user has been created successfully!"
+    login_instructions = {
+      step_1 = "Use the username and password provided in the outputs"
+      step_2 = "Access the admin portal via the provided URL"
+      step_3 = "Login with the platform admin credentials"
+      step_4 = "You will have full platform administration capabilities"
+    }
+    admin_capabilities = [
+      "Tenant onboarding and offboarding",
+      "Tenant suspension and reactivation", 
+      "Tenant super-admin management",
+      "Platform-wide governance",
+      "User and role management"
     ]
-    access_url = var.enable_lambda_function_urls ? module.admin_portal_web_server.function_url : "No public access configured"
-    tenant_registry_table = var.tenant_registry_table_name
-    vpc_endpoints_created = module.vpc_endpoints.endpoint_services_created
-    architecture_type = "Independent Lambda-based with Step Functions orchestration"
-  }
+    rbac_storage = "RBAC data stored in tenant registry table (single-table design)"
+    security_note = "Please change the default password after first login for security"
+  } : null
 }

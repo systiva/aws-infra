@@ -1,0 +1,371 @@
+# Multi-Tenant POC CI/CD Pipeline
+# Automated deployment pipeline using Make for tool-agnostic execution
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: 
+      - main
+      - develop
+      - sso
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  pull_request:
+    branches: 
+      - main
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
+      skip_tests:
+        description: 'Skip tests (for hotfixes)'
+        required: false
+        default: false
+        type: boolean
+
+# Environment variables
+env:
+  AWS_REGION: us-east-1
+  NODE_VERSION: '18'
+  TERRAFORM_VERSION: '1.5.7'
+
+jobs:
+  # ============================================================================
+  # Determine environment and setup
+  # ============================================================================
+  setup:
+    name: 🔧 Setup & Environment Detection
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env-detection.outputs.environment }}
+      should_deploy: ${{ steps.env-detection.outputs.should_deploy }}
+      aws_profile: ${{ steps.env-detection.outputs.aws_profile }}
+    steps:
+      - name: Determine environment
+        id: env-detection
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENV="prod"
+          elif [ "${{ github.ref }}" = "refs/heads/develop" ] || [ "${{ github.ref }}" = "refs/heads/sso" ]; then
+            ENV="dev"
+          else
+            ENV="dev"
+          fi
+          
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          
+          # Determine if we should deploy (not on PRs unless manual)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          fi
+          
+          # Set AWS profile based on environment
+          if [ "${ENV}" = "prod" ]; then
+            echo "aws_profile=fct_fct.admin" >> $GITHUB_OUTPUT
+          else
+            echo "aws_profile=fct_fct.admin" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "🎯 Detected environment: ${ENV}"
+          echo "🚀 Should deploy: ${{ github.event_name != 'pull_request' }}"
+
+  # ============================================================================
+  # Continuous Integration (CI) - Build and Test
+  # ============================================================================
+  ci:
+    name: 🔨 Continuous Integration
+    runs-on: ubuntu-latest
+    needs: setup
+    env:
+      ENV: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for versioning
+
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            admin-portal-fe/package-lock.json
+            admin-portal-be/package-lock.json
+            ims-service/package-lock.json
+            create-infra-worker/package-lock.json
+            delete-infra-worker/package-lock.json
+            poll-infra-worker/package-lock.json
+            jwt-authorizer/package-lock.json
+            admin-portal-web-server/package-lock.json
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: 🛠️ Setup Make and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+          make --version
+
+      - name: 🏃‍♂️ CI Build Pipeline
+        run: |
+          if [ "${{ github.event.inputs.skip_tests }}" = "true" ]; then
+            echo "⚠️ Skipping tests as requested"
+            make setup install lint build package ENV=${{ env.ENV }}
+          else
+            make ci-build ENV=${{ env.ENV }}
+          fi
+
+      - name: 📦 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ needs.setup.outputs.environment }}
+          path: |
+            admin-portal-fe/build/
+            admin-portal-iac/lambda-packages/
+            admin-portal-iac/frontend-*.tar.gz
+          retention-days: 7
+
+      - name: 🧪 Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ needs.setup.outputs.environment }}
+          path: |
+            admin-portal-be/coverage/
+            ims-service/coverage/
+            **/test-results.xml
+          retention-days: 7
+
+  # ============================================================================
+  # Security Scanning
+  # ============================================================================
+  security:
+    name: 🔒 Security Scanning
+    runs-on: ubuntu-latest
+    needs: [setup, ci]
+    if: always() && (needs.ci.result == 'success' || needs.ci.result == 'skipped')
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 🔍 Run npm audit
+        run: |
+          echo "🔍 Running security audit for all components..."
+          
+          # Frontend audit
+          cd admin-portal-fe && npm audit --audit-level moderate || true
+          
+          # Backend audit  
+          cd ../admin-portal-be && npm audit --audit-level moderate || true
+          
+          # IMS service audit
+          cd ../ims-service && npm audit --audit-level moderate || true
+          
+          echo "✅ Security audit completed"
+
+      - name: 🛡️ Terraform security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'admin-portal-iac/'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: 📋 Upload security scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+  # ============================================================================
+  # Continuous Deployment (CD) - Deploy to Environment
+  # ============================================================================
+  cd:
+    name: 🚀 Continuous Deployment
+    runs-on: ubuntu-latest
+    needs: [setup, ci, security]
+    if: needs.setup.outputs.should_deploy == 'true' && needs.ci.result == 'success'
+    environment: 
+      name: ${{ needs.setup.outputs.environment }}
+      url: ${{ steps.deploy.outputs.web_url }}
+    env:
+      ENV: ${{ needs.setup.outputs.environment }}
+      AWS_PROFILE: ${{ needs.setup.outputs.aws_profile }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: 📦 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ env.ENV }}
+
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🚀 Deploy to ${{ env.ENV }}
+        id: deploy
+        run: |
+          echo "🚀 Starting deployment to ${{ env.ENV }} environment..."
+          
+          # Run deployment
+          make cd-deploy ENV=${{ env.ENV }}
+          
+          # Capture outputs
+          cd admin-portal-iac
+          WEB_URL=$(terraform output -raw web_server_url 2>/dev/null || echo "Not available")
+          API_URL=$(terraform output -raw api_gateway_url 2>/dev/null || echo "Not available")
+          
+          echo "web_url=${WEB_URL}" >> $GITHUB_OUTPUT
+          echo "api_url=${API_URL}" >> $GITHUB_OUTPUT
+          
+          echo "✅ Deployment completed successfully!"
+          echo "🌐 Web URL: ${WEB_URL}"
+          echo "🔗 API URL: ${API_URL}"
+
+      - name: 🔍 Post-deployment verification
+        run: |
+          echo "🔍 Running post-deployment verification..."
+          make verify ENV=${{ env.ENV }}
+
+      - name: 📊 Generate deployment summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🚀 Deployment Summary
+          
+          **Environment:** \`${{ env.ENV }}\`
+          **Version:** \`$(git rev-parse --short HEAD)\`
+          **Timestamp:** \`$(date -u)\`
+          
+          ### 🌐 Access URLs
+          - **Web Application:** ${{ steps.deploy.outputs.web_url }}
+          - **API Gateway:** ${{ steps.deploy.outputs.api_url }}
+          
+          ### 📦 Components Deployed
+          - ✅ Frontend (React TypeScript)
+          - ✅ Backend API (Node.js/Express)  
+          - ✅ IMS Service (Identity Management)
+          - ✅ Web Server (Lambda)
+          - ✅ Worker Functions (4 Lambda functions)
+          - ✅ Infrastructure (Terraform)
+          
+          ### 🎯 Next Steps
+          - Monitor application health
+          - Review CloudWatch logs
+          - Validate tenant operations
+          EOF
+
+  # ============================================================================
+  # Rollback (Manual trigger only)
+  # ============================================================================
+  rollback:
+    name: 🔄 Rollback Deployment
+    runs-on: ubuntu-latest
+    if: failure() && github.event_name == 'workflow_dispatch'
+    needs: [setup, cd]
+    environment: 
+      name: ${{ needs.setup.outputs.environment }}-rollback
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔄 Execute rollback
+        run: |
+          echo "🔄 Starting rollback procedure..."
+          echo "⚠️ Manual intervention required for rollback"
+          echo "📋 Please review the following:"
+          echo "1. Check Terraform state"
+          echo "2. Verify backup availability"
+          echo "3. Coordinate with team"
+          
+          # Add specific rollback logic here if needed
+          # This is a placeholder for rollback procedures
+
+  # ============================================================================
+  # Cleanup (Runs on schedule or manual trigger)
+  # ============================================================================
+  cleanup:
+    name: 🧹 Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'cleanup')
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🧹 Clean up old artifacts
+        run: |
+          echo "🧹 Cleaning up old build artifacts..."
+          # This would contain logic to clean up old S3 objects, 
+          # ECR images, etc. based on retention policies
+          echo "✅ Cleanup completed"
+
+# ============================================================================
+# Workflow Configuration
+# ============================================================================
+
+# Concurrency control - cancel previous runs on new push
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

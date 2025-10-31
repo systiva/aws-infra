@@ -57,3 +57,22 @@ variable "common_tags" {
   type        = map(string)
   default     = {}
 }
+
+# JWT Authorizer Configuration
+variable "enable_jwt_authorizer" {
+  description = "Enable JWT authorizer for API Gateway"
+  type        = bool
+  default     = false
+}
+
+variable "jwt_authorizer_lambda_invoke_arn" {
+  description = "Invoke ARN for JWT authorizer Lambda function"
+  type        = string
+  default     = ""
+}
+
+variable "jwt_authorizer_lambda_function_name" {
+  description = "Name of the JWT authorizer Lambda function"
+  type        = string
+  default     = ""
+}

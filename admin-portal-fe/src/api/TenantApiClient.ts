@@ -60,6 +60,35 @@ export class TenantApiClient {
     }
   }
 
+  async fetchTenantsWithAuth(token: string): Promise<TenantData[]> {
+    try {
+      const response = await this.makeRequest<BackendResponse<TenantsListResponse>>(
+        `${API_BASE_URL}/tenants`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      return response.data.tenants;
+    } catch (error) {
+      console.error('Error fetching tenants with auth:', error);
+      throw error;
+    }
+  }
+
+  async fetchTenantDetails(tenantId: string): Promise<TenantData> {
+    try {
+      const response = await this.makeRequest<BackendResponse<TenantData>>(
+        `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching tenant details:', error);
+      throw error;
+    }
+  }
+
   async updateTenant(tenantId: string, updateData: Partial<TenantData>): Promise<TenantData> {
     try {
       const response = await this.makeRequest<BackendResponse<TenantData>>(

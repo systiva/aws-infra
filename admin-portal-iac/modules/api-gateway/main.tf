@@ -108,6 +108,73 @@ resource "aws_api_gateway_deployment" "admin_api" {
   ]
 }
 
+# JWT Authorizer for API Gateway (optional)
+resource "aws_api_gateway_authorizer" "jwt_authorizer" {
+  count                            = var.enable_jwt_authorizer ? 1 : 0
+  name                            = "${local.api_name}-jwt-authorizer"
+  rest_api_id                     = aws_api_gateway_rest_api.admin_api.id
+  authorizer_uri                  = var.jwt_authorizer_lambda_invoke_arn
+  authorizer_credentials          = aws_iam_role.api_gateway_jwt_authorizer_role[0].arn
+  type                           = "REQUEST"
+  identity_source                = "method.request.header.Authorization"
+  authorizer_result_ttl_in_seconds = 300  # 5 minutes cache
+}
+
+# IAM role for API Gateway to invoke JWT authorizer Lambda
+resource "aws_iam_role" "api_gateway_jwt_authorizer_role" {
+  count = var.enable_jwt_authorizer ? 1 : 0
+  name  = "${local.api_name}-jwt-authorizer-invoke-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "apigateway.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    Name        = "${local.api_name}-jwt-authorizer-invoke-role"
+    Component   = "Authorization"
+    Purpose     = "API Gateway JWT Authorizer Invocation"
+  })
+}
+
+# IAM policy for API Gateway to invoke JWT authorizer Lambda
+resource "aws_iam_role_policy" "api_gateway_jwt_authorizer_policy" {
+  count = var.enable_jwt_authorizer ? 1 : 0
+  name  = "${local.api_name}-jwt-authorizer-invoke-policy"
+  role  = aws_iam_role.api_gateway_jwt_authorizer_role[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = var.jwt_authorizer_lambda_invoke_arn
+      }
+    ]
+  })
+}
+
+# Lambda permission for API Gateway to invoke JWT authorizer
+resource "aws_lambda_permission" "jwt_authorizer_permission" {
+  count         = var.enable_jwt_authorizer ? 1 : 0
+  statement_id  = "AllowAPIGatewayInvokeJWTAuthorizer"
+  action        = "lambda:InvokeFunction"
+  function_name = var.jwt_authorizer_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*"
+}
+
 # Resources and methods for web server (root path and proxy)
 
 # Root resource method (/)

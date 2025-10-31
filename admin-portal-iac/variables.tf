@@ -261,3 +261,112 @@ variable "admin_account_state_key" {
   type        = string
   default     = "admin-account-iac/terraform.tfstate"
 }
+
+# ==============================================
+# Identity Management System Configuration
+# ==============================================
+
+# Cognito Configuration
+variable "enable_cognito" {
+  description = "Enable Cognito User Pool for authentication"
+  type        = bool
+  default     = true
+}
+
+variable "cognito_admin_create_user_only" {
+  description = "Only allow administrators to create users in Cognito"
+  type        = bool
+  default     = true
+}
+
+variable "cognito_access_token_validity_minutes" {
+  description = "Access token validity in minutes"
+  type        = number
+  default     = 60  # 1 hour
+}
+
+variable "cognito_id_token_validity_minutes" {
+  description = "ID token validity in minutes"
+  type        = number
+  default     = 60  # 1 hour
+}
+
+variable "cognito_refresh_token_validity_days" {
+  description = "Refresh token validity in days"
+  type        = number
+  default     = 30  # 30 days
+}
+
+variable "cognito_callback_urls" {
+  description = "List of allowed callback URLs for OAuth"
+  type        = list(string)
+  default     = []
+}
+
+variable "cognito_logout_urls" {
+  description = "List of allowed logout URLs for OAuth"
+  type        = list(string)
+  default     = []
+}
+
+# JWT Authorizer Configuration
+variable "enable_jwt_authorizer" {
+  description = "Enable JWT Authorizer Lambda for API Gateway"
+  type        = bool
+  default     = true
+}
+
+variable "jwt_authorizer_log_level" {
+  description = "Log level for JWT Authorizer"
+  type        = string
+  default     = "INFO"
+}
+
+# IMS (Identity Management Service) Configuration
+variable "enable_ims_service" {
+  description = "Enable Identity Management Service Lambda"
+  type        = bool
+  default     = true
+}
+
+variable "ims_lambda_timeout" {
+  description = "IMS Lambda timeout in seconds"
+  type        = number
+  default     = 30
+}
+
+variable "ims_lambda_memory_size" {
+  description = "IMS Lambda memory size in MB"
+  type        = number
+  default     = 512
+}
+
+variable "ims_log_level" {
+  description = "Log level for IMS Service"
+  type        = string
+  default     = "INFO"
+}
+
+# ==============================================
+# Platform Bootstrap Configuration
+# ==============================================
+
+# Platform Bootstrap Configuration
+variable "enable_platform_bootstrap" {
+  description = "Enable platform admin user creation and RBAC bootstrap"
+  type        = bool
+  default     = true
+}
+
+variable "platform_admin_email" {
+  description = "Email address for the platform admin user"
+  type        = string
+  default     = "demo_platform_admin@platform.com"
+}
+
+variable "temporary_password" {
+  description = "Temporary password for platform admin user"
+  type        = string
+  sensitive   = true
+  default     = "TempPass123!"
+}

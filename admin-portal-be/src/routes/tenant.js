@@ -110,4 +110,18 @@ router.post('/complete-provisioning/:tenantId', async (req, res, next) => {
   }
 });
 
+// GET /:tenantId - Get individual tenant details
+router.get('/:tenantId', async (req, res, next) => {
+  try {
+    const tenantId = req.params.tenantId;
+    Logger.debug({ tenantId }, 'GET /:tenantId - Getting tenant details');
+    const serviceRes = await TenantService.getTenantDetails(tenantId);
+    Logger.debug(serviceRes, 'GET /:tenantId - Service response');
+    res.status(serviceRes.status).json(serviceRes.json);
+  } catch (error) {
+    Logger.error(error, 'GET /:tenantId - Error occurred');
+    next(error);
+  }
+});
+
 module.exports = router;
