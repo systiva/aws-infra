@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TenantApiClient } from '../api/TenantApiClient';
 import { TenantData } from '../models/TenantModel';
+import { useAuth } from '../contexts/AuthContext';
 import './TenantInfoOverlay.css';
 
 interface TenantInfoOverlayProps {
@@ -17,6 +18,7 @@ export const TenantInfoOverlay: React.FC<TenantInfoOverlayProps> = ({
   const [tenantData, setTenantData] = useState<TenantData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { state } = useAuth();
 
   useEffect(() => {
     if (isOpen && tenantId) {
@@ -49,7 +51,8 @@ export const TenantInfoOverlay: React.FC<TenantInfoOverlayProps> = ({
 
     try {
       const apiClient = TenantApiClient.getInstance();
-      const data = await apiClient.fetchTenantDetails(tenantId);
+      const token = state.tokens?.accessToken;
+      const data = await apiClient.fetchTenantDetails(tenantId, token);
       setTenantData(data);
     } catch (error) {
       console.error('Failed to fetch tenant details:', error);

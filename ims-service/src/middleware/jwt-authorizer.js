@@ -1,15 +1,26 @@
 const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-client').default || require('jwks-client');
 const config = require('../../config');
 const logger = require('../../logger');
 
-// Initialize JWKS client for Cognito tokens
-const client = jwksClient({
-  jwksUri: `https://cognito-idp.${config.AWS_REGION}.amazonaws.com/${config.USER_POOL_ID}/.well-known/jwks.json`,
-  cache: true,
-  cacheMaxEntries: 10,
-  cacheMaxAge: 600000 // 10 minutes
-});
+// JWKS client will be initialized lazily using dynamic import
+let jwksClientInstance = null;
+
+/**
+ * Get or initialize JWKS client using dynamic import
+ * This handles the ES Module compatibility issue with jwks-client
+ */
+async function getJwksClient() {
+  if (!jwksClientInstance) {
+    const { default: jwksClient } = await import('jwks-client');
+    jwksClientInstance = jwksClient({
+      jwksUri: `https://cognito-idp.${config.AWS_REGION}.amazonaws.com/${config.USER_POOL_ID}/.well-known/jwks.json`,
+      cache: true,
+      cacheMaxEntries: 10,
+      cacheMaxAge: 600000 // 10 minutes
+    });
+  }
+  return jwksClientInstance;
+}
 
 /**
  * JWT Authorizer Middleware for local development
@@ -220,6 +231,7 @@ function extractToken(req) {
  * Get signing key from JWKS
  */
 async function getSigningKey(kid) {
+  const client = await getJwksClient();
   return new Promise((resolve, reject) => {
     client.getSigningKey(kid, (err, key) => {
       if (err) {

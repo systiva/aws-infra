@@ -11,6 +11,8 @@ export const TenantRegistration: React.FC = () => {
     tenantName: '',
     email: '',
     subscriptionTier: 'public',
+    firstName: '',
+    lastName: '',
     createdBy: 'admin'
   });
 
@@ -68,6 +70,43 @@ export const TenantRegistration: React.FC = () => {
                 placeholder="admin@company.com"
               />
             </label>
+          </div>
+
+          <div className="admin-section">
+            <h3>Admin User Details</h3>
+            <p className="admin-info">These details will be used to create the tenant administrator account.</p>
+            
+            <div className="form-row">
+              <div className="form-section half-width">
+                <label className="field-label">
+                  Admin First Name
+                  <input
+                    type="text"
+                    className="field-input"
+                    value={registrationData.firstName}
+                    onChange={(e) => handleFieldChange('firstName', e.target.value)}
+                    required
+                    disabled={isSubmitting}
+                    placeholder="John"
+                  />
+                </label>
+              </div>
+
+              <div className="form-section half-width">
+                <label className="field-label">
+                  Admin Last Name
+                  <input
+                    type="text"
+                    className="field-input"
+                    value={registrationData.lastName}
+                    onChange={(e) => handleFieldChange('lastName', e.target.value)}
+                    required
+                    disabled={isSubmitting}
+                    placeholder="Doe"
+                  />
+                </label>
+              </div>
+            </div>
           </div>
 
           <div className="form-section">

@@ -45,7 +45,7 @@ provider:
 
 functions:
   app:
-    handler: lambda.handler
+    handler: index.handler
     events:
       - http:
           path: /

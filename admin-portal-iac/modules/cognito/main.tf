@@ -88,6 +88,20 @@ resource "aws_cognito_user_pool" "admin_portal" {
     }
   }
 
+  # Custom attributes schema
+  schema {
+    attribute_data_type = "String"
+    name                = "tenant_id"
+    developer_only_attribute = false
+    mutable             = true
+    required            = false
+
+    string_attribute_constraints {
+      min_length = 1
+      max_length = 256
+    }
+  }
+
   # Custom attributes - managed externally to avoid Cognito schema modification errors
   # Schema changes are ignored via lifecycle rule to prevent deployment issues
   
@@ -110,9 +124,9 @@ resource "aws_cognito_user_pool" "admin_portal" {
   })
 
   lifecycle {
-    prevent_destroy = true
-    # Ignore schema changes to prevent Cognito errors
-    ignore_changes = [schema]
+    # prevent_destroy = true
+    # Allow schema changes to create custom attributes
+    # ignore_changes = [schema]  # Commented out to allow custom attribute creation
   }
 }
 
@@ -169,20 +183,16 @@ resource "aws_cognito_user_pool_client" "admin_portal_client" {
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
 
-  # Read/write attributes
+  # Read/write attributes - including custom tenant_id
   read_attributes = [
     "email",
     "email_verified",
-    "custom:tenant_id",
-    "custom:user_role",     # DEPRECATED: Ignore in application logic
-    "custom:permissions",   # DEPRECATED: Ignore in application logic
+    "custom:tenant_id"
   ]
 
   write_attributes = [
     "email",
-    "custom:tenant_id",
-    "custom:user_role",     # DEPRECATED: Ignore in application logic
-    "custom:permissions",   # DEPRECATED: Ignore in application logic
+    "custom:tenant_id"
   ]
 
   depends_on = [aws_cognito_user_pool.admin_portal]

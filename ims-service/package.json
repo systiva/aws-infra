@@ -2,11 +2,11 @@
   "name": "ims-service",
   "version": "1.0.0",
   "description": "Identity Management Service for Admin Portal",
-  "main": "lambda.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node lambda.js",
+    "start": "node index.js",
     "local": "cross-env NODE_ENV=development nodemon server.js",
-    "dev": "nodemon lambda.js",
+    "dev": "nodemon index.js",
     "test": "jest",
     "lint": "eslint ."
   },

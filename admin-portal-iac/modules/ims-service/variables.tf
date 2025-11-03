@@ -25,7 +25,7 @@ variable "lambda_zip_path" {
 variable "handler" {
   description = "Lambda function handler"
   type        = string
-  default     = "lambda.handler"
+  default     = "index.handler"
 }
 
 variable "runtime" {

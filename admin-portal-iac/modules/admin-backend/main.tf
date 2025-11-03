@@ -10,22 +10,24 @@ resource "random_id" "suffix" {
   byte_length = 4
 }
 
+# Local values
 locals {
   function_name = "${var.project_name}-${var.environment}-backend"
+  role_name     = "${var.project_name}-${var.environment}-backend-execution-role"
 }
 
 # Lambda function for admin backend API
 resource "aws_lambda_function" "admin_backend" {
   function_name = local.function_name
   role         = aws_iam_role.lambda_execution_role.arn
-  handler      = "lambda.handler"  # Updated to match admin-portal-be structure
+  handler      = "index.handler"  # Updated to match consistent Lambda handler naming
   runtime      = var.runtime
   timeout      = var.timeout
   memory_size  = var.memory_size
   
   # Use local file for deployment package (temporary for infrastructure setup)
-  filename         = "${path.root}/lambda-packages/admin-backend.zip"
-  source_code_hash = filebase64sha256("${path.root}/lambda-packages/admin-backend.zip")
+  filename         = "${path.root}/lambda-packages/admin-portal-be.zip"
+  source_code_hash = filebase64sha256("${path.root}/lambda-packages/admin-portal-be.zip")
 
   environment {
     variables = {

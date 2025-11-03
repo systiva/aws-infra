@@ -77,10 +77,18 @@ export class TenantApiClient {
     }
   }
 
-  async fetchTenantDetails(tenantId: string): Promise<TenantData> {
+  async fetchTenantDetails(tenantId: string, token?: string): Promise<TenantData> {
     try {
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await this.makeRequest<BackendResponse<TenantData>>(
-        `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}`
+        `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}`,
+        {
+          headers
+        }
       );
       return response.data;
     } catch (error) {

@@ -47,22 +47,35 @@ data "aws_region" "current" {}
 
 # Local values for resource naming and configuration
 locals {
+  # Account comparison logic
+  admin_account_id  = var.admin_account_id
+  tenant_account_id = var.tenant_account_id
+  is_same_account   = local.admin_account_id == local.tenant_account_id
+  
   account_id = data.aws_caller_identity.current.account_id
   region     = data.aws_region.current.name
   
-  # Resource naming convention
-  name_prefix = "${var.project_name}-${var.environment}"
+  # Workspace-based naming (workspace becomes primary prefix)
+  workspace_prefix = var.workspace_prefix
+  name_prefix = "${local.workspace_prefix}-admin-portal"
   
   # S3 bucket names (must be globally unique)
   admin_portal_bucket_name = var.s3_admin_portal_bucket_name != "" ? var.s3_admin_portal_bucket_name : "${local.name_prefix}-portal-${random_id.suffix.hex}"
   
-  # Common tags for all resources
+  # Enhanced tagging with workspace information
   common_tags = merge(var.common_tags, {
-    Environment   = var.environment
-    Project       = var.project_name
-    Region        = var.aws_region
-    AccountId     = local.account_id
-    TerraformPath = basename(abspath(path.root))
+    Workspace         = terraform.workspace
+    WorkspacePrefix   = local.workspace_prefix
+    Environment       = var.environment
+    Project           = var.project_name
+    Region            = var.aws_region
+    AdminAccount      = local.admin_account_id
+    TenantAccount     = local.tenant_account_id
+    SameAccount       = local.is_same_account
+    AccountId         = local.account_id
+    TerraformPath     = basename(abspath(path.root))
+    ComponentType     = "admin-infrastructure"
+    ManagedBy         = "terraform"
   })
 }
 
@@ -119,6 +132,7 @@ module "admin_portal_web_server" {
 
 # Admin Backend Lambda (API endpoints)
 module "admin_backend" {
+  count  = var.enable_admin_backend ? 1 : 0
   source = "./modules/admin-backend"
   
   # Basic configuration
@@ -212,6 +226,33 @@ module "poll_infra_worker" {
   depends_on = [module.networking]
 }
 
+# Create Admin Worker Lambda (Tenant Admin User Creation)
+module "create_admin_worker" {
+  source = "./modules/create-admin-worker"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Lambda configuration
+  runtime     = var.lambda_runtime
+  timeout     = 180  # 3 minutes for user creation operations
+  memory_size = 256
+  
+  # IMS Service Configuration
+  ims_service_url = var.ims_service_url
+  ims_timeout     = var.ims_timeout
+  
+  # Platform Tenant Configuration
+  tenant_platform_id    = var.tenant_platform_id
+  tenant_admin_group_id = var.tenant_admin_group_id
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.networking]
+}
+
 # Private API Gateway for application access
 module "api_gateway" {
   count  = var.enable_api_gateway ? 1 : 0
@@ -230,14 +271,18 @@ module "api_gateway" {
   
   # Lambda integrations
   admin_portal_lambda_invoke_arn      = module.admin_portal_web_server.lambda_function_invoke_arn
-  admin_backend_lambda_invoke_arn     = module.admin_backend.lambda_function_invoke_arn
+  admin_backend_lambda_invoke_arn     = module.admin_backend[0].lambda_function_invoke_arn
   admin_portal_lambda_function_name   = module.admin_portal_web_server.lambda_function_name
-  admin_backend_lambda_function_name  = module.admin_backend.lambda_function_name
+  admin_backend_lambda_function_name  = module.admin_backend[0].lambda_function_name
   
   # JWT Authorizer configuration
   enable_jwt_authorizer                   = var.enable_jwt_authorizer && var.enable_cognito
   jwt_authorizer_lambda_invoke_arn       = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_invoke_arn : ""
   jwt_authorizer_lambda_function_name    = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_name : ""
+  
+  # IMS Service configuration
+  ims_service_lambda_invoke_arn       = var.enable_ims_service && var.enable_cognito ? module.ims_service[0].lambda_function_invoke_arn : ""
+  ims_service_lambda_function_name    = var.enable_ims_service && var.enable_cognito ? module.ims_service[0].lambda_function_name : ""
   
   # Tags
   common_tags = local.common_tags

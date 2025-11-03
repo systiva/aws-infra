@@ -76,3 +76,16 @@ variable "jwt_authorizer_lambda_function_name" {
   type        = string
   default     = ""
 }
+
+# IMS Service Configuration
+variable "ims_service_lambda_invoke_arn" {
+  description = "Invoke ARN for IMS service Lambda function"
+  type        = string
+  default     = ""
+}
+
+variable "ims_service_lambda_function_name" {
+  description = "Name of the IMS service Lambda function"
+  type        = string
+  default     = ""
+}

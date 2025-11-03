@@ -97,12 +97,7 @@ resource "aws_iam_role_policy" "ims_service_dynamodb" {
       {
         Effect = "Allow"
         Action = [
-          "dynamodb:GetItem",
-          "dynamodb:PutItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:DeleteItem",
-          "dynamodb:Query",
-          "dynamodb:Scan"
+          "dynamodb:*"
         ]
         Resource = [
           var.tenant_registry_table_arn,

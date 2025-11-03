@@ -124,12 +124,6 @@ resource "aws_cognito_user" "platform_admin" {
   
   # Ensure the platform ID is generated first
   depends_on = [random_integer.platform_id]
-  
-  lifecycle {
-    ignore_changes = [
-      attributes
-    ]
-  }
 }
 
 # ==============================================

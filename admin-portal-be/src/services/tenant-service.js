@@ -78,7 +78,7 @@ class TenantService {
     
     try {
       // Validate required fields
-      const requiredFields = ['tenantName', 'email', 'subscriptionTier'];
+      const requiredFields = ['tenantName', 'email', 'subscriptionTier', 'firstName', 'lastName'];
       for (const field of requiredFields) {
         if (!tenantData[field]) {
           throw new InternalError(`Missing required field: ${field}`);
@@ -114,6 +114,8 @@ class TenantService {
         tenantId: tenantId,
         tenantName: tenantData.tenantName,
         email: tenantData.email,
+        firstName: tenantData.firstName,
+        lastName: tenantData.lastName,
         subscriptionTier: tenantData.subscriptionTier,
         provisioningState: 'creating',
         registeredOn: moment().toISOString(),
@@ -231,6 +233,8 @@ class TenantService {
         subscriptionTier: tenant.subscriptionTier,
         tenantName: tenant.tenantName,
         email: tenant.email,
+        firstName: tenant.firstName,
+        lastName: tenant.lastName,
         createdBy: tenant.createdBy,
         registeredOn: tenant.registeredOn
       };

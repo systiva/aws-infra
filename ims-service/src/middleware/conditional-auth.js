@@ -1,22 +1,21 @@
-const jwtAuthorizerMiddleware = require('./jwt-authorizer-wrapper');
 const { authenticateToken } = require('./auth');
 const logger = require('../../logger');
 
 /**
  * Conditional authentication middleware for public routes
- * Uses embedded JWT authorizer for local development
- * Uses header-based auth for production (expects API Gateway authorizer headers)
+ * Uses embedded JWT authorizer for local development only
+ * Uses header-based auth for all Lambda deployments (dev, qa, prod)
  * Continues execution even if authentication fails (for public routes)
  */
 const conditionalAuth = (req, res, next) => {
-  const useLocalAuth = process.env.NODE_ENV === 'development' || 
-                      process.env.USE_LOCAL_AUTH === 'true';
+  // Only use local auth when running locally (not in Lambda)
+  const useLocalAuth = process.env.NODE_ENV === 'development' && !process.env.AWS_LAMBDA_FUNCTION_NAME;
 
   if (useLocalAuth) {
-    logger.debug('Using local JWT authorizer middleware (public)');
+    logger.debug('Using local JWT authorizer middleware (public) - Local development mode');
     return conditionalAuthPublic(req, res, next);
   } else {
-    logger.debug('Using header-based authentication (production mode, public)');
+    logger.debug('Using header-based authentication (Lambda deployment) - API Gateway handles auth');
     return authenticateTokenPublic(req, res, next);
   }
 };

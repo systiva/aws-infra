@@ -107,7 +107,7 @@ output "deployment_summary" {
     vpc_created               = module.networking.vpc_id
     lambda_functions_deployed = concat([
       module.admin_portal_web_server.lambda_function_name,
-      module.admin_backend.lambda_function_name,
+      # module.admin_backend.lambda_function_name,  # COMMENTED OUT
       module.create_infra_worker.lambda_function_name,
       module.delete_infra_worker.lambda_function_name,
       module.poll_infra_worker.lambda_function_name
@@ -169,12 +169,12 @@ output "admin_portal_web_server_name" {
 
 output "admin_backend_arn" {
   description = "ARN of the admin backend Lambda function"
-  value       = module.admin_backend.lambda_function_arn
+  value       = module.admin_backend[0].lambda_function_arn
 }
 
 output "admin_backend_name" {
   description = "Name of the admin backend Lambda function"
-  value       = module.admin_backend.lambda_function_name
+  value       = module.admin_backend[0].lambda_function_name
 }
 
 # Lambda Function URLs (Alternative to API Gateway)
@@ -184,8 +184,8 @@ output "admin_portal_function_url" {
 }
 
 output "admin_backend_function_url" {
-  description = "Function URL for admin backend (if enabled)"
-  value       = var.enable_lambda_function_urls ? module.admin_backend.function_url : null
+  description = "Function URL for admin backend Lambda (if enabled)"
+  value       = var.enable_lambda_function_urls ? module.admin_backend[0].function_url : null
 }
 
 # Private API Gateway Outputs
@@ -235,7 +235,7 @@ output "access_methods" {
   value = {
     lambda_function_urls = {
       admin_portal = var.enable_lambda_function_urls ? module.admin_portal_web_server.function_url : null
-      admin_backend = var.enable_lambda_function_urls ? module.admin_backend.function_url : null
+      # admin_backend = var.enable_lambda_function_urls ? module.admin_backend.function_url : null  # COMMENTED OUT
     }
   }
 }
@@ -250,7 +250,7 @@ output "infrastructure_summary" {
     rbac_table           = var.tenant_registry_table_name  # Same table used for RBAC
     lambda_functions      = {
       admin_portal        = module.admin_portal_web_server.lambda_function_name
-      admin_backend       = module.admin_backend.lambda_function_name
+      # admin_backend       = module.admin_backend.lambda_function_name  # COMMENTED OUT
       create_infra_worker = module.create_infra_worker.lambda_function_name
       delete_infra_worker = module.delete_infra_worker.lambda_function_name
       poll_infra_worker   = module.poll_infra_worker.lambda_function_name

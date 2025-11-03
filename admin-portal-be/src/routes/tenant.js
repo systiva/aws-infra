@@ -16,6 +16,20 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// GET /tenants/:tenantId - Get single tenant by ID
+router.get('/:tenantId', async (req, res, next) => {
+  try {
+    const tenantId = req.params.tenantId;
+    Logger.debug({ tenantId }, 'GET /tenants/:tenantId - Retrieving tenant by ID');
+    const serviceRes = await TenantService.getTenantDetails(tenantId);
+    Logger.debug(serviceRes, 'GET /tenants/:tenantId - Service response');
+    res.status(serviceRes.status).json(serviceRes.json);
+  } catch (error) {
+    Logger.error(error, 'GET /tenants/:tenantId - Error occurred');
+    next(error);
+  }
+});
+
 // POST /onboard - Create new tenant
 router.post('/onboard', async (req, res, next) => {
   try {

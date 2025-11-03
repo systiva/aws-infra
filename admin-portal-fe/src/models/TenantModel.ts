@@ -13,6 +13,8 @@ export interface TenantRegistrationRequest {
   tenantName: string;
   email: string;
   subscriptionTier: 'public' | 'private';
+  firstName: string;      // Admin user first name
+  lastName: string;       // Admin user last name
   createdBy?: string;
 }
 

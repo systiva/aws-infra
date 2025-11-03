@@ -104,3 +104,46 @@
   background: #9ca3af;
   cursor: not-allowed;
 }
+
+/* Admin Section Styling */
+.admin-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 2rem 0;
+}
+
+.admin-section h3 {
+  margin-bottom: 0.5rem;
+  color: #1e3a5f;
+  font-size: 1.25rem;
+}
+
+.admin-info {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Form Row Layout */
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.half-width {
+  flex: 1;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .half-width {
+    flex: none;
+  }
+}

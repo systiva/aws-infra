@@ -1,0 +1,24 @@
+{
+  "name": "create-admin-worker",
+  "version": "1.0.0",
+  "description": "Lambda function to create tenant admin user during onboarding",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "local": "set ENV=local&& set AWS_ACCESS_KEY_ID=fake&& set AWS_SECRET_ACCESS_KEY=fake&& set AWS_DEFAULT_REGION=us-east-1&& node ./index.js | npx pino-pretty"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "aws",
+    "lambda",
+    "tenant",
+    "admin",
+    "user-creation"
+  ],
+  "author": "Multi-Tenant Platform",
+  "license": "MIT"
+}

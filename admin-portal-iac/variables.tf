@@ -1,4 +1,37 @@
 # Variables for admin portal infrastructure
+
+# Workspace Configuration
+variable "workspace_prefix" {
+  description = "Workspace prefix for resource naming (dev|qa|prd|uat)"
+  type        = string
+  
+  validation {
+    condition     = contains(["dev", "qa", "prd", "uat"], var.workspace_prefix)
+    error_message = "Workspace prefix must be one of: dev, qa, prd, uat."
+  }
+}
+
+# Account Configuration
+variable "admin_account_id" {
+  description = "AWS account ID for admin account"
+  type        = string
+  
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.admin_account_id))
+    error_message = "Admin account ID must be a 12-digit number."
+  }
+}
+
+variable "tenant_account_id" {
+  description = "AWS account ID for tenant account"
+  type        = string
+  
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.tenant_account_id))
+    error_message = "Tenant account ID must be a 12-digit number."
+  }
+}
+
 variable "aws_region" {
   description = "AWS region for resources"
   type        = string
@@ -6,9 +39,9 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS profile to use (configured for 'fct_fct.admin' profile - no SSO login required)"
+  description = "AWS profile to use for authentication"
   type        = string
-  default     = "fct_fct.admin"
+  default     = "admin"
 }
 
 variable "project_name" {
@@ -127,6 +160,12 @@ variable "enable_lambda_function_urls" {
   default     = true
 }
 
+variable "enable_admin_backend" {
+  description = "Enable admin backend Lambda function"
+  type        = bool
+  default     = true
+}
+
 variable "lambda_function_url_cors" {
   description = "CORS configuration for Lambda Function URLs"
   type = object({
@@ -194,6 +233,31 @@ variable "create_tenant_step_function_arn" {
 
 variable "delete_tenant_step_function_arn" {
   description = "ARN of the Delete Tenant Step Functions state machine"
+  type        = string
+  default     = ""
+}
+
+# Create Admin Worker Configuration (Tenant Admin User Creation)
+variable "ims_service_url" {
+  description = "Base URL for IMS service (Identity Management Service)"
+  type        = string
+  default     = ""
+}
+
+variable "ims_timeout" {
+  description = "IMS service timeout in milliseconds"
+  type        = number
+  default     = 30000
+}
+
+variable "tenant_platform_id" {
+  description = "Platform tenant ID where admin users are created"
+  type        = string
+  default     = "platform"
+}
+
+variable "tenant_admin_group_id" {
+  description = "UUID of the tenant admin group in platform tenant"
   type        = string
   default     = ""
 }

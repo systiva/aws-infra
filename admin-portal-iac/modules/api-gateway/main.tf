@@ -52,7 +52,7 @@ resource "aws_api_gateway_deployment" "admin_api" {
   stage_name  = var.stage_name
 
   triggers = {
-    redeployment = sha1(jsonencode([
+    redeployment = sha1(jsonencode(concat([
       aws_api_gateway_rest_api.admin_api.body,
       aws_api_gateway_rest_api.admin_api.policy, # Include policy changes
       # Web server endpoints
@@ -68,18 +68,53 @@ resource "aws_api_gateway_deployment" "admin_api" {
       aws_api_gateway_resource.tenants.id,
       aws_api_gateway_method.tenants_get.id,
       aws_api_gateway_integration.tenants_get.id,
+      aws_api_gateway_resource.tenant_by_id.id,
+      aws_api_gateway_method.tenant_by_id_get.id,
+      aws_api_gateway_integration.tenant_by_id_get.id,
       aws_api_gateway_resource.offboard.id,
       aws_api_gateway_method.offboard_delete.id,
       aws_api_gateway_integration.offboard_delete.id,
       aws_api_gateway_resource.onboard.id,
       aws_api_gateway_method.onboard_post.id,
-      aws_api_gateway_method.onboard_put.id,
       aws_api_gateway_integration.onboard_post.id,
+      aws_api_gateway_method.onboard_put.id,
       aws_api_gateway_integration.onboard_put.id,
       aws_api_gateway_resource.suspend.id,
       aws_api_gateway_method.suspend_put.id,
       aws_api_gateway_integration.suspend_put.id,
-    ]))
+      # IMS Service endpoints
+      aws_api_gateway_resource.auth.id,
+      aws_api_gateway_resource.auth_proxy.id,
+      aws_api_gateway_method.auth_any.id,
+      aws_api_gateway_method.auth_proxy_any.id,
+      aws_api_gateway_integration.auth_any.id,
+      aws_api_gateway_integration.auth_proxy_any.id,
+      aws_api_gateway_resource.users.id,
+      aws_api_gateway_resource.users_proxy.id,
+      aws_api_gateway_method.users_any.id,
+      aws_api_gateway_method.users_proxy_any.id,
+      aws_api_gateway_integration.users_any.id,
+      aws_api_gateway_integration.users_proxy_any.id,
+      aws_api_gateway_resource.roles.id,
+      aws_api_gateway_resource.roles_proxy.id,
+      aws_api_gateway_method.roles_any.id,
+      aws_api_gateway_method.roles_proxy_any.id,
+      aws_api_gateway_integration.roles_any.id,
+      aws_api_gateway_integration.roles_proxy_any.id,
+      aws_api_gateway_resource.rbac.id,
+      aws_api_gateway_resource.rbac_proxy.id,
+      aws_api_gateway_method.rbac_any.id,
+      aws_api_gateway_method.rbac_proxy_any.id,
+      aws_api_gateway_integration.rbac_any.id,
+      aws_api_gateway_integration.rbac_proxy_any.id,
+      aws_api_gateway_resource.context.id,
+      aws_api_gateway_resource.context_proxy.id,
+      aws_api_gateway_method.context_any.id,
+      aws_api_gateway_method.context_proxy_any.id,
+      aws_api_gateway_integration.context_any.id,
+      aws_api_gateway_integration.context_proxy_any.id,
+    ]
+    )))
   }
 
   lifecycle {
@@ -97,14 +132,37 @@ resource "aws_api_gateway_deployment" "admin_api" {
     # Backend API methods and integrations
     aws_api_gateway_method.tenants_get,
     aws_api_gateway_integration.tenants_get,
+    aws_api_gateway_method.tenant_by_id_get,
+    aws_api_gateway_integration.tenant_by_id_get,
     aws_api_gateway_method.offboard_delete,
     aws_api_gateway_integration.offboard_delete,
     aws_api_gateway_method.onboard_post,
-    aws_api_gateway_method.onboard_put,
     aws_api_gateway_integration.onboard_post,
+    aws_api_gateway_method.onboard_put,
     aws_api_gateway_integration.onboard_put,
     aws_api_gateway_method.suspend_put,
-    aws_api_gateway_integration.suspend_put
+    aws_api_gateway_integration.suspend_put,
+    # IMS Service methods and integrations
+    aws_api_gateway_method.auth_any,
+    aws_api_gateway_method.auth_proxy_any,
+    aws_api_gateway_integration.auth_any,
+    aws_api_gateway_integration.auth_proxy_any,
+    aws_api_gateway_method.users_any,
+    aws_api_gateway_method.users_proxy_any,
+    aws_api_gateway_integration.users_any,
+    aws_api_gateway_integration.users_proxy_any,
+    aws_api_gateway_method.roles_any,
+    aws_api_gateway_method.roles_proxy_any,
+    aws_api_gateway_integration.roles_any,
+    aws_api_gateway_integration.roles_proxy_any,
+    aws_api_gateway_method.rbac_any,
+    aws_api_gateway_method.rbac_proxy_any,
+    aws_api_gateway_integration.rbac_any,
+    aws_api_gateway_integration.rbac_proxy_any,
+    aws_api_gateway_method.context_any,
+    aws_api_gateway_method.context_proxy_any,
+    aws_api_gateway_integration.context_any,
+    aws_api_gateway_integration.context_proxy_any,
   ]
 }
 
@@ -269,7 +327,8 @@ resource "aws_api_gateway_method" "tenants_get" {
   rest_api_id   = aws_api_gateway_rest_api.admin_api.id
   resource_id   = aws_api_gateway_resource.tenants.id
   http_method   = "GET"
-  authorization = "NONE"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
 }
 
 # /api/v1/tenants GET integration
@@ -281,6 +340,41 @@ resource "aws_api_gateway_integration" "tenants_get" {
   integration_http_method = "POST"
   type                   = "AWS_PROXY"
   uri                    = var.admin_backend_lambda_invoke_arn
+}
+
+# /api/v1/tenants/{tenantId} resource
+resource "aws_api_gateway_resource" "tenant_by_id" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.tenants.id
+  path_part   = "{tenantId}"
+}
+
+# /api/v1/tenants/{tenantId} GET method
+resource "aws_api_gateway_method" "tenant_by_id_get" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.tenant_by_id.id
+  http_method   = "GET"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+  
+  request_parameters = {
+    "method.request.path.tenantId" = true
+  }
+}
+
+# /api/v1/tenants/{tenantId} GET integration
+resource "aws_api_gateway_integration" "tenant_by_id_get" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.tenant_by_id.id
+  http_method = aws_api_gateway_method.tenant_by_id_get.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.admin_backend_lambda_invoke_arn
+  
+  request_parameters = {
+    "integration.request.path.tenantId" = "method.request.path.tenantId"
+  }
 }
 
 # /api/v1/tenants/offboard resource
@@ -295,7 +389,8 @@ resource "aws_api_gateway_method" "offboard_delete" {
   rest_api_id   = aws_api_gateway_rest_api.admin_api.id
   resource_id   = aws_api_gateway_resource.offboard.id
   http_method   = "DELETE"
-  authorization = "NONE"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
 }
 
 # /api/v1/tenants/offboard DELETE integration
@@ -321,7 +416,8 @@ resource "aws_api_gateway_method" "onboard_post" {
   rest_api_id   = aws_api_gateway_rest_api.admin_api.id
   resource_id   = aws_api_gateway_resource.onboard.id
   http_method   = "POST"
-  authorization = "NONE"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
 }
 
 # /api/v1/tenants/onboard PUT method
@@ -329,7 +425,8 @@ resource "aws_api_gateway_method" "onboard_put" {
   rest_api_id   = aws_api_gateway_rest_api.admin_api.id
   resource_id   = aws_api_gateway_resource.onboard.id
   http_method   = "PUT"
-  authorization = "NONE"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
 }
 
 # /api/v1/tenants/onboard POST integration
@@ -366,7 +463,8 @@ resource "aws_api_gateway_method" "suspend_put" {
   rest_api_id   = aws_api_gateway_rest_api.admin_api.id
   resource_id   = aws_api_gateway_resource.suspend.id
   http_method   = "PUT"
-  authorization = "NONE"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
 }
 
 # /api/v1/tenants/suspend PUT integration
@@ -378,6 +476,278 @@ resource "aws_api_gateway_integration" "suspend_put" {
   integration_http_method = "POST"
   type                   = "AWS_PROXY"
   uri                    = var.admin_backend_lambda_invoke_arn
+}
+
+# ==============================================
+# IMS Service Routes
+# ==============================================
+
+# /api/v1/auth resource (PUBLIC - no authorization)
+resource "aws_api_gateway_resource" "auth" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.v1.id
+  path_part   = "auth"
+}
+
+# /api/v1/auth proxy resource for all auth routes
+resource "aws_api_gateway_resource" "auth_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.auth.id
+  path_part   = "{proxy+}"
+}
+
+# /api/v1/auth ANY method (public)
+resource "aws_api_gateway_method" "auth_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.auth.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+# /api/v1/auth proxy ANY method (public)
+resource "aws_api_gateway_method" "auth_proxy_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.auth_proxy.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+# /api/v1/auth integration
+resource "aws_api_gateway_integration" "auth_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.auth.id
+  http_method = aws_api_gateway_method.auth_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/auth proxy integration
+resource "aws_api_gateway_integration" "auth_proxy_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.auth_proxy.id
+  http_method = aws_api_gateway_method.auth_proxy_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/users resource (PROTECTED)
+resource "aws_api_gateway_resource" "users" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.v1.id
+  path_part   = "users"
+}
+
+# /api/v1/users proxy resource
+resource "aws_api_gateway_resource" "users_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.users.id
+  path_part   = "{proxy+}"
+}
+
+# /api/v1/users ANY method (protected)
+resource "aws_api_gateway_method" "users_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.users.id
+  http_method   = "ANY"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+}
+
+# /api/v1/users proxy ANY method (protected)
+resource "aws_api_gateway_method" "users_proxy_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.users_proxy.id
+  http_method   = "ANY"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+}
+
+# /api/v1/users integration
+resource "aws_api_gateway_integration" "users_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.users.id
+  http_method = aws_api_gateway_method.users_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/users proxy integration
+resource "aws_api_gateway_integration" "users_proxy_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.users_proxy.id
+  http_method = aws_api_gateway_method.users_proxy_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/roles resource (PROTECTED)
+resource "aws_api_gateway_resource" "roles" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.v1.id
+  path_part   = "roles"
+}
+
+# /api/v1/roles proxy resource
+resource "aws_api_gateway_resource" "roles_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.roles.id
+  path_part   = "{proxy+}"
+}
+
+# /api/v1/roles ANY method (protected)
+resource "aws_api_gateway_method" "roles_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.roles.id
+  http_method   = "ANY"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+}
+
+# /api/v1/roles proxy ANY method (protected)
+resource "aws_api_gateway_method" "roles_proxy_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.roles_proxy.id
+  http_method   = "ANY"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+}
+
+# /api/v1/roles integration
+resource "aws_api_gateway_integration" "roles_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.roles.id
+  http_method = aws_api_gateway_method.roles_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/roles proxy integration
+resource "aws_api_gateway_integration" "roles_proxy_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.roles_proxy.id
+  http_method = aws_api_gateway_method.roles_proxy_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/rbac resource (PROTECTED)
+resource "aws_api_gateway_resource" "rbac" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.v1.id
+  path_part   = "rbac"
+}
+
+# /api/v1/rbac proxy resource
+resource "aws_api_gateway_resource" "rbac_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.rbac.id
+  path_part   = "{proxy+}"
+}
+
+# /api/v1/rbac ANY method (protected)
+resource "aws_api_gateway_method" "rbac_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.rbac.id
+  http_method   = "ANY"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+}
+
+# /api/v1/rbac proxy ANY method (protected)
+resource "aws_api_gateway_method" "rbac_proxy_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.rbac_proxy.id
+  http_method   = "ANY"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+}
+
+# /api/v1/rbac integration
+resource "aws_api_gateway_integration" "rbac_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.rbac.id
+  http_method = aws_api_gateway_method.rbac_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/rbac proxy integration
+resource "aws_api_gateway_integration" "rbac_proxy_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.rbac_proxy.id
+  http_method = aws_api_gateway_method.rbac_proxy_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/context resource (PROTECTED)
+resource "aws_api_gateway_resource" "context" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.v1.id
+  path_part   = "context"
+}
+
+# /api/v1/context proxy resource
+resource "aws_api_gateway_resource" "context_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  parent_id   = aws_api_gateway_resource.context.id
+  path_part   = "{proxy+}"
+}
+
+# /api/v1/context ANY method (protected)
+resource "aws_api_gateway_method" "context_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.context.id
+  http_method   = "ANY"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+}
+
+# /api/v1/context proxy ANY method (protected)
+resource "aws_api_gateway_method" "context_proxy_any" {
+  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
+  resource_id   = aws_api_gateway_resource.context_proxy.id
+  http_method   = "ANY"
+  authorization = var.enable_jwt_authorizer ? "CUSTOM" : "NONE"
+  authorizer_id = var.enable_jwt_authorizer ? aws_api_gateway_authorizer.jwt_authorizer[0].id : null
+}
+
+# /api/v1/context integration
+resource "aws_api_gateway_integration" "context_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.context.id
+  http_method = aws_api_gateway_method.context_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
+}
+
+# /api/v1/context proxy integration
+resource "aws_api_gateway_integration" "context_proxy_any" {
+  rest_api_id = aws_api_gateway_rest_api.admin_api.id
+  resource_id = aws_api_gateway_resource.context_proxy.id
+  http_method = aws_api_gateway_method.context_proxy_any.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.ims_service_lambda_invoke_arn
 }
 
 # Lambda permissions for API Gateway
@@ -393,6 +763,16 @@ resource "aws_lambda_permission" "admin_backend_api_gateway" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
+}
+
+# Lambda permission for IMS service
+resource "aws_lambda_permission" "ims_service_api_gateway" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
 }
