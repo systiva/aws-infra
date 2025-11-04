@@ -38,7 +38,7 @@ export const TenantUsers: React.FC = () => {
         // Fetch tenant information
         try {
           const tenantClient = TenantApiClient.getInstance();
-          const tenantsData = await tenantClient.fetchTenantsWithAuth(token);
+          const tenantsData = await tenantClient.fetchTenants();
           const currentTenant = tenantsData.find(tenant => tenant.tenantId === currentUserTenantId);
           setTenantInfo(currentTenant || null);
         } catch (tenantError) {

@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const TenantService = require('../services/tenant-service');
 const Logger = require('../../logger');
+const { authMiddleware } = require('../middlewares/auth');
+
+// Apply auth middleware to all tenant routes
+router.use(authMiddleware);
 
 // GET /tenants - Get all tenants and total count
 router.get('/', async (req, res, next) => {

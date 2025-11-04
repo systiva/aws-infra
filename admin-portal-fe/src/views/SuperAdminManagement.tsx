@@ -66,9 +66,9 @@ export const SuperAdminManagement: React.FC = () => {
         
         // Try to fetch tenants from admin-portal-be
         try {
-          console.log('SuperAdminManagement: Calling fetchTenantsWithAuth from admin-portal-be...');
+          console.log('SuperAdminManagement: Calling fetchTenants from admin-portal-be...');
           const tenantClient = TenantApiClient.getInstance();
-          tenantsData = await tenantClient.fetchTenantsWithAuth(token);
+          tenantsData = await tenantClient.fetchTenants();
           console.log('SuperAdminManagement: Fetched tenants:', tenantsData);
         } catch (tenantError) {
           console.warn('SuperAdminManagement: Failed to fetch tenants, showing empty list:', tenantError);

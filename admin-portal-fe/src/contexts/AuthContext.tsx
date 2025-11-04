@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
 import { Group } from '../utils/rbac';
+import { apiClient } from '../api/ApiClient';
 
 // Types
 export interface User {
@@ -225,6 +226,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       window.removeEventListener('authError', handleAuthError as EventListener);
     };
   }, []);
+
+  // Inject token provider into API client whenever tokens change
+  useEffect(() => {
+    apiClient.setTokenProvider(() => state.tokens?.accessToken || null);
+  }, [state.tokens]);
 
   // Login function
   const login = async (username: string, password: string): Promise<{ challengeRequired?: boolean }> => {
