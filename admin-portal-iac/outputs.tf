@@ -169,12 +169,12 @@ output "admin_portal_web_server_name" {
 
 output "admin_backend_arn" {
   description = "ARN of the admin backend Lambda function"
-  value       = module.admin_backend[0].lambda_function_arn
+  value       = module.admin_backend.lambda_function_arn
 }
 
 output "admin_backend_name" {
   description = "Name of the admin backend Lambda function"
-  value       = module.admin_backend[0].lambda_function_name
+  value       = module.admin_backend.lambda_function_name
 }
 
 # Lambda Function URLs (Alternative to API Gateway)
@@ -185,7 +185,7 @@ output "admin_portal_function_url" {
 
 output "admin_backend_function_url" {
   description = "Function URL for admin backend Lambda (if enabled)"
-  value       = var.enable_lambda_function_urls ? module.admin_backend[0].function_url : null
+  value       = var.enable_lambda_function_urls ? module.admin_backend.function_url : null
 }
 
 # Private API Gateway Outputs

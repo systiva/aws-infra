@@ -160,12 +160,6 @@ variable "enable_lambda_function_urls" {
   default     = true
 }
 
-variable "enable_admin_backend" {
-  description = "Enable admin backend Lambda function"
-  type        = bool
-  default     = true
-}
-
 variable "lambda_function_url_cors" {
   description = "CORS configuration for Lambda Function URLs"
   type = object({

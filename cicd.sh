@@ -737,20 +737,35 @@ deploy_lambda_or_backend_service() {
     local package_path="$IAC_DIR/lambda-packages/${service_name}.zip"
     if [[ ! -f "$package_path" ]]; then
         print_error "Package not found: $package_path"
-        print_info "Run: ./cicd.sh build --service=$service_name"
+        print_info "Run: ./cicd.sh build --service=$service_name --workspace=${TERRAFORM_WORKSPACE}"
         exit 1
     fi
     
     cd "$IAC_DIR"
     local full_function_name=$(get_lambda_function_name "$service_name")
     
+    # Verify Lambda function exists before attempting update
+    print_info "Verifying Lambda function: $full_function_name"
+    if ! aws lambda get-function --function-name "$full_function_name" --profile "$AWS_ADMIN_PROFILE" > /dev/null 2>&1; then
+        print_error "Lambda function not found: $full_function_name"
+        print_error "The Lambda function does not exist in AWS."
+        print_info "Expected function name: $full_function_name"
+        print_info "Workspace: ${TERRAFORM_WORKSPACE}"
+        print_info ""
+        print_info "To create the Lambda function, run:"
+        print_info "  ./cicd.sh admin-apply --workspace=${TERRAFORM_WORKSPACE} --aws-account=${AWS_ACCOUNT_ID} --admin-profile=${AWS_ADMIN_PROFILE}"
+        exit 1
+    fi
+    
+    print_info "Updating Lambda function code: $full_function_name"
     if aws lambda update-function-code \
         --function-name "$full_function_name" \
         --zip-file "fileb://lambda-packages/${service_name}.zip" \
         --profile "$AWS_ADMIN_PROFILE" > /dev/null; then
-        print_success "✅ $service_name deployed successfully"
+        print_success "✅ $service_name deployed successfully to $full_function_name"
     else
         print_error "Failed to deploy $service_name"
+        print_error "Check AWS credentials and permissions for profile: $AWS_ADMIN_PROFILE"
         exit 1
     fi
     
@@ -1115,75 +1130,9 @@ test() {
 }
 
 # ============================================================================
-# Build & Package Creation
+# Legacy Create Lambda Zips (Deprecated - kept for backwards compatibility)
+# Use: ./cicd.sh build --service=<service-name> instead
 # ============================================================================
-
-build_frontend() {
-    print_info "Building frontend application..."
-    cd "$FE_DIR" && npm run "build:$ENV"
-    cd "$SCRIPT_DIR"
-    print_success "Frontend built successfully"
-}
-
-build_backend() {
-    print_info "Building backend package..."
-    mkdir -p "$IAC_DIR/lambda-packages/admin-portal-be"
-    cp -r "$BE_DIR"/{src,package.json,*.js} "$IAC_DIR/lambda-packages/admin-portal-be/" 2>/dev/null || true
-    cd "$IAC_DIR/lambda-packages/admin-portal-be" && npm ci --production --silent
-    cd "$SCRIPT_DIR"
-    print_success "Backend package ready"
-}
-
-build_workers() {
-    print_info "Building worker packages..."
-    for worker in "${LAMBDA_DIRS[@]}"; do
-        echo -e "${CYAN}  Building $worker package...${NC}"
-        mkdir -p "$IAC_DIR/lambda-packages/$worker"
-        cp -r "$worker"/{src,package.json,*.js} "$IAC_DIR/lambda-packages/$worker/" 2>/dev/null || true
-        cd "$IAC_DIR/lambda-packages/$worker" && npm ci --production --silent && cd "$SCRIPT_DIR"
-    done
-    print_success "Worker packages built"
-}
-
-build_ims() {
-    print_info "Building IMS service package..."
-    mkdir -p "$IAC_DIR/lambda-packages/ims-service"
-    cp -r "$IMS_DIR"/{src,package.json,*.js} "$IAC_DIR/lambda-packages/ims-service/" 2>/dev/null || true
-    cd "$IAC_DIR/lambda-packages/ims-service" && npm ci --production --silent
-    cd "$SCRIPT_DIR"
-    print_success "IMS package ready"
-}
-
-build_web_server() {
-    print_info "Building web server package..."
-    mkdir -p "$IAC_DIR/lambda-packages/admin-portal-web-server"
-    cp -r "$WEB_SERVER_DIR"/{utils,package.json,*.js} "$IAC_DIR/lambda-packages/admin-portal-web-server/" 2>/dev/null || true
-    
-    if [[ -d "$FE_DIR/build" ]]; then
-        cp -r "$FE_DIR/build" "$IAC_DIR/lambda-packages/admin-portal-web-server/"
-    else
-        print_warning "Frontend build not found. Run 'build-frontend' first."
-    fi
-    
-    cd "$IAC_DIR/lambda-packages/admin-portal-web-server" && npm ci --production --silent
-    cd "$SCRIPT_DIR"
-    print_success "Web server package ready"
-}
-
-build_lambda_packages() {
-    build_backend
-    build_workers
-    build_ims
-    build_web_server
-    print_success "All Lambda packages built"
-}
-
-build() {
-    print_header "Building Components"
-    build_frontend
-    build_lambda_packages
-    print_success "All components built successfully"
-}
 
 create_lambda_zips() {
     print_info "Creating Lambda deployment packages..."

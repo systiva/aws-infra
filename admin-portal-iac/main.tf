@@ -132,7 +132,6 @@ module "admin_portal_web_server" {
 
 # Admin Backend Lambda (API endpoints)
 module "admin_backend" {
-  count  = var.enable_admin_backend ? 1 : 0
   source = "./modules/admin-backend"
   
   # Basic configuration
@@ -271,9 +270,9 @@ module "api_gateway" {
   
   # Lambda integrations
   admin_portal_lambda_invoke_arn      = module.admin_portal_web_server.lambda_function_invoke_arn
-  admin_backend_lambda_invoke_arn     = module.admin_backend[0].lambda_function_invoke_arn
+  admin_backend_lambda_invoke_arn     = module.admin_backend.lambda_function_invoke_arn
   admin_portal_lambda_function_name   = module.admin_portal_web_server.lambda_function_name
-  admin_backend_lambda_function_name  = module.admin_backend[0].lambda_function_name
+  admin_backend_lambda_function_name  = module.admin_backend.lambda_function_name
   
   # JWT Authorizer configuration
   enable_jwt_authorizer                   = var.enable_jwt_authorizer && var.enable_cognito
