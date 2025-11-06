@@ -22,10 +22,13 @@ const extractJwtFromApiGateway = (req) => {
         Logger.debug({ authorizer }, 'JWT claims from API Gateway authorizer');
         
         return {
-          sub: authorizer.sub,
+          // JWT authorizer sends 'userId' not 'sub'
+          sub: authorizer.userId || authorizer.sub,
           email: authorizer.email,
-          username: authorizer['cognito:username'] || authorizer.username,
-          tenantId: authorizer['custom:tenant_id'],
+          // JWT authorizer sends 'username' directly, not 'cognito:username'
+          username: authorizer.username || authorizer['cognito:username'],
+          // JWT authorizer sends 'tenantId' directly, not 'custom:tenant_id'
+          tenantId: authorizer.tenantId || authorizer['custom:tenant_id'],
           groups: authorizer.groups ? (typeof authorizer.groups === 'string' ? JSON.parse(authorizer.groups) : authorizer.groups) : [],
           permissions: authorizer.permissions ? (typeof authorizer.permissions === 'string' ? JSON.parse(authorizer.permissions) : authorizer.permissions) : []
         };

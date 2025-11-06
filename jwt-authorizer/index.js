@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-client').default || require('jwks-client');
+const jwksClient = require('jwks-rsa');
 const AWS = require('aws-sdk');
 
 // Initialize JWKS client for Cognito tokens
@@ -183,8 +183,22 @@ async function getSigningKey(kid) {
 
 /**
  * Generate IAM policy for API Gateway
+ * Uses wildcard to allow all methods and paths in the stage to avoid caching issues
  */
 function generatePolicy(principalId, effect, resource, context = {}) {
+  // Extract the API Gateway ARN base and create wildcard policy
+  // From: arn:aws:execute-api:region:account:api-id/stage/method/path
+  // To:   arn:aws:execute-api:region:account:api-id/stage/*/*
+  const arnParts = resource.split('/');
+  const apiGatewayArn = arnParts.slice(0, 2).join('/') + '/*/*';
+  
+  console.log('Generating policy:', {
+    principalId,
+    effect,
+    originalResource: resource,
+    wildcardResource: apiGatewayArn
+  });
+
   const policy = {
     principalId: principalId,
     policyDocument: {
@@ -193,7 +207,7 @@ function generatePolicy(principalId, effect, resource, context = {}) {
         {
           Action: 'execute-api:Invoke',
           Effect: effect,
-          Resource: resource
+          Resource: apiGatewayArn  // Use wildcard to allow all methods and paths
         }
       ]
     }

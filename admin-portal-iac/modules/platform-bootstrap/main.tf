@@ -124,6 +124,18 @@ resource "aws_cognito_user" "platform_admin" {
   
   # Ensure the platform ID is generated first
   depends_on = [random_integer.platform_id]
+  
+  # CRITICAL: Prevent Terraform from modifying user after creation
+  # This prevents Terraform from resetting user attributes (including custom:tenant_id)
+  # when the user updates their profile, changes password, etc.
+  lifecycle {
+    ignore_changes = [
+      attributes,           # Don't reset attributes when user updates profile
+      temporary_password,   # Password will change after first login
+      enabled,             # User might be enabled/disabled manually
+      message_action       # Don't resend messages
+    ]
+  }
 }
 
 # ==============================================
