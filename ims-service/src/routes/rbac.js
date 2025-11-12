@@ -344,19 +344,23 @@ router.delete('/permissions/:permissionId', async (req, res) => {
 // POST /rbac/users/:userId/groups - Add user to group  
 router.post('/users/:userId/groups', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
     const { userId } = req.params;
-    const { groupId } = req.body;
+    const { groupId, tenantId } = req.body;
     const currentUser = getCurrentUser(req);
+    
+    // Prefer tenantId from request body (for worker calls) over context (for API Gateway calls)
+    const effectiveTenantId = tenantId || getTenantId(req);
 
-    if (!tenantId) {
+    if (!effectiveTenantId) {
       return res.status(400).json({ error: 'Tenant ID is required' });
     }
     if (!groupId) {
       return res.status(400).json({ error: 'Group ID is required' });
     }
 
-    const result = await rbacService.addUserToGroup(tenantId, userId, groupId, currentUser);
+    logger.info('Adding user to group', { userId, groupId, tenantId: effectiveTenantId });
+
+    const result = await rbacService.addUserToGroup(effectiveTenantId, userId, groupId, currentUser);
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`Error adding user to group: ${error.message}`);

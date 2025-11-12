@@ -1,29 +1,66 @@
 const logger = require('../../logger');
 
 /**
- * Authentication middleware to extract user context from headers set by the authorizer service
- * This assumes the authorizer service has already validated the JWT and set user context headers
+ * Authentication middleware to extract user context from API Gateway authorizer
+ * Supports both Lambda (via req.apiGateway.event) and header-based auth
  */
 const authenticateToken = (req, res, next) => {
   try {
-    // Extract user context from headers set by the authorizer service
-    const userId = req.headers['x-user-id'] || req.headers['x-user-sub'];
-    const username = req.headers['x-user-name'] || req.headers['x-username'];
-    const email = req.headers['x-user-email'];
-    const tenantId = req.headers['x-tenant-id'];
-    const roles = req.headers['x-user-roles'] ? req.headers['x-user-roles'].split(',') : [];
-    const groups = req.headers['x-user-groups'] ? req.headers['x-user-groups'].split(',') : [];
+    let userContext = null;
 
-    // If we have user context from authorizer, use it
-    if (userId || username || email) {
-      req.user = {
-        sub: userId,
-        username: username,
-        email: email,
-        tenantId: tenantId,
-        roles: roles,
-        groups: groups
-      };
+    // Method 1: Extract from API Gateway authorizer context (Lambda with serverless-http)
+    if (req.apiGateway && req.apiGateway.event) {
+      const event = req.apiGateway.event;
+      const authorizer = event.requestContext?.authorizer;
+      
+      if (authorizer) {
+        userContext = {
+          sub: authorizer.userId || authorizer.sub,
+          username: authorizer.username || authorizer['cognito:username'],
+          email: authorizer.email,
+          tenantId: authorizer.tenantId || authorizer['custom:tenant_id'],
+          userRole: authorizer.userRole || authorizer['custom:user_role'],
+          roles: authorizer.roles ? (typeof authorizer.roles === 'string' ? JSON.parse(authorizer.roles) : authorizer.roles) : [],
+          groups: authorizer.groups ? (typeof authorizer.groups === 'string' ? JSON.parse(authorizer.groups) : authorizer.groups) : [],
+          permissions: authorizer.permissions ? (typeof authorizer.permissions === 'string' ? JSON.parse(authorizer.permissions) : authorizer.permissions) : []
+        };
+        
+        logger.debug('User context from API Gateway authorizer', { 
+          userId: userContext.sub,
+          tenantId: userContext.tenantId
+        });
+      }
+    }
+    
+    // Method 2: Fallback to headers (for backward compatibility or custom setups)
+    if (!userContext) {
+      const userId = req.headers['x-user-id'] || req.headers['x-user-sub'];
+      const username = req.headers['x-user-name'] || req.headers['x-username'];
+      const email = req.headers['x-user-email'];
+      const tenantId = req.headers['x-tenant-id'];
+      const roles = req.headers['x-user-roles'] ? req.headers['x-user-roles'].split(',') : [];
+      const groups = req.headers['x-user-groups'] ? req.headers['x-user-groups'].split(',') : [];
+
+      if (userId || username || email) {
+        userContext = {
+          sub: userId,
+          username: username,
+          email: email,
+          tenantId: tenantId,
+          roles: roles,
+          groups: groups
+        };
+        
+        logger.debug('User context from headers', { 
+          userId: userContext.sub,
+          tenantId: userContext.tenantId
+        });
+      }
+    }
+
+    // If we have user context, set it on req.user
+    if (userContext) {
+      req.user = userContext;
 
       logger.info('User context from authorizer', { 
         userId: req.user.sub, 
@@ -54,7 +91,5 @@ const authenticateToken = (req, res, next) => {
     });
   }
 };
-
-module.exports = { authenticateToken };
 
 module.exports = { authenticateToken };

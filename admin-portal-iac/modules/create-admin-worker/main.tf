@@ -74,6 +74,23 @@ resource "aws_iam_role_policy" "create_admin_worker_policy" {
   })
 }
 
+# IAM Policy for IMS Lambda Invocation
+resource "aws_iam_role_policy" "lambda_invoke_ims" {
+  name = "${local.function_name}-invoke-ims-policy"
+  role = aws_iam_role.create_admin_worker_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "lambda:InvokeFunction"
+        Resource = var.ims_lambda_arn
+      }
+    ]
+  })
+}
+
 # Attach VPC execution role if VPC is configured
 resource "aws_iam_role_policy_attachment" "vpc_execution_role" {
   count      = var.vpc_config != null ? 1 : 0
@@ -106,9 +123,9 @@ resource "aws_lambda_function" "create_admin_worker" {
 
   environment {
     variables = {
-      # IMS Service Configuration
-      IMS_SERVICE_URL = var.ims_service_url
-      IMS_TIMEOUT     = var.ims_timeout
+      # IMS Lambda Configuration (Direct Invocation)
+      IMS_LAMBDA_FUNCTION_NAME = var.ims_lambda_function_name
+      IMS_TIMEOUT              = var.ims_timeout
       
       # Platform Tenant Configuration
       TENANT_PLATFORM_ID     = var.tenant_platform_id

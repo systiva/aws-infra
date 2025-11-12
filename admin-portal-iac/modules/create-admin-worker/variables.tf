@@ -40,14 +40,19 @@ variable "enable_xray" {
   default     = true
 }
 
-# IMS Service Configuration
-variable "ims_service_url" {
-  description = "Base URL for IMS service"
+# IMS Lambda Configuration (Direct Invocation)
+variable "ims_lambda_function_name" {
+  description = "Name of the IMS Lambda function to invoke directly"
+  type        = string
+}
+
+variable "ims_lambda_arn" {
+  description = "ARN of the IMS Lambda function for IAM permissions"
   type        = string
 }
 
 variable "ims_timeout" {
-  description = "IMS service timeout in milliseconds"
+  description = "IMS Lambda invocation timeout in milliseconds"
   type        = number
   default     = 30000
 }

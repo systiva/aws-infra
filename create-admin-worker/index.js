@@ -1,4 +1,4 @@
-const axios = require('axios');
+const IMSLambdaClient = require('./src/lambda-client');
 const config = require('./config');
 const logger = require('./logger');
 
@@ -12,8 +12,8 @@ const logger = require('./logger');
  *   "tenantName": "Company XYZ",
  *   "firstName": "John",
  *   "lastName": "Doe", 
- *   "email": "john.doe@company.com",
- *   "password": "optional-temp-password",  // Optional: if not provided, will be generated
+ *   "adminEmail": "john.doe@company.com",  // Admin user email
+ *   "adminPassword": "optional-temp-password",  // Optional: if not provided, will be generated
  *   "createdBy": "system",
  *   "registeredOn": "2024-10-31T..."
  * }
@@ -36,8 +36,9 @@ exports.handler = async (event, context) => {
       tenantName,
       firstName,
       lastName,
-      email,
-      password,  // Optional password from frontend
+      adminUsername,  // Username for Cognito login
+      adminEmail,
+      adminPassword,  // Optional password from frontend
       createdBy,
       registeredOn
     } = event;
@@ -47,8 +48,8 @@ exports.handler = async (event, context) => {
       throw new Error(`Invalid operation: ${operation}. Expected: CREATE_ADMIN`);
     }
 
-    if (!tenantId || !firstName || !lastName || !email) {
-      throw new Error('Missing required fields: tenantId, firstName, lastName, email are required');
+    if (!tenantId || !firstName || !lastName || !adminUsername || !adminEmail) {
+      throw new Error('Missing required fields: tenantId, firstName, lastName, adminUsername, adminEmail are required');
     }
 
     // Validate environment configuration
@@ -61,8 +62,9 @@ exports.handler = async (event, context) => {
       tenantName,
       firstName,
       lastName,
-      email,
-      hasProvidedPassword: !!password,
+      adminUsername,
+      adminEmail,
+      hasProvidedPassword: !!adminPassword,
       platformTenantId: config.PLATFORM.TENANT_ID,
       adminGroupId: config.PLATFORM.ADMIN_GROUP_ID
     }, 'Creating tenant admin user');
@@ -70,8 +72,9 @@ exports.handler = async (event, context) => {
     // Step 1: Prepare admin user data
     const adminUserData = {
       name: `${firstName} ${lastName}`.trim(),
-      email: email,
-      password: password || generateSecurePassword(), // Use provided password or generate
+      email: adminEmail,
+      userId: adminUsername, // Use adminUsername as userId for Cognito
+      password: adminPassword || generateSecurePassword(), // Use provided password or generate
       status: 'ACTIVE',
       created_by: createdBy || 'tenant-provisioning',
       tenantId: tenantId  // Use the actual tenant ID from user input
@@ -81,23 +84,23 @@ exports.handler = async (event, context) => {
         tenantId,
         name: adminUserData.name,
         email: adminUserData.email,
+        userId: adminUserData.userId,
         status: adminUserData.status,
         userTenantId: adminUserData.tenantId,
-        passwordSource: password ? 'provided' : 'generated'
-      }, 'Prepared admin user data');    // Step 2: Create user in IMS service (Platform tenant)
+        passwordSource: adminPassword ? 'provided' : 'generated'
+      }, 'Prepared admin user data');
+
+    // Initialize IMS Lambda client for direct invocation
+    const imsClient = new IMSLambdaClient(config);
+
+    // Step 2: Create user in IMS service (Platform tenant)
     let createdUser;
     let userCreationError = null;
     
     try {
-      const userResponse = await axios.post(
-        `${config.IMS_SERVICE.BASE_URL}/users`,
+      const userResponse = await imsClient.createUser(
         adminUserData,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          timeout: config.IMS_SERVICE.TIMEOUT
-        }
+        config.PLATFORM.TENANT_ID
       );
 
       createdUser = userResponse.data.data;
@@ -123,18 +126,13 @@ exports.handler = async (event, context) => {
     
     if (createdUser) {
       try {
-        await axios.post(
-          `${config.IMS_SERVICE.BASE_URL}/users/${createdUser.user_id}/groups`,
+        await imsClient.assignUserToGroup(
+          createdUser.user_id,
           {
             groupId: config.PLATFORM.ADMIN_GROUP_ID,
             tenantId: config.PLATFORM.TENANT_ID  // Pass tenantId in request body
           },
-          {
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            timeout: config.IMS_SERVICE.TIMEOUT
-          }
+          config.PLATFORM.TENANT_ID
         );
 
         logger.info({
@@ -169,7 +167,7 @@ exports.handler = async (event, context) => {
         name: createdUser.name,
         status: createdUser.status,
         tenant_id: config.PLATFORM.TENANT_ID,
-        groups: groupAssignmentError ? [] : ['tenant-super-admin'],
+        groups: groupAssignmentError ? [] : ['tenant-admin'],
         password_status: 'TEMPORARY',
         requiresPasswordChange: true,
         created_at: new Date().toISOString()
@@ -265,7 +263,7 @@ if (require.main === module) {
     tenantName: 'Test Company',
     firstName: 'John',
     lastName: 'Doe',
-    email: 'john.doe@testcompany.com',
+    adminEmail: 'john.doe@testcompany.com',
     createdBy: 'system',
     registeredOn: new Date().toISOString()
   };

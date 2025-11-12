@@ -233,7 +233,7 @@ variable "delete_tenant_step_function_arn" {
 
 # Create Admin Worker Configuration (Tenant Admin User Creation)
 variable "ims_service_url" {
-  description = "Base URL for IMS service (Identity Management Service)"
+  description = "Base URL for IMS service (Identity Management Service). If enable_api_gateway is true, this is dynamically resolved from API Gateway outputs."
   type        = string
   default     = ""
 }
@@ -245,13 +245,13 @@ variable "ims_timeout" {
 }
 
 variable "tenant_platform_id" {
-  description = "Platform tenant ID where admin users are created"
+  description = "Platform tenant ID where admin users are created. Dynamically resolved from platform-bootstrap module."
   type        = string
-  default     = "platform"
+  default     = "PLATFORM"
 }
 
 variable "tenant_admin_group_id" {
-  description = "UUID of the tenant admin group in platform tenant"
+  description = "UUID of the tenant admin group in platform tenant. Dynamically resolved from platform-bootstrap module."
   type        = string
   default     = ""
 }

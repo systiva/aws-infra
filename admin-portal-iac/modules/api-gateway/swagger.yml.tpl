@@ -15,7 +15,7 @@ securityDefinitions:
     x-amazon-apigateway-authtype: "custom"
     x-amazon-apigateway-authorizer:
       authorizerUri: "${jwt_authorizer_uri}"
-      authorizerResultTtlInSeconds: 300
+      authorizerResultTtlInSeconds: 0
       type: "token"
 
 paths:
@@ -172,6 +172,22 @@ paths:
   # ==============================================
   # IMS Service Routes - Users (Protected)
   # ==============================================
+  /api/v1/users:
+    x-amazon-apigateway-any-method:
+      summary: "User management base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${ims_service_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
   /api/v1/users/{proxy+}:
     x-amazon-apigateway-any-method:
       summary: "User management endpoints (protected)"
@@ -196,6 +212,22 @@ paths:
   # ==============================================
   # IMS Service Routes - Roles (Protected)
   # ==============================================
+  /api/v1/roles:
+    x-amazon-apigateway-any-method:
+      summary: "Role management base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${ims_service_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
   /api/v1/roles/{proxy+}:
     x-amazon-apigateway-any-method:
       summary: "Role management endpoints (protected)"
@@ -220,6 +252,22 @@ paths:
   # ==============================================
   # IMS Service Routes - RBAC (Protected)
   # ==============================================
+  /api/v1/rbac:
+    x-amazon-apigateway-any-method:
+      summary: "RBAC base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${ims_service_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
   /api/v1/rbac/{proxy+}:
     x-amazon-apigateway-any-method:
       summary: "RBAC endpoints (protected)"
@@ -244,6 +292,22 @@ paths:
   # ==============================================
   # IMS Service Routes - Context (Protected)
   # ==============================================
+  /api/v1/context:
+    x-amazon-apigateway-any-method:
+      summary: "Context base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${ims_service_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
   /api/v1/context/{proxy+}:
     x-amazon-apigateway-any-method:
       summary: "Context endpoints (protected)"

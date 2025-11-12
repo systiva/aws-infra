@@ -158,17 +158,53 @@ const conditionalAuthPublic = async (req, res, next) => {
 };
 
 /**
- * Public version of header-based auth that doesn't return 401 errors
+ * Public version of API Gateway authorizer context extraction that doesn't return 401 errors
+ * Extracts user context from API Gateway authorizer or falls back to headers
  */
 const authenticateTokenPublic = (req, res, next) => {
   try {
-    // Extract user context from headers set by the authorizer service
-    const userId = req.headers['x-user-id'] || req.headers['x-user-sub'];
-    const username = req.headers['x-user-name'] || req.headers['x-username'];
-    const email = req.headers['x-user-email'];
-    const tenantId = req.headers['x-tenant-id'];
-    const roles = req.headers['x-user-roles'] ? req.headers['x-user-roles'].split(',') : [];
-    const groups = req.headers['x-user-groups'] ? req.headers['x-user-groups'].split(',') : [];
+    // Primary: Extract user context from API Gateway authorizer context
+    let userId, username, email, tenantId, userRole, roles, groups, permissions;
+    
+    if (req.apiGateway?.event?.requestContext?.authorizer) {
+      const authorizer = req.apiGateway.event.requestContext.authorizer;
+      
+      userId = authorizer.userId || authorizer.sub;
+      username = authorizer.username;
+      email = authorizer.email;
+      tenantId = authorizer.tenantId;
+      userRole = authorizer.userRole;
+      
+      // Parse roles if it's a JSON string
+      if (authorizer.roles) {
+        roles = typeof authorizer.roles === 'string' ? JSON.parse(authorizer.roles) : authorizer.roles;
+      }
+      
+      // Parse groups if it's a JSON string
+      if (authorizer.groups) {
+        groups = typeof authorizer.groups === 'string' ? JSON.parse(authorizer.groups) : authorizer.groups;
+      }
+      
+      // Parse permissions if it's a JSON string
+      if (authorizer.permissions) {
+        permissions = typeof authorizer.permissions === 'string' ? JSON.parse(authorizer.permissions) : authorizer.permissions;
+      }
+      
+      logger.debug('User context extracted from API Gateway authorizer (public)', { userId, username, tenantId });
+    } else {
+      // Fallback: Extract from headers (for backward compatibility or direct Lambda invocation)
+      userId = req.headers['x-user-id'] || req.headers['x-user-sub'];
+      username = req.headers['x-user-name'] || req.headers['x-username'];
+      email = req.headers['x-user-email'];
+      tenantId = req.headers['x-tenant-id'];
+      userRole = req.headers['x-user-role'];
+      roles = req.headers['x-user-roles'] ? req.headers['x-user-roles'].split(',') : [];
+      groups = req.headers['x-user-groups'] ? req.headers['x-user-groups'].split(',') : [];
+      
+      if (userId) {
+        logger.debug('User context extracted from headers (public)', { userId, username, tenantId });
+      }
+    }
 
     // If we have user context from authorizer, use it
     if (userId || username || email) {
@@ -177,11 +213,13 @@ const authenticateTokenPublic = (req, res, next) => {
         username: username,
         email: email,
         tenantId: tenantId,
-        roles: roles,
-        groups: groups
+        userRole: userRole,
+        roles: roles || [],
+        groups: groups || [],
+        permissions: permissions || []
       };
 
-      logger.debug('User context from authorizer (public)', { 
+      logger.debug('User context available (public)', { 
         userId: req.user.sub, 
         username: req.user.username,
         tenantId: req.user.tenantId 

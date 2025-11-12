@@ -199,7 +199,17 @@ resource "aws_lambda_permission" "ims_auth_endpoints" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/auth/*"
 }
 
-# Permission 2: /api/v1/users/* (protected - user management)
+# Permission 2: GET/POST/PUT/DELETE /api/v1/users (base endpoint)
+resource "aws_lambda_permission" "ims_users_base_endpoint" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UsersBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/users"
+}
+
+# Permission 3: /api/v1/users/* (protected - user management with path params)
 resource "aws_lambda_permission" "ims_users_endpoints" {
   count         = var.ims_service_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-Users"
@@ -209,7 +219,17 @@ resource "aws_lambda_permission" "ims_users_endpoints" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/users/*"
 }
 
-# Permission 3: /api/v1/roles/* (protected - role management)
+# Permission 4: GET/POST/PUT/DELETE /api/v1/roles (base endpoint)
+resource "aws_lambda_permission" "ims_roles_base_endpoint" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-RolesBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/roles"
+}
+
+# Permission 5: /api/v1/roles/* (protected - role management with path params)
 resource "aws_lambda_permission" "ims_roles_endpoints" {
   count         = var.ims_service_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-Roles"
@@ -219,7 +239,17 @@ resource "aws_lambda_permission" "ims_roles_endpoints" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/roles/*"
 }
 
-# Permission 4: /api/v1/rbac/* (protected - RBAC management)
+# Permission 6: GET/POST/PUT/DELETE /api/v1/rbac (base endpoint)
+resource "aws_lambda_permission" "ims_rbac_base_endpoint" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-RBACBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/rbac"
+}
+
+# Permission 7: /api/v1/rbac/* (protected - RBAC management with path params)
 resource "aws_lambda_permission" "ims_rbac_endpoints" {
   count         = var.ims_service_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-RBAC"
@@ -229,7 +259,17 @@ resource "aws_lambda_permission" "ims_rbac_endpoints" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/rbac/*"
 }
 
-# Permission 5: /api/v1/context/* (protected - context management)
+# Permission 8: GET/POST/PUT/DELETE /api/v1/context (base endpoint)
+resource "aws_lambda_permission" "ims_context_base_endpoint" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-ContextBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/context"
+}
+
+# Permission 9: /api/v1/context/* (protected - context management with path params)
 resource "aws_lambda_permission" "ims_context_endpoints" {
   count         = var.ims_service_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-Context"

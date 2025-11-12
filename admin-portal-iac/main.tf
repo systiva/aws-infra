@@ -238,18 +238,19 @@ module "create_admin_worker" {
   timeout     = 180  # 3 minutes for user creation operations
   memory_size = 256
   
-  # IMS Service Configuration
-  ims_service_url = var.ims_service_url
-  ims_timeout     = var.ims_timeout
+  # IMS Lambda Configuration (Direct Invocation) - dynamically from IMS module outputs
+  ims_lambda_function_name = var.enable_ims_service ? module.ims_service[0].lambda_function_name : ""
+  ims_lambda_arn           = var.enable_ims_service ? module.ims_service[0].lambda_function_arn : ""
+  ims_timeout              = var.ims_timeout
   
-  # Platform Tenant Configuration
-  tenant_platform_id    = var.tenant_platform_id
-  tenant_admin_group_id = var.tenant_admin_group_id
+  # Platform Tenant Configuration - from platform-bootstrap module (conditional access)
+  tenant_platform_id    = var.enable_platform_bootstrap ? module.platform_bootstrap[0].platform_tenant_id : "platform"
+  tenant_admin_group_id = var.enable_platform_bootstrap ? module.platform_bootstrap[0].tenant_admin_group_id : var.tenant_admin_group_id
   
   # Tags
   common_tags = local.common_tags
   
-  depends_on = [module.networking]
+  depends_on = [module.networking, module.ims_service, module.platform_bootstrap]
 }
 
 # Private API Gateway for application access

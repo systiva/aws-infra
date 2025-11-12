@@ -50,3 +50,9 @@ output "stage_name" {
   description = "Stage name of the API Gateway deployment"
   value       = aws_api_gateway_stage.admin_api.stage_name
 }
+
+# IMS Service specific URL for create-admin-worker
+output "ims_service_base_url" {
+  description = "Full base URL for IMS service API (used by create-admin-worker)"
+  value       = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1"
+}

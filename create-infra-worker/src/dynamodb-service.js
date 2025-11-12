@@ -46,8 +46,8 @@ class DynamoDBService {
     try {
       // Create tenant entry in TENANT_PUBLIC table (in tenant account)
       const tenantEntry = {
-        pk: `TENANT#${tenantData.tenantId}`,
-        sk: 'init',
+        PK: `TENANT#${tenantData.tenantId}`,
+        SK: 'init',
         tenantId: tenantData.tenantId,
         tenantName: tenantData.tenantName,
         email: tenantData.email,
@@ -324,8 +324,8 @@ class DynamoDBService {
       const params = {
         TableName: config.DYNAMODB.TENANT_REGISTRY_TABLE,
         Key: {
-          pk: `TENANT#${tenantId}`,
-          sk: 'METADATA'
+          PK: `TENANT#${tenantId}`,
+          SK: 'METADATA'
         },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,

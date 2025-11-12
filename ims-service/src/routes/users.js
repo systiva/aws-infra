@@ -209,7 +209,7 @@ router.get('/:userId', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, email, status = 'ACTIVE', created_by, userId, password } = req.body;
+    const { name, email, status = 'ACTIVE', created_by, userId, password, tenantId } = req.body;
     const currentUser = getCurrentUser(req);
 
     if (!name || !email) {
@@ -247,7 +247,8 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const effectiveTenantId = getTenantId(req);
+    // Prefer tenantId from request body (for worker calls) over context (for API Gateway calls)
+    const effectiveTenantId = tenantId || getTenantId(req);
     if (!effectiveTenantId) {
       return res.status(400).json({ error: 'Tenant ID is required' });
     }
@@ -264,12 +265,14 @@ router.post('/', async (req, res) => {
     let cognitoUser;
     try {
       cognitoUser = await cognitoService.createUser({
-        username: cognitoUsername, // Use UUID as username
+        username: cognitoUsername, // Use provided userId or UUID as username
         email: email,
-        temporaryPassword: temporaryPassword
-        // Using only basic attributes - email and email_verified
+        temporaryPassword: temporaryPassword,
+        customAttributes: {
+          tenant_id: effectiveTenantId  // Set custom:tenant_id attribute
+        }
       });
-      logger.info('User created in Cognito', { email, cognitoUsername: cognitoUser.Username });
+      logger.info('User created in Cognito', { email, cognitoUsername: cognitoUser.Username, tenantId: effectiveTenantId });
     } catch (cognitoError) {
       logger.error('Cognito user creation failed', { email, error: cognitoError.message });
       

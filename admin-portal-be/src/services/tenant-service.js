@@ -78,7 +78,7 @@ class TenantService {
     
     try {
       // Validate required fields
-      const requiredFields = ['tenantName', 'email', 'subscriptionTier', 'firstName', 'lastName'];
+      const requiredFields = ['tenantName', 'email', 'subscriptionTier', 'firstName', 'lastName', 'adminUsername', 'adminEmail'];
       for (const field of requiredFields) {
         if (!tenantData[field]) {
           throw new InternalError(`Missing required field: ${field}`);
@@ -116,6 +116,9 @@ class TenantService {
         email: tenantData.email,
         firstName: tenantData.firstName,
         lastName: tenantData.lastName,
+        adminUsername: tenantData.adminUsername, // Username for Cognito login
+        adminEmail: tenantData.adminEmail,
+        adminPassword: tenantData.adminPassword, // Optional, will be filtered if undefined
         subscriptionTier: tenantData.subscriptionTier,
         provisioningState: 'creating',
         registeredOn: moment().toISOString(),
@@ -235,6 +238,9 @@ class TenantService {
         email: tenant.email,
         firstName: tenant.firstName,
         lastName: tenant.lastName,
+        adminUsername: tenant.adminUsername,
+        adminEmail: tenant.adminEmail,
+        adminPassword: tenant.adminPassword,
         createdBy: tenant.createdBy,
         registeredOn: tenant.registeredOn
       };

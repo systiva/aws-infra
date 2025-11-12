@@ -40,8 +40,8 @@ class DynamoDBService {
     const updateParams = {
       TableName: this.tableName,
       Key: { 
-        pk: `TENANT#${tenantId}`,
-        sk: 'METADATA'
+        PK: `TENANT#${tenantId}`,
+        SK: 'METADATA'
       },
       UpdateExpression: `SET 
         provisioningState = :status,
@@ -132,8 +132,8 @@ class DynamoDBService {
     const params = {
       TableName: this.tableName,
       Key: { 
-        pk: `TENANT#${tenantId}`,
-        sk: 'METADATA'
+        PK: `TENANT#${tenantId}`,
+        SK: 'METADATA'
       }
     };
 
@@ -169,8 +169,8 @@ class DynamoDBService {
     const updateParams = {
       TableName: this.tableName,
       Key: { 
-        pk: `TENANT#${tenantId}`,
-        sk: 'METADATA'
+        PK: `TENANT#${tenantId}`,
+        SK: 'METADATA'
       },
       UpdateExpression: `SET 
         pollingAttempts = :attempts,
@@ -207,8 +207,8 @@ class DynamoDBService {
     const updateParams = {
       TableName: this.tableName,
       Key: { 
-        pk: `TENANT#${tenantId}`,
-        sk: 'METADATA'
+        PK: `TENANT#${tenantId}`,
+        SK: 'METADATA'
       },
       UpdateExpression: `SET 
         provisioningState = :status,

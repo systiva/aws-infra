@@ -266,7 +266,9 @@ resource "aws_sfn_state_machine" "tenant_operations" {
           "tenantName.$": "$.tenantName",
           "firstName.$": "$.firstName",
           "lastName.$": "$.lastName",
-          "email.$": "$.email",
+          "adminUsername.$": "$.adminUsername",
+          "adminEmail.$": "$.adminEmail",
+          "adminPassword.$": "$.adminPassword",
           "createdBy.$": "$.createdBy",
           "registeredOn.$": "$.registeredOn"
         }
@@ -356,7 +358,8 @@ resource "aws_iam_role_policy" "step_functions" {
         Resource = [
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-create-infra-worker",
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-delete-infra-worker",
-          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-poll-infra-worker"
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-poll-infra-worker",
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-create-admin-worker"
         ]
       },
       {

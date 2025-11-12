@@ -306,3 +306,19 @@ output "platform_admin_quick_start" {
     security_note = "Please change the default password after first login for security"
   } : null
 }
+
+# ==============================================
+# Create Admin Worker Configuration
+# ==============================================
+
+output "create_admin_worker_config" {
+  description = "Dynamic configuration for create-admin-worker Lambda"
+  value = {
+    lambda_function_name   = module.create_admin_worker.function_name
+    lambda_function_arn    = module.create_admin_worker.function_arn
+    ims_service_url        = var.enable_api_gateway ? module.api_gateway[0].ims_service_base_url : var.ims_service_url
+    tenant_platform_id     = var.enable_platform_bootstrap ? module.platform_bootstrap[0].platform_tenant_id : "platform"
+    tenant_admin_group_id  = var.enable_platform_bootstrap ? module.platform_bootstrap[0].tenant_admin_group_id : var.tenant_admin_group_id
+    configuration_source   = "dynamically_resolved_from_terraform_outputs"
+  }
+}

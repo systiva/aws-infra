@@ -95,3 +95,14 @@ output "rbac_setup_summary" {
     relationship_types = ["USER_GROUP_MEMBERSHIP", "GROUP_ROLE_MEMBERSHIP", "ROLE_PERMISSION_MEMBERSHIP"]
   }
 }
+
+# Create Admin Worker Configuration Outputs
+output "tenant_admin_group_id" {
+  description = "UUID of the tenant-super-admin group for create-admin-worker"
+  value       = random_uuid.tenant_admin_group_id.result
+}
+
+output "platform_tenant_id" {
+  description = "Platform tenant ID for admin users"
+  value       = local.platform_id
+}

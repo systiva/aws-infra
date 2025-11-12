@@ -1,7 +1,7 @@
 module.exports = {
-  // IMS Service Configuration
-  IMS_SERVICE: {
-    BASE_URL: process.env.IMS_SERVICE_URL || 'https://api-gateway-url/ims',
+  // IMS Lambda Configuration (Direct Invocation)
+  IMS_LAMBDA: {
+    FUNCTION_NAME: process.env.IMS_LAMBDA_FUNCTION_NAME || 'dev-admin-portal-ims-service',
     TIMEOUT: parseInt(process.env.IMS_TIMEOUT) || 30000
   },
   
@@ -9,11 +9,6 @@ module.exports = {
   PLATFORM: {
     TENANT_ID: process.env.TENANT_PLATFORM_ID || 'platform',
     ADMIN_GROUP_ID: process.env.TENANT_ADMIN_GROUP_ID || null
-  },
-  
-  // AWS Configuration
-  AWS: {
-    REGION: process.env.AWS_REGION || 'us-east-1'
   },
   
   // Logging Configuration
