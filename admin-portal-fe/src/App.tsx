@@ -79,12 +79,12 @@ function AppContent() {
             } 
           />
           
-          {/* RBAC Management Routes - Super Admin Only */}
+          {/* RBAC Management Routes - Tenant Admin Only */}
           <Route 
             path="/user-management" 
             element={
               <GroupGuard 
-                allowedGroups={['super-admin']}
+                allowedGroups={['tenant-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage users.</div>}
               >
                 <UserManagement />
@@ -96,7 +96,7 @@ function AppContent() {
             path="/role-management" 
             element={
               <GroupGuard 
-                allowedGroups={['super-admin']}
+                allowedGroups={['tenant-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage roles.</div>}
               >
                 <RoleManagement />
@@ -108,7 +108,7 @@ function AppContent() {
             path="/group-management" 
             element={
               <GroupGuard 
-                allowedGroups={['super-admin']}
+                allowedGroups={['tenant-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage groups.</div>}
               >
                 <GroupManagement />
@@ -120,7 +120,7 @@ function AppContent() {
             path="/permission-management" 
             element={
               <GroupGuard 
-                allowedGroups={['super-admin']}
+                allowedGroups={['tenant-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage permissions.</div>}
               >
                 <PermissionManagement />

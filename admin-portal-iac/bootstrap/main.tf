@@ -252,10 +252,44 @@ resource "aws_sfn_state_machine" "tenant_operations" {
           {
             Variable = "$.operation"
             StringEquals = "CREATE"
-            Next = "CreateTenantAdmin"
+            Next = "SetupDefaultRBAC"
           }
         ]
         Default = "SuccessState"
+      }
+      SetupDefaultRBAC = {
+        Type = "Task"
+        Resource = "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-setup-rbac-worker"
+        Parameters = {
+          "tenantId.$": "$.tenantId"
+        }
+        ResultPath = "$.rbacSetup"
+        Next = "CreateTenantAdmin"
+        Retry = [
+          {
+            ErrorEquals = ["States.TaskFailed"]
+            IntervalSeconds = 15
+            MaxAttempts = 2
+            BackoffRate = 2.0
+          }
+        ]
+        Catch = [
+          {
+            ErrorEquals = ["States.ALL"]
+            ResultPath = "$.rbacSetupError"
+            Next = "RBACSetupFailed"
+          }
+        ]
+      }
+      RBACSetupFailed = {
+        Type = "Pass"
+        Parameters = {
+          "message": "Infrastructure created successfully but RBAC setup failed",
+          "infrastructureStatus": "COMPLETE",
+          "rbacSetupStatus": "FAILED",
+          "error.$": "$.rbacSetupError"
+        }
+        End = true
       }
       CreateTenantAdmin = {
         Type = "Task"
@@ -270,7 +304,8 @@ resource "aws_sfn_state_machine" "tenant_operations" {
           "adminEmail.$": "$.adminEmail",
           "adminPassword.$": "$.adminPassword",
           "createdBy.$": "$.createdBy",
-          "registeredOn.$": "$.registeredOn"
+          "registeredOn.$": "$.registeredOn",
+          "tenantAdminGroupId.$": "$.rbacSetup.tenantAdminGroupId"
         }
         ResultPath = "$.adminCreation"
         Next = "SuccessState"
@@ -359,6 +394,7 @@ resource "aws_iam_role_policy" "step_functions" {
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-create-infra-worker",
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-delete-infra-worker",
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-poll-infra-worker",
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-setup-rbac-worker",
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-create-admin-worker"
         ]
       },

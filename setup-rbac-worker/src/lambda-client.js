@@ -21,7 +21,7 @@ class IMSLambdaClient {
    * Invoke IMS Lambda directly with API Gateway-compatible event structure
    * @private
    */
-  async invokeLambda(httpMethod, path, body = null, tenantId = null, userId = 'system-worker') {
+  async invokeLambda(httpMethod, path, body = null, tenantId = null, userId = 'setup-rbac-worker') {
     // Construct event in API Gateway format for serverless-http compatibility
     const event = {
       httpMethod,
@@ -33,7 +33,7 @@ class IMSLambdaClient {
       requestContext: {
         // Simulate authenticated request context
         authorizer: {
-          tenantId: tenantId,  // Tenant ID is always required for RBAC operations
+          tenantId: tenantId || 'platform',
           sub: userId,
           source: 'lambda-direct-invocation'
         }
@@ -41,7 +41,7 @@ class IMSLambdaClient {
       isBase64Encoded: false
     };
 
-    logger.info({
+    logger.debug({
       functionName: this.functionName,
       method: httpMethod,
       path,
@@ -61,7 +61,7 @@ class IMSLambdaClient {
       // Parse Lambda response
       const payload = JSON.parse(Buffer.from(response.Payload).toString());
       
-      logger.info({
+      logger.debug({
         statusCode: payload.statusCode,
         path
       }, 'IMS Lambda invocation completed');
@@ -109,56 +109,75 @@ class IMSLambdaClient {
   }
 
   /**
-   * Create a new user in IMS service
-   * POST /api/v1/users
+   * Create permission via IMS
+   * POST /api/v1/rbac/permissions
    */
-  async createUser(userData, tenantId) {
-    logger.info({
-      email: userData.email,
+  async createPermission(permissionData, tenantId) {
+    logger.debug({
+      name: permissionData.name,
       tenantId
-    }, 'Creating user via Lambda invocation');
+    }, 'Creating permission via IMS');
 
     return this.invokeLambda(
       'POST',
-      '/api/v1/users',
-      userData,
+      '/api/v1/rbac/permissions',
+      permissionData,
       tenantId
     );
   }
 
   /**
-   * Assign user to a group
-   * POST /api/v1/rbac/users/{userId}/groups
+   * Create role via IMS (with permissions array)
+   * POST /api/v1/rbac/roles
    */
-  async assignUserToGroup(userId, groupData, tenantId) {
-    logger.info({
-      userId,
-      groupId: groupData.groupId,
+  async createRole(roleData, tenantId) {
+    logger.debug({
+      name: roleData.name,
+      permissionsCount: roleData.permissions?.length || 0,
       tenantId
-    }, 'Assigning user to group via Lambda invocation');
+    }, 'Creating role via IMS');
 
     return this.invokeLambda(
       'POST',
-      `/api/v1/rbac/users/${userId}/groups`,
+      '/api/v1/rbac/roles',
+      roleData,
+      tenantId
+    );
+  }
+
+  /**
+   * Create group via IMS
+   * POST /api/v1/rbac/groups
+   */
+  async createGroup(groupData, tenantId) {
+    logger.debug({
+      name: groupData.name,
+      tenantId
+    }, 'Creating group via IMS');
+
+    return this.invokeLambda(
+      'POST',
+      '/api/v1/rbac/groups',
       groupData,
       tenantId
     );
   }
 
   /**
-   * Get user by ID
-   * GET /api/v1/users/{userId}
+   * Assign role to group via IMS
+   * POST /api/v1/rbac/groups/{groupId}/roles
    */
-  async getUser(userId, tenantId) {
-    logger.info({
-      userId,
+  async assignRoleToGroup(groupId, roleId, tenantId) {
+    logger.debug({
+      groupId,
+      roleId,
       tenantId
-    }, 'Getting user via Lambda invocation');
+    }, 'Assigning role to group via IMS');
 
     return this.invokeLambda(
-      'GET',
-      `/api/v1/users/${userId}`,
-      null,
+      'POST',
+      `/api/v1/rbac/groups/${groupId}/roles`,
+      { roleId },
       tenantId
     );
   }

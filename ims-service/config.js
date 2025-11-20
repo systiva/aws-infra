@@ -29,6 +29,9 @@ const config = {
   // DynamoDB Configuration
   TENANT_REGISTRY_TABLE_NAME: process.env.TENANT_REGISTRY_TABLE_NAME || 'admin-portal-dev-tenant-registry',
   
+  // Platform Configuration
+  PLATFORM_TENANT_ID: process.env.PLATFORM_TENANT_ID || 'platform',
+  
   // API Configuration
   API_VERSION: 'v1',
   MAX_REQUEST_SIZE: '10mb',

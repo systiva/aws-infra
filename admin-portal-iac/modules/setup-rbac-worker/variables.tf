@@ -1,4 +1,4 @@
-# Variables for Create Admin Worker Lambda
+# Variables for Setup RBAC Worker Lambda
 
 variable "project_name" {
   description = "Name of the project"
@@ -40,9 +40,9 @@ variable "enable_xray" {
   default     = true
 }
 
-# IMS Lambda Configuration (Direct Invocation)
+# DynamoDB Configuration
 variable "ims_lambda_function_name" {
-  description = "Name of the IMS Lambda function to invoke directly"
+  description = "Name of the IMS Lambda function to invoke"
   type        = string
 }
 

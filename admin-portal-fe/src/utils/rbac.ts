@@ -131,22 +131,22 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
     path: '/user-management',
     label: 'User Management',
-    requiredGroups: ['super-admin'],
+    requiredGroups: ['tenant-admin'],
   },
   {
     path: '/group-management',
     label: 'Group Management',
-    requiredGroups: ['super-admin'],
+    requiredGroups: ['tenant-admin'],
   },
   {
     path: '/role-management',
     label: 'Role Management',
-    requiredGroups: ['super-admin'],
+    requiredGroups: ['tenant-admin'],
   },
   {
     path: '/permission-management',
     label: 'Permission Management',
-    requiredGroups: ['super-admin'],
+    requiredGroups: ['tenant-admin'],
   },
   {
     path: '/',

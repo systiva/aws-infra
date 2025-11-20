@@ -237,6 +237,7 @@ class CognitoService {
       }
       
       logger.info('User created successfully', { username, email });
+      logger.info('User created successfully', { username, email });
       return result.User;
     } catch (error) {
       logger.error('User creation failed', { error: error.message });
@@ -524,6 +525,20 @@ class CognitoService {
       logger.error('Set user status failed', { username, error: error.message });
       throw new Error(`Set user status failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Get user attribute value from Cognito user object
+   * @param {Object} user - Cognito user object
+   * @param {string} attributeName - Attribute name (e.g., 'sub', 'email')
+   * @returns {string|null} Attribute value or null if not found
+   */
+  getUserAttribute(user, attributeName) {
+    if (!user || !user.Attributes) {
+      return null;
+    }
+    const attr = user.Attributes.find(a => a.Name === attributeName);
+    return attr ? attr.Value : null;
   }
 }
 

@@ -306,14 +306,36 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Extract Cognito sub from user attributes - this is the unique user identifier
+    const cognitoSub = cognitoService.getUserAttribute(cognitoUser, 'sub');
+    
+    if (!cognitoSub) {
+      // Rollback: Delete user from Cognito if we can't get the sub
+      logger.error('Failed to extract Cognito sub from user', { email, cognitoUsername });
+      try {
+        await cognitoService.deleteUser(cognitoUsername);
+        logger.info('Cognito user rolled back due to missing sub', { email, cognitoUsername });
+      } catch (rollbackError) {
+        logger.error('Failed to rollback Cognito user', { email, cognitoUsername, error: rollbackError.message });
+      }
+      
+      return res.status(500).json({
+        error: 'User Creation Failed',
+        message: 'Failed to retrieve user identifier from authentication service'
+      });
+    }
+
+    logger.info('Extracted Cognito sub for user', { email, cognitoUsername, cognitoSub });
+
     // Create user entry in RBAC system using TenantRBACService
     const userEntry = {
+      userId: cognitoSub,  // Use Cognito sub as primary user ID for consistency
       name: name,
       email: email,
       status: status,
       created_by: created_by || currentUser,
-      cognito_username: cognitoUsername, // Store the generated UUID username
-      cognito_sub: cognitoUser.Username, // Store Cognito username (should be same as cognitoUsername)
+      cognito_username: cognitoUsername, // Store the username for reference
+      cognito_sub: cognitoSub, // Store Cognito sub (same as userId)
       password_status: 'TEMPORARY',
       first_login_completed: false
     };

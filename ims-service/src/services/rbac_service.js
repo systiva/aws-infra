@@ -18,7 +18,12 @@ class RBACService {
   async createUser(tenantId, userData) {
     try {
       logger.info(`Creating user in tenant: ${tenantId}`);
-      const userId = userData.userId || uuidv4();
+      
+      // userId must be provided (typically Cognito sub)
+      const userId = userData.userId;
+      if (!userId) {
+        throw new Error('userId is required for user creation');
+      }
       
       const userToCreate = {
         userId,

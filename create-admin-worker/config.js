@@ -5,12 +5,6 @@ module.exports = {
     TIMEOUT: parseInt(process.env.IMS_TIMEOUT) || 30000
   },
   
-  // Platform Tenant Configuration
-  PLATFORM: {
-    TENANT_ID: process.env.TENANT_PLATFORM_ID || 'platform',
-    ADMIN_GROUP_ID: process.env.TENANT_ADMIN_GROUP_ID || null
-  },
-  
   // Logging Configuration
   LOG_LEVEL: process.env.LOG_LEVEL || 'info'
 };

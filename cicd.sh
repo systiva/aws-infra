@@ -39,7 +39,7 @@ ALLOWED_WORKSPACES=("dev" "qa" "prd" "uat")
 WORKSPACE_PREFIX="${WORKSPACE_PREFIX:-}"
 
 # Valid service names
-VALID_SERVICES=("create-infra-worker" "delete-infra-worker" "poll-infra-worker" "create-admin-worker" "jwt-authorizer" "admin-portal-be" "ims-service" "admin-portal-web-server" "admin-portal-fe")
+VALID_SERVICES=("create-infra-worker" "delete-infra-worker" "poll-infra-worker" "create-admin-worker" "setup-rbac-worker" "jwt-authorizer" "admin-portal-be" "ims-service" "admin-portal-web-server" "admin-portal-fe")
 
 # Directories
 IAC_DIR="admin-portal-iac"
@@ -506,7 +506,7 @@ build_service() {
         "admin-portal-web-server")
             build_web_server_service "$service_name"
             ;;
-        "create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"jwt-authorizer")
+        "create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"setup-rbac-worker"|"jwt-authorizer")
             build_lambda_service "$service_name"
             ;;
         "admin-portal-be"|"ims-service")
@@ -529,7 +529,7 @@ deploy_service() {
         "admin-portal-fe")
             deploy_react_frontend
             ;;
-        "admin-portal-web-server"|"create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"jwt-authorizer"|"admin-portal-be"|"ims-service")
+        "admin-portal-web-server"|"create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"setup-rbac-worker"|"jwt-authorizer"|"admin-portal-be"|"ims-service")
             deploy_lambda_or_backend_service "$service_name"
             ;;
         *)
@@ -549,7 +549,7 @@ test_service() {
         "admin-portal-fe")
             test_react_frontend
             ;;
-        "create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"jwt-authorizer")
+        "create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"setup-rbac-worker"|"jwt-authorizer")
             test_lambda_service "$service_name"
             ;;
         "admin-portal-be"|"ims-service"|"admin-portal-web-server")

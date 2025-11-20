@@ -14,6 +14,7 @@ const logger = require('./logger');
  *   "lastName": "Doe", 
  *   "adminEmail": "john.doe@company.com",  // Admin user email
  *   "adminPassword": "optional-temp-password",  // Optional: if not provided, will be generated
+ *   "tenantAdminGroupId": "uuid-of-tenant-admin-group",  // Dynamic group ID from setup-rbac-worker
  *   "createdBy": "system",
  *   "registeredOn": "2024-10-31T..."
  * }
@@ -39,6 +40,7 @@ exports.handler = async (event, context) => {
       adminUsername,  // Username for Cognito login
       adminEmail,
       adminPassword,  // Optional password from frontend
+      tenantAdminGroupId,  // Dynamic group ID from setup-rbac-worker
       createdBy,
       registeredOn
     } = event;
@@ -52,9 +54,9 @@ exports.handler = async (event, context) => {
       throw new Error('Missing required fields: tenantId, firstName, lastName, adminUsername, adminEmail are required');
     }
 
-    // Validate environment configuration
-    if (!config.PLATFORM.ADMIN_GROUP_ID) {
-      throw new Error('TENANT_ADMIN_GROUP_ID environment variable is required');
+    // Validate tenantAdminGroupId from Step Functions
+    if (!tenantAdminGroupId) {
+      throw new Error('tenantAdminGroupId is required (should be provided by setup-rbac-worker)');
     }
 
     logger.info({
@@ -65,8 +67,7 @@ exports.handler = async (event, context) => {
       adminUsername,
       adminEmail,
       hasProvidedPassword: !!adminPassword,
-      platformTenantId: config.PLATFORM.TENANT_ID,
-      adminGroupId: config.PLATFORM.ADMIN_GROUP_ID
+      tenantAdminGroupId
     }, 'Creating tenant admin user');
 
     // Step 1: Prepare admin user data
@@ -93,14 +94,14 @@ exports.handler = async (event, context) => {
     // Initialize IMS Lambda client for direct invocation
     const imsClient = new IMSLambdaClient(config);
 
-    // Step 2: Create user in IMS service (Platform tenant)
+    // Step 2: Create user in IMS service (in actual tenant, not platform)
     let createdUser;
     let userCreationError = null;
     
     try {
       const userResponse = await imsClient.createUser(
         adminUserData,
-        config.PLATFORM.TENANT_ID
+        tenantId  // Use actual tenant ID so user is stored in same tenant as RBAC data
       );
 
       createdUser = userResponse.data.data;
@@ -108,7 +109,7 @@ exports.handler = async (event, context) => {
         tenantId,
         userId: createdUser.user_id,
         email: createdUser.email,
-        platformTenantId: config.PLATFORM.TENANT_ID
+        userStoredInTenant: tenantId
       }, 'User created successfully in IMS');
 
     } catch (userCreationErr) {
@@ -129,17 +130,17 @@ exports.handler = async (event, context) => {
         await imsClient.assignUserToGroup(
           createdUser.user_id,
           {
-            groupId: config.PLATFORM.ADMIN_GROUP_ID,
-            tenantId: config.PLATFORM.TENANT_ID  // Pass tenantId in request body
+            groupId: tenantAdminGroupId,  // Use dynamic group ID from setup-rbac-worker
+            tenantId: tenantId  // Use actual tenant ID where group was created
           },
-          config.PLATFORM.TENANT_ID
+          tenantId  // Query context in actual tenant
         );
 
         logger.info({
           tenantId,
           userId: createdUser.user_id,
-          groupId: config.PLATFORM.ADMIN_GROUP_ID,
-          platformTenantId: config.PLATFORM.TENANT_ID
+          groupId: tenantAdminGroupId,  // Log the dynamic group ID
+          assignedToTenant: tenantId
         }, 'User assigned to tenant admin group successfully');
 
       } catch (groupAssignmentErr) {
@@ -147,7 +148,7 @@ exports.handler = async (event, context) => {
         logger.error({
           tenantId,
           userId: createdUser.user_id,
-          groupId: config.PLATFORM.ADMIN_GROUP_ID,
+          groupId: tenantAdminGroupId,  // Log the dynamic group ID
           error: groupAssignmentErr.message,
           status: groupAssignmentErr.response?.status,
           data: groupAssignmentErr.response?.data
@@ -166,7 +167,7 @@ exports.handler = async (event, context) => {
         email: createdUser.email,
         name: createdUser.name,
         status: createdUser.status,
-        tenant_id: config.PLATFORM.TENANT_ID,
+        tenant_id: tenantId,  // User belongs to actual tenant
         groups: groupAssignmentError ? [] : ['tenant-admin'],
         password_status: 'TEMPORARY',
         requiresPasswordChange: true,
@@ -185,7 +186,7 @@ exports.handler = async (event, context) => {
       message: createdUser 
         ? (groupAssignmentError 
             ? 'Tenant admin created but group assignment failed - manual intervention required'
-            : 'Tenant admin created successfully in platform tenant')
+            : 'Tenant admin created successfully')
         : 'Tenant admin creation failed - manual intervention required',
       executionTime: executionTime
     };

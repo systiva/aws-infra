@@ -225,6 +225,30 @@ module "poll_infra_worker" {
   depends_on = [module.networking]
 }
 
+# Setup RBAC Worker Lambda (Default RBAC Creation for New Tenants via IMS)
+module "setup_rbac_worker" {
+  source = "./modules/setup-rbac-worker"
+  
+  # Basic configuration
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Lambda configuration
+  runtime     = var.lambda_runtime
+  timeout     = 180  # 3 minutes for RBAC setup operations
+  memory_size = 256
+  
+  # IMS Lambda Configuration (calls IMS APIs instead of direct DynamoDB)
+  ims_lambda_function_name = var.enable_ims_service ? module.ims_service[0].lambda_function_name : ""
+  ims_lambda_arn           = var.enable_ims_service ? module.ims_service[0].lambda_function_arn : ""
+  ims_timeout              = var.ims_timeout
+  
+  # Tags
+  common_tags = local.common_tags
+  
+  depends_on = [module.networking, module.ims_service]
+}
+
 # Create Admin Worker Lambda (Tenant Admin User Creation)
 module "create_admin_worker" {
   source = "./modules/create-admin-worker"
@@ -243,14 +267,10 @@ module "create_admin_worker" {
   ims_lambda_arn           = var.enable_ims_service ? module.ims_service[0].lambda_function_arn : ""
   ims_timeout              = var.ims_timeout
   
-  # Platform Tenant Configuration - from platform-bootstrap module (conditional access)
-  tenant_platform_id    = var.enable_platform_bootstrap ? module.platform_bootstrap[0].platform_tenant_id : "platform"
-  tenant_admin_group_id = var.enable_platform_bootstrap ? module.platform_bootstrap[0].tenant_admin_group_id : var.tenant_admin_group_id
-  
   # Tags
   common_tags = local.common_tags
   
-  depends_on = [module.networking, module.ims_service, module.platform_bootstrap]
+  depends_on = [module.networking, module.ims_service, module.platform_bootstrap, module.setup_rbac_worker]
 }
 
 # Private API Gateway for application access
