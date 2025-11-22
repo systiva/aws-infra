@@ -68,7 +68,7 @@ export const RoleManagement: React.FC = () => {
 
     try {
       setError(null);
-      await rbacApiClient.updateRole(editingRole.role_id, formData, token);
+      await rbacApiClient.updateRole(editingRole.roleId, formData, token);
       setFormData({ name: '', description: '', permissions: [] });
       setEditingRole(null);
       setShowCreateForm(false);
@@ -118,12 +118,17 @@ export const RoleManagement: React.FC = () => {
   };
 
   const handlePermissionToggle = (permissionId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: prev.permissions?.includes(permissionId)
-        ? prev.permissions.filter(p => p !== permissionId)
-        : [...(prev.permissions || []), permissionId]
-    }));
+    setFormData(prev => {
+      const currentPermissions = prev.permissions || [];
+      const newPermissions = currentPermissions.includes(permissionId)
+        ? currentPermissions.filter(p => p !== permissionId)
+        : [...currentPermissions, permissionId];
+      
+      return {
+        ...prev,
+        permissions: newPermissions
+      };
+    });
   };
 
   if (loading) {
@@ -196,14 +201,20 @@ export const RoleManagement: React.FC = () => {
                     <p className="no-permissions">No permissions available. Create permissions first.</p>
                   ) : (
                     permissions.map(permission => (
-                      <label key={permission.permission_id} className="permission-checkbox-simple">
+                      <div key={permission.permissionId} className="permission-checkbox-simple">
                         <input
                           type="checkbox"
-                          checked={formData.permissions?.includes(permission.permission_id) || false}
-                          onChange={() => handlePermissionToggle(permission.permission_id)}
+                          id={`permission-${permission.permissionId}`}
+                          checked={formData.permissions?.includes(permission.permissionId) || false}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handlePermissionToggle(permission.permissionId);
+                          }}
                         />
-                        <span className="permission-name-simple">{permission.name}</span>
-                      </label>
+                        <label htmlFor={`permission-${permission.permissionId}`} className="permission-name-simple">
+                          {permission.name}
+                        </label>
+                      </div>
                     ))
                   )}
                 </div>
@@ -241,13 +252,13 @@ export const RoleManagement: React.FC = () => {
             </thead>
             <tbody>
               {roles.map(role => (
-                <tr key={role.role_id}>
+                <tr key={role.roleId}>
                   <td>{role.name}</td>
                   <td>{role.description || 'No description'}</td>
                   <td>
                     {(() => {
                       const validPermissions = role.permissions?.filter(permId => 
-                        permissions.find(p => p.permission_id === permId)
+                        permissions.find(p => p.permissionId === permId)
                       ) || [];
                       const count = validPermissions.length;
                       return `${count} permission${count !== 1 ? 's' : ''}`;
@@ -255,7 +266,7 @@ export const RoleManagement: React.FC = () => {
                     {role.permissions && role.permissions.length > 0 && (
                       <div className="permissions-preview">
                         {role.permissions.slice(0, 2).map(permId => {
-                          const perm = permissions.find(p => p.permission_id === permId);
+                          const perm = permissions.find(p => p.permissionId === permId);
                           return perm ? (
                             <span key={permId} className="permission-tag">
                               {perm.name}
@@ -264,7 +275,7 @@ export const RoleManagement: React.FC = () => {
                         }).filter(Boolean)}
                         {(() => {
                           const validPermissions = role.permissions.filter(permId => 
-                            permissions.find(p => p.permission_id === permId)
+                            permissions.find(p => p.permissionId === permId)
                           );
                           return validPermissions.length > 2 && (
                             <span className="permission-tag more">+{validPermissions.length - 2} more</span>
@@ -285,7 +296,7 @@ export const RoleManagement: React.FC = () => {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteRole(role.role_id)}
+                        onClick={() => handleDeleteRole(role.roleId)}
                         className="btn btn-sm btn-danger"
                         title="Delete Role"
                       >

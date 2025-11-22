@@ -34,7 +34,7 @@ interface RBACGroup {
   entity_type: string;
   tenant_id: string;
   entity_id: string;
-  group_id: string;
+  groupId: string;  // Changed from group_id to match backend
   name: string;
   description: string;
   metadata?: any;
@@ -49,7 +49,7 @@ interface RBACRole {
   entity_type: string;
   tenant_id: string;
   entity_id: string;
-  role_id: string;
+  roleId: string;  // Changed from role_id to match backend
   name: string;
   description: string;
   permissions: string[];
@@ -65,7 +65,7 @@ interface RBACPermission {
   entity_type: string;
   tenant_id: string;
   entity_id: string;
-  permission_id: string;
+  permissionId: string;  // Changed from permission_id to match backend
   name: string;
   description: string;
   resource: string;
@@ -122,7 +122,7 @@ class RBACApiClient {
   private usersBaseUrl: string;
   private tenantId: string | null = null;
 
-  constructor(baseUrl: string = 'http://localhost:3001/api/v1') {
+  constructor(baseUrl: string = process.env.REACT_APP_IMS_BASE_URL || 'http://localhost:3001/api/v1') {
     this.rbacBaseUrl = `${baseUrl}/rbac`;
     this.usersBaseUrl = `${baseUrl}/users`;
   }

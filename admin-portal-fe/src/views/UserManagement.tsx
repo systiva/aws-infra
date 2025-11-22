@@ -47,8 +47,8 @@ export const UserManagement: React.FC = () => {
             const userGroupRels = await rbacApiClient.getUserGroups(user.user_id || user.cognitoUserId || '', token);
             // Map group relationships to full group objects
             const userGroups = userGroupRels.map(groupRel => {
-              const groupId = groupRel.SK?.replace('GROUP#', '') || groupRel.group_id;
-              return groupsData.find(group => group.group_id === groupId);
+              const groupId = groupRel.SK?.replace('GROUP#', '') || groupRel.groupId;
+              return groupsData.find(group => group.groupId === groupId);
             }).filter(Boolean); // Remove any undefined values
             
             return { ...user, groups: userGroups };
@@ -157,7 +157,7 @@ export const UserManagement: React.FC = () => {
       await rbacApiClient.updateUser(userId, updatePayload, token);
       
       // Handle group assignments
-      const currentGroupIds = editingUser.groups ? editingUser.groups.map((group: any) => group.group_id || group.id) : [];
+      const currentGroupIds = editingUser.groups ? editingUser.groups.map((group: any) => group.groupId || group.id) : [];
       const newGroupIds = formData.groupIds || [];
       
       // Remove user from groups not in the new selection
@@ -209,7 +209,7 @@ export const UserManagement: React.FC = () => {
 
   const handleEditUser = (user: RBACUser) => {
     setEditingUser(user);
-    const userGroupIds = user.groups ? user.groups.map((group: any) => group.group_id || group.id) : [];
+    const userGroupIds = user.groups ? user.groups.map((group: any) => group.groupId || group.id) : [];
     const [firstName = '', lastName = ''] = (user.name || '').split(' ', 2);
     setFormData({
       firstName,
@@ -372,11 +372,11 @@ export const UserManagement: React.FC = () => {
                     <p className="no-groups">No groups available. Create groups first.</p>
                   ) : (
                     groups.map(group => (
-                      <label key={group.group_id} className="group-checkbox-simple">
+                      <label key={group.groupId} className="group-checkbox-simple">
                         <input
                           type="checkbox"
-                          checked={(formData.groupIds || []).includes(group.group_id)}
-                          onChange={(e) => handleGroupSelectionChange(group.group_id, e.target.checked)}
+                          checked={(formData.groupIds || []).includes(group.groupId)}
+                          onChange={(e) => handleGroupSelectionChange(group.groupId, e.target.checked)}
                         />
                         <span className="group-name-simple">{group.name}</span>
                       </label>

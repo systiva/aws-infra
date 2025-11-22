@@ -62,7 +62,7 @@ export const PermissionManagement: React.FC = () => {
 
     try {
       setError(null);
-      await rbacApiClient.updatePermission(editingPermission.permission_id, formData, token);
+      await rbacApiClient.updatePermission(editingPermission.permissionId, formData, token);
       setFormData({ name: '', description: '' });
       setEditingPermission(null);
       setShowCreateForm(false);
@@ -204,7 +204,7 @@ export const PermissionManagement: React.FC = () => {
             </thead>
             <tbody>
               {permissions.map(permission => (
-                <tr key={permission.permission_id}>
+                <tr key={permission.permissionId}>
                   <td>{permission.name}</td>
                   <td>{permission.description || 'No description'}</td>
                   <td>{permission.created_by || 'Unknown'}</td>
@@ -219,7 +219,7 @@ export const PermissionManagement: React.FC = () => {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeletePermission(permission.permission_id)}
+                        onClick={() => handleDeletePermission(permission.permissionId)}
                         className="btn btn-sm btn-danger"
                         title="Delete Permission"
                       >

@@ -51,10 +51,10 @@ export const GroupManagement: React.FC = () => {
       const allRoles = [];
       for (const group of groupsData) {
         try {
-          const roles = await rbacApiClient.getGroupRoles(group.group_id, token);
-          allRoles.push(...roles.map(role => ({ ...role, group_id: group.group_id })));
+          const roles = await rbacApiClient.getGroupRoles(group.groupId, token);
+          allRoles.push(...roles.map(role => ({ ...role, groupId: group.groupId })));
         } catch (error) {
-          console.warn(`Failed to load roles for group ${group.group_id}:`, error);
+          console.warn(`Failed to load roles for group ${group.groupId}:`, error);
         }
       }
       setAllGroupRoles(allRoles);
@@ -69,8 +69,8 @@ export const GroupManagement: React.FC = () => {
   const loadGroupDetails = async (group: RBACGroup) => {
     try {
       const [members, roles] = await Promise.all([
-        rbacApiClient.getGroupMembers(group.group_id, token),
-        rbacApiClient.getGroupRoles(group.group_id, token)
+        rbacApiClient.getGroupMembers(group.groupId, token),
+        rbacApiClient.getGroupRoles(group.groupId, token)
       ]);
       setGroupMembers(members);
       setGroupRoles(roles);
@@ -90,7 +90,7 @@ export const GroupManagement: React.FC = () => {
       if (formData.roleIds && formData.roleIds.length > 0) {
         await Promise.all(
           formData.roleIds.map(roleId => 
-            rbacApiClient.assignRoleToGroup(createdGroup.group_id, roleId, token)
+            rbacApiClient.assignRoleToGroup(createdGroup.groupId, roleId, token)
           )
         );
       }
@@ -117,13 +117,13 @@ export const GroupManagement: React.FC = () => {
       setError(null);
       
       // Update group basic info
-      await rbacApiClient.updateGroup(editingGroup.group_id, formData, token);
+      await rbacApiClient.updateGroup(editingGroup.groupId, formData, token);
       
       // Handle role assignments if roles were changed
       if (formData.roleIds) {
         // Get current roles
-        const currentRoles = await rbacApiClient.getGroupRoles(editingGroup.group_id, token);
-        const currentRoleIds = currentRoles.map(role => role.SK.replace('ROLE#', ''));
+        const currentRoles = await rbacApiClient.getGroupRoles(editingGroup.groupId, token);
+        const currentRoleIds = currentRoles.map(role => role.SK?.replace('ROLE#', '') || role.roleId);
         
         // Find roles to add and remove
         const rolesToAdd = formData.roleIds.filter(roleId => !currentRoleIds.includes(roleId));
@@ -132,14 +132,14 @@ export const GroupManagement: React.FC = () => {
         // Add new roles
         await Promise.all(
           rolesToAdd.map(roleId => 
-            rbacApiClient.assignRoleToGroup(editingGroup.group_id, roleId, token)
+            rbacApiClient.assignRoleToGroup(editingGroup.groupId, roleId, token)
           )
         );
         
         // Remove old roles
         await Promise.all(
           rolesToRemove.map(roleId => 
-            rbacApiClient.removeRoleFromGroup(editingGroup.group_id, roleId, token)
+            rbacApiClient.removeRoleFromGroup(editingGroup.groupId, roleId, token)
           )
         );
       }
@@ -177,8 +177,8 @@ export const GroupManagement: React.FC = () => {
     setEditingGroup(group);
     try {
       // Load current roles for the group
-      const currentRoles = await rbacApiClient.getGroupRoles(group.group_id, token);
-      const currentRoleIds = currentRoles.map(role => role.SK.replace('ROLE#', ''));
+      const currentRoles = await rbacApiClient.getGroupRoles(group.groupId, token);
+      const currentRoleIds = currentRoles.map(role => role.SK?.replace('ROLE#', '') || role.roleId);
       
       setFormData({
         name: group.name,
@@ -208,7 +208,7 @@ export const GroupManagement: React.FC = () => {
 
     try {
       setError(null);
-      await rbacApiClient.addUserToGroup(userId, selectedGroup.group_id, token);
+      await rbacApiClient.addUserToGroup(userId, selectedGroup.groupId, token);
       await loadGroupDetails(selectedGroup);
     } catch (error) {
       console.error('Failed to add user to group:', error);
@@ -221,7 +221,7 @@ export const GroupManagement: React.FC = () => {
 
     try {
       setError(null);
-      await rbacApiClient.removeUserFromGroup(userId, selectedGroup.group_id, token);
+      await rbacApiClient.removeUserFromGroup(userId, selectedGroup.groupId, token);
       await loadGroupDetails(selectedGroup);
     } catch (error) {
       console.error('Failed to remove user from group:', error);
@@ -234,7 +234,7 @@ export const GroupManagement: React.FC = () => {
 
     try {
       setError(null);
-      await rbacApiClient.assignRoleToGroup(selectedGroup.group_id, roleId, token);
+      await rbacApiClient.assignRoleToGroup(selectedGroup.groupId, roleId, token);
       await loadGroupDetails(selectedGroup);
     } catch (error) {
       console.error('Failed to assign role to group:', error);
@@ -247,7 +247,7 @@ export const GroupManagement: React.FC = () => {
 
     try {
       setError(null);
-      await rbacApiClient.removeRoleFromGroup(selectedGroup.group_id, roleId, token);
+      await rbacApiClient.removeRoleFromGroup(selectedGroup.groupId, roleId, token);
       await loadGroupDetails(selectedGroup);
     } catch (error) {
       console.error('Failed to remove role from group:', error);
@@ -274,12 +274,16 @@ export const GroupManagement: React.FC = () => {
   };
 
   const handleRoleSelectionChange = (roleId: string, isChecked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      roleIds: isChecked 
+    setFormData(prev => {
+      const newRoleIds = isChecked 
         ? [...(prev.roleIds || []), roleId]
-        : (prev.roleIds || []).filter(id => id !== roleId)
-    }));
+        : (prev.roleIds || []).filter(id => id !== roleId);
+      
+      return {
+        ...prev,
+        roleIds: newRoleIds
+      };
+    });
   };
 
   const isUserInGroup = (userId: string) => {
@@ -360,14 +364,20 @@ export const GroupManagement: React.FC = () => {
                     <p className="no-roles">No roles available. Create roles first.</p>
                   ) : (
                     roles.map(role => (
-                      <label key={role.role_id} className="role-checkbox-simple">
+                      <div key={role.roleId} className="role-checkbox-simple">
                         <input
                           type="checkbox"
-                          checked={(formData.roleIds || []).includes(role.role_id)}
-                          onChange={(e) => handleRoleSelectionChange(role.role_id, e.target.checked)}
+                          id={`role-${role.roleId}`}
+                          checked={(formData.roleIds || []).includes(role.roleId)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleRoleSelectionChange(role.roleId, e.target.checked);
+                          }}
                         />
-                        <span className="role-name-simple">{role.name}</span>
-                      </label>
+                        <label htmlFor={`role-${role.roleId}`} className="role-name-simple">
+                          {role.name}
+                        </label>
+                      </div>
                     ))
                   )}
                 </div>
@@ -420,7 +430,7 @@ export const GroupManagement: React.FC = () => {
                   <h3>Current Members</h3>
                   <div className="assignment-list">
                     {groupMembers.map(member => {
-                      const userId = member.SK.replace('USER#', '');
+                      const userId = member.SK?.replace('USER#', '') || member.userId;
                       const user = users.find(u => (u.user_id === userId) || (u.cognitoUserId === userId));
                       return user ? (
                         <div key={member.SK} className="assignment-item">
@@ -446,14 +456,14 @@ export const GroupManagement: React.FC = () => {
                 <div className="assignment-section">
                   <h3>Available Roles</h3>
                   <div className="assignment-list">
-                    {roles.filter(role => !isRoleInGroup(role.role_id)).map(role => (
-                      <div key={role.role_id} className="assignment-item">
+                    {roles.filter(role => !isRoleInGroup(role.roleId)).map(role => (
+                      <div key={role.roleId} className="assignment-item">
                         <div className="assignment-info">
                           <span className="assignment-name">{role.name}</span>
                           <span className="assignment-detail">{role.description}</span>
                         </div>
                         <button
-                          onClick={() => handleAssignRoleToGroup(role.role_id)}
+                          onClick={() => handleAssignRoleToGroup(role.roleId)}
                           className="btn btn-sm btn-primary"
                         >
                           Assign
@@ -465,8 +475,8 @@ export const GroupManagement: React.FC = () => {
                   <h3>Assigned Roles</h3>
                   <div className="assignment-list">
                     {groupRoles.map(groupRole => {
-                      const roleId = groupRole.SK.replace('ROLE#', '');
-                      const role = roles.find(r => r.role_id === roleId);
+                      const roleId = groupRole.SK?.replace('ROLE#', '') || groupRole.roleId;
+                      const role = roles.find(r => r.roleId === roleId);
                       return role ? (
                         <div key={groupRole.SK} className="assignment-item">
                           <div className="assignment-info">
@@ -512,22 +522,22 @@ export const GroupManagement: React.FC = () => {
             </thead>
             <tbody>
               {groups.map(group => (
-                <tr key={group.group_id}>
+                <tr key={group.groupId}>
                   <td>{group.name}</td>
                   <td>{group.description || 'No description'}</td>
                   <td>
                     {(() => {
-                      const groupRoleData = allGroupRoles.filter(gr => gr.group_id === group.group_id);
+                      const groupRoleData = allGroupRoles.filter(gr => gr.groupId === group.groupId);
                       const count = groupRoleData.length;
                       return `${count} role${count !== 1 ? 's' : ''}`;
                     })()}
                     {(() => {
-                      const groupRoleData = allGroupRoles.filter(gr => gr.group_id === group.group_id);
+                      const groupRoleData = allGroupRoles.filter(gr => gr.groupId === group.groupId);
                       return groupRoleData.length > 0 && (
                         <div className="roles-preview">
                           {groupRoleData.slice(0, 2).map(gr => {
-                            const roleId = gr.SK.replace('ROLE#', '');
-                            const role = roles.find(r => r.role_id === roleId);
+                            const roleId = gr.SK?.replace('ROLE#', '') || gr.roleId;
+                            const role = roles.find(r => r.roleId === roleId);
                             return role ? (
                               <span key={roleId} className="role-tag">
                                 {role.name}
@@ -553,7 +563,7 @@ export const GroupManagement: React.FC = () => {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteGroup(group.group_id)}
+                        onClick={() => handleDeleteGroup(group.groupId)}
                         className="btn btn-sm btn-danger"
                         title="Delete Group"
                       >

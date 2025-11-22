@@ -175,12 +175,11 @@
   display: flex;
   align-items: center;
   padding: 8px 10px;
-  cursor: pointer;
   background: white;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   transition: all 0.2s ease;
-  gap: 20px;
+  gap: 10px;
 }
 
 .permission-checkbox-simple:hover {
@@ -205,7 +204,7 @@
   white-space: nowrap;
   flex: 1;
   line-height: 1.2;
-  margin-left: 15px;
+  cursor: pointer;
 }
 
 .form-actions {
