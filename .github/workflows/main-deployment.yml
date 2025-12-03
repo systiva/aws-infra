@@ -51,9 +51,101 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  debug:
+    name: Debug Secrets and Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Secret Availability
+        run: |
+          echo "### Debug Information ###"
+          echo "Checking if secrets are available..."
+          
+          # Check if secrets exist (without revealing values)
+          if [ -n "${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}" ]; then
+            echo "✅ AWS_ADMIN_ACCESS_KEY_ID is set"
+            echo "   Length: ${#AWS_ADMIN_ACCESS_KEY_ID}"
+            echo "   First 4 chars: ${AWS_ADMIN_ACCESS_KEY_ID:0:4}****"
+          else
+            echo "❌ AWS_ADMIN_ACCESS_KEY_ID is NOT set"
+          fi
+          
+          if [ -n "${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}" ]; then
+            echo "✅ AWS_ADMIN_SECRET_ACCESS_KEY is set"
+            echo "   Length: ${#AWS_ADMIN_SECRET_ACCESS_KEY}"
+          else
+            echo "❌ AWS_ADMIN_SECRET_ACCESS_KEY is NOT set"
+          fi
+          
+          if [ -n "${{ secrets.TEMPORARY_PASSWORD }}" ]; then
+            echo "✅ TEMPORARY_PASSWORD is set"
+          else
+            echo "❌ TEMPORARY_PASSWORD is NOT set"
+          fi
+          
+          echo ""
+          echo "### Environment Information ###"
+          echo "Region: ${{ env.AWS_REGION }}"
+          echo "Node Version: ${{ env.NODE_VERSION }}"
+          echo "Terraform Version: ${{ env.TERRAFORM_VERSION }}"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "GitHub Actor: ${{ github.actor }}"
+        env:
+          AWS_ADMIN_ACCESS_KEY_ID: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          AWS_ADMIN_SECRET_ACCESS_KEY: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+      
+      - name: Test AWS Credentials
+        run: |
+          echo "### Testing AWS Credentials ###"
+          
+          # Install AWS CLI if needed
+          if ! command -v aws &> /dev/null; then
+            echo "Installing AWS CLI..."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install
+          fi
+          
+          echo "AWS CLI Version:"
+          aws --version
+          
+          echo ""
+          echo "Testing STS GetCallerIdentity..."
+          
+          # Set credentials as environment variables
+          export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}"
+          export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}"
+          export AWS_DEFAULT_REGION="${{ env.AWS_REGION }}"
+          
+          # Try to call STS
+          if aws sts get-caller-identity; then
+            echo "✅ AWS credentials are VALID"
+          else
+            echo "❌ AWS credentials are INVALID or lack permissions"
+            echo "Error code: $?"
+          fi
+      
+      - name: Test with configure-aws-credentials action
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+        continue-on-error: true
+      
+      - name: Verify AWS Identity after action
+        run: |
+          echo "### After configure-aws-credentials action ###"
+          if aws sts get-caller-identity; then
+            echo "✅ Successfully configured AWS credentials"
+          else
+            echo "❌ Failed to configure AWS credentials"
+          fi
+        continue-on-error: true
+
   setup:
     name: Setup Environment
     runs-on: ubuntu-latest
+    needs: debug
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -78,7 +170,7 @@ jobs:
   admin-bootstrap:
     name: Admin Infrastructure Bootstrap
     runs-on: ubuntu-latest
-    needs: setup
+    needs: [setup, debug]
     if: |
       inputs.deployment_stage == 'all' || 
       inputs.deployment_stage == 'admin-bootstrap' || 
