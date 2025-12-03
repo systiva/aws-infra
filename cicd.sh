@@ -218,9 +218,17 @@ manage_admin_workspace() {
     
     # Initialize with workspace-specific backend - handle configuration changes
     print_info "Initializing Terraform with backend config: backend-${TERRAFORM_WORKSPACE}.conf"
-    if ! terraform init -backend-config="backend-${TERRAFORM_WORKSPACE}.conf" 2>/dev/null; then
-        print_warning "Backend configuration changed, reconfiguring..."
-        terraform init -reconfigure -backend-config="backend-${TERRAFORM_WORKSPACE}.conf"
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        if ! AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform init -backend-config="backend-${TERRAFORM_WORKSPACE}.conf" 2>/dev/null; then
+            print_warning "Backend configuration changed, reconfiguring..."
+            AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform init -reconfigure -backend-config="backend-${TERRAFORM_WORKSPACE}.conf"
+        fi
+    else
+        if ! terraform init -backend-config="backend-${TERRAFORM_WORKSPACE}.conf" 2>/dev/null; then
+            print_warning "Backend configuration changed, reconfiguring..."
+            terraform init -reconfigure -backend-config="backend-${TERRAFORM_WORKSPACE}.conf"
+        fi
     fi
     
     # Select or create workspace
@@ -251,9 +259,17 @@ manage_tenant_workspace() {
     
     # Initialize with workspace-specific backend - handle configuration changes
     print_info "Initializing Terraform with backend config: backend-${TERRAFORM_WORKSPACE}.conf"
-    if ! terraform init -backend-config="backend-${TERRAFORM_WORKSPACE}.conf" 2>/dev/null; then
-        print_warning "Backend configuration changed, reconfiguring..."
-        terraform init -reconfigure -backend-config="backend-${TERRAFORM_WORKSPACE}.conf"
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
+        if ! AWS_PROFILE="$AWS_TENANT_PROFILE" terraform init -backend-config="backend-${TERRAFORM_WORKSPACE}.conf" 2>/dev/null; then
+            print_warning "Backend configuration changed, reconfiguring..."
+            AWS_PROFILE="$AWS_TENANT_PROFILE" terraform init -reconfigure -backend-config="backend-${TERRAFORM_WORKSPACE}.conf"
+        fi
+    else
+        if ! terraform init -backend-config="backend-${TERRAFORM_WORKSPACE}.conf" 2>/dev/null; then
+            print_warning "Backend configuration changed, reconfiguring..."
+            terraform init -reconfigure -backend-config="backend-${TERRAFORM_WORKSPACE}.conf"
+        fi
     fi
     
     # Select or create workspace
@@ -345,15 +361,28 @@ bootstrap_admin_infrastructure() {
     
     print_info "Account: $AWS_ACCOUNT_ID, Workspace: $TERRAFORM_WORKSPACE, Profile: $AWS_ADMIN_PROFILE"
     
+    # Export profile as Terraform variable for compatibility with CI/CD
+    export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
+    
     cd "$IAC_DIR/bootstrap"
-    AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform init
-    AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform plan \
-        -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
-        -var="admin_account_id=${AWS_ACCOUNT_ID}" \
-        -var="aws_region=${AWS_REGION}" \
-        -var="aws_profile=${AWS_ADMIN_PROFILE}" \
-        -out="bootstrap-plan"
-    AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform apply "bootstrap-plan"
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform init
+        AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform plan \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${AWS_ACCOUNT_ID}" \
+            -var="aws_region=${AWS_REGION}" \
+            -out="bootstrap-plan"
+        AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform apply "bootstrap-plan"
+    else
+        terraform init
+        terraform plan \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${AWS_ACCOUNT_ID}" \
+            -var="aws_region=${AWS_REGION}" \
+            -out="bootstrap-plan"
+        terraform apply "bootstrap-plan"
+    fi
     cd - > /dev/null
     print_success "Admin infrastructure bootstrapped for account: $AWS_ACCOUNT_ID"
 }
@@ -362,14 +391,27 @@ plan_admin_infrastructure() {
     print_header "Planning Admin Infrastructure"
     validate_admin_command
     
+    # Export profile as Terraform variable for compatibility with CI/CD
+    export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
+    
     manage_admin_workspace
     cd "$IAC_DIR"
-    AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform plan \
-        -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
-        -var="admin_account_id=${AWS_ACCOUNT_ID}" \
-        -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
-        -var-file="environments/${ENV}.tfvars" \
-        -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform plan \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${AWS_ACCOUNT_ID}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var-file="environments/${ENV}.tfvars" \
+            -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    else
+        terraform plan \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${AWS_ACCOUNT_ID}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var-file="environments/${ENV}.tfvars" \
+            -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    fi
     cd - > /dev/null
     print_success "Admin infrastructure plan created for account: $AWS_ACCOUNT_ID"
 }
@@ -377,6 +419,9 @@ plan_admin_infrastructure() {
 apply_admin_infrastructure() {
     print_header "Applying Admin Infrastructure"
     validate_admin_command
+    
+    # Export profile as Terraform variable for compatibility with CI/CD
+    export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
     
     manage_admin_workspace
     cd "$IAC_DIR"
@@ -386,7 +431,12 @@ apply_admin_infrastructure() {
         exit 1
     fi
     
-    AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    else
+        terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    fi
     cd - > /dev/null
     print_success "Admin infrastructure applied for account: $AWS_ACCOUNT_ID"
 }
@@ -418,16 +468,30 @@ bootstrap_tenant_infrastructure() {
     print_info "Tenant Account: $AWS_ACCOUNT_ID, Admin Account: $ADMIN_ACCOUNT_ID"
     print_info "Workspace: $TERRAFORM_WORKSPACE, Profile: $AWS_TENANT_PROFILE"
     
+    # Export profile as Terraform variable for compatibility with CI/CD
+    export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
+    
     cd "$TENANT_IAC_DIR/bootstrap"
-    AWS_PROFILE="$AWS_TENANT_PROFILE" terraform init
-    AWS_PROFILE="$AWS_TENANT_PROFILE" terraform plan \
-        -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
-        -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
-        -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
-        -var="tenant_aws_profile=${AWS_TENANT_PROFILE}" \
-        -var="aws_region=${AWS_REGION}" \
-        -out="bootstrap-plan"
-    AWS_PROFILE="$AWS_TENANT_PROFILE" terraform apply "bootstrap-plan"
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
+        AWS_PROFILE="$AWS_TENANT_PROFILE" terraform init
+        AWS_PROFILE="$AWS_TENANT_PROFILE" terraform plan \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
+            -var="aws_region=${AWS_REGION}" \
+            -out="bootstrap-plan"
+        AWS_PROFILE="$AWS_TENANT_PROFILE" terraform apply "bootstrap-plan"
+    else
+        terraform init
+        terraform plan \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
+            -var="aws_region=${AWS_REGION}" \
+            -out="bootstrap-plan"
+        terraform apply "bootstrap-plan"
+    fi
     cd - > /dev/null
     print_success "✅ Tenant infrastructure bootstrapped for account: $AWS_ACCOUNT_ID"
 }
@@ -436,16 +500,31 @@ plan_tenant_infrastructure() {
     print_header "📋 Planning Tenant Infrastructure"
     validate_tenant_command
     
+    # Export profile as Terraform variable for compatibility with CI/CD
+    export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
+    
     manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
-    AWS_PROFILE="$AWS_TENANT_PROFILE" terraform plan \
-        -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
-        -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
-        -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
-        -var="tenant_id=${TENANT_ID}" \
-        -var="environment=${ENV}" \
-        -var-file="environments/${ENV}.tfvars" \
-        -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
+        AWS_PROFILE="$AWS_TENANT_PROFILE" terraform plan \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var="tenant_id=${TENANT_ID}" \
+            -var="environment=${ENV}" \
+            -var-file="environments/${ENV}.tfvars" \
+            -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    else
+        terraform plan \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var="tenant_id=${TENANT_ID}" \
+            -var="environment=${ENV}" \
+            -var-file="environments/${ENV}.tfvars" \
+            -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    fi
     cd - > /dev/null
     print_success "✅ Tenant infrastructure plan created for account: $AWS_ACCOUNT_ID"
 }
@@ -453,6 +532,9 @@ plan_tenant_infrastructure() {
 apply_tenant_infrastructure() {
     print_header "🚀 Applying Tenant Infrastructure"
     validate_tenant_command
+    
+    # Export profile as Terraform variable for compatibility with CI/CD
+    export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
     
     manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
@@ -462,7 +544,12 @@ apply_tenant_infrastructure() {
         exit 1
     fi
     
-    AWS_PROFILE="$AWS_TENANT_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
+        AWS_PROFILE="$AWS_TENANT_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    else
+        terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    fi
     cd - > /dev/null
     print_success "✅ Tenant infrastructure applied for account: $AWS_ACCOUNT_ID"
 }
