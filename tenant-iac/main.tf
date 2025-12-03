@@ -20,8 +20,11 @@ terraform {
 
 # AWS Provider with tenant profile
 provider "aws" {
-  region  = var.aws_region
-  profile = var.tenant_aws_profile
+  region = var.aws_region
+  
+  # Only use profile for local development
+  # GitHub Actions and CI/CD use environment variables
+  profile = var.tenant_aws_profile != "default" ? var.tenant_aws_profile : null
 }
 
 # Get current account ID to validate we're in the right account

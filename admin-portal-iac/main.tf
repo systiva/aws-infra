@@ -25,8 +25,11 @@ terraform {
 
 # Configure AWS Provider - No default tags due to SCP restrictions
 provider "aws" {
-  region  = var.aws_region
-  profile = var.aws_profile
+  region = var.aws_region
+  
+  # Only use profile for local development
+  # GitHub Actions and CI/CD use environment variables
+  profile = var.aws_profile != "default" ? var.aws_profile : null
 }
 
 # Random suffix for unique resource names
