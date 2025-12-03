@@ -10,6 +10,9 @@ yarn-error.log*
 *.tar.gz
 *.tgz
 
+# Exception: Allow placeholder Lambda packages for Terraform
+!admin-portal-iac/lambda-packages/*.zip
+
 # Build outputs
 build/
 dist/
