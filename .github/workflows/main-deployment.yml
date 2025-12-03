@@ -224,8 +224,8 @@ jobs:
           path: admin-portal-iac/backend-${{ inputs.workspace }}.conf
           retention-days: 90
 
-  admin-plan:
-    name: Admin Infrastructure Plan
+  admin-infrastructure:
+    name: Admin Infrastructure Plan & Apply
     runs-on: ubuntu-latest
     needs: admin-bootstrap
     if: |
@@ -233,6 +233,7 @@ jobs:
       (needs.admin-bootstrap.result == 'success' || needs.admin-bootstrap.result == 'skipped') &&
       (inputs.deployment_stage == 'all' || 
        inputs.deployment_stage == 'admin-plan' || 
+       inputs.deployment_stage == 'admin-apply' || 
        inputs.deployment_stage == 'admin-infrastructure')
     steps:
       - name: Checkout code
@@ -267,44 +268,9 @@ jobs:
             --admin-profile=default
         env:
           TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
-
-  admin-apply:
-    name: Admin Infrastructure Apply
-    runs-on: ubuntu-latest
-    needs: admin-plan
-    if: |
-      always() && 
-      (needs.admin-plan.result == 'success' || needs.admin-plan.result == 'skipped') &&
-      (inputs.deployment_stage == 'all' || 
-       inputs.deployment_stage == 'admin-apply' || 
-       inputs.deployment_stage == 'admin-infrastructure')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Download backend config from bootstrap
-        uses: actions/download-artifact@v4
-        with:
-          name: admin-backend-config-${{ inputs.workspace }}
-          path: admin-portal-iac/
-        continue-on-error: true
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-      
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
       
       - name: Run admin apply
         run: |
-          chmod +x ./cicd.sh
           ./cicd.sh admin-apply \
             --workspace=${{ inputs.workspace }} \
             --aws-account=${{ inputs.admin_account_id }} \
@@ -315,10 +281,10 @@ jobs:
   tenant-bootstrap:
     name: Tenant Infrastructure Bootstrap
     runs-on: ubuntu-latest
-    needs: admin-apply
+    needs: admin-infrastructure
     if: |
       always() && 
-      (needs.admin-apply.result == 'success' || needs.admin-apply.result == 'skipped') &&
+      (needs.admin-infrastructure.result == 'success' || needs.admin-infrastructure.result == 'skipped') &&
       (inputs.deployment_stage == 'all' || 
        inputs.deployment_stage == 'tenant-bootstrap' || 
        inputs.deployment_stage == 'tenant-infrastructure')
@@ -355,8 +321,8 @@ jobs:
           path: tenant-iac/backend-${{ inputs.workspace }}.conf
           retention-days: 90
 
-  tenant-plan:
-    name: Tenant Infrastructure Plan
+  tenant-infrastructure:
+    name: Tenant Infrastructure Plan & Apply
     runs-on: ubuntu-latest
     needs: tenant-bootstrap
     if: |
@@ -364,6 +330,7 @@ jobs:
       (needs.tenant-bootstrap.result == 'success' || needs.tenant-bootstrap.result == 'skipped') &&
       (inputs.deployment_stage == 'all' || 
        inputs.deployment_stage == 'tenant-plan' || 
+       inputs.deployment_stage == 'tenant-apply' || 
        inputs.deployment_stage == 'tenant-infrastructure')
     steps:
       - name: Checkout code
@@ -397,44 +364,9 @@ jobs:
             --aws-account=${{ inputs.tenant_account_id }} \
             --admin-account=${{ inputs.admin_account_id }} \
             --tenant-profile=default
-
-  tenant-apply:
-    name: Tenant Infrastructure Apply
-    runs-on: ubuntu-latest
-    needs: tenant-plan
-    if: |
-      always() && 
-      (needs.tenant-plan.result == 'success' || needs.tenant-plan.result == 'skipped') &&
-      (inputs.deployment_stage == 'all' || 
-       inputs.deployment_stage == 'tenant-apply' || 
-       inputs.deployment_stage == 'tenant-infrastructure')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Download backend config from bootstrap
-        uses: actions/download-artifact@v4
-        with:
-          name: tenant-backend-config-${{ inputs.workspace }}
-          path: tenant-iac/
-        continue-on-error: true
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-      
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
       
       - name: Run tenant apply
         run: |
-          chmod +x ./cicd.sh
           ./cicd.sh tenant-apply \
             --workspace=${{ inputs.workspace }} \
             --aws-account=${{ inputs.tenant_account_id }} \
@@ -444,10 +376,10 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    needs: tenant-apply
+    needs: tenant-infrastructure
     if: |
       always() && 
-      (needs.tenant-apply.result == 'success' || needs.tenant-apply.result == 'skipped') &&
+      (needs.tenant-infrastructure.result == 'success' || needs.tenant-infrastructure.result == 'skipped') &&
       (inputs.deployment_stage == 'all' || 
        inputs.deployment_stage == 'services-all' || 
        inputs.deployment_stage == 'services-frontend-only')
