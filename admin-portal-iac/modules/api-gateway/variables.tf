@@ -89,3 +89,16 @@ variable "ims_service_lambda_function_name" {
   type        = string
   default     = ""
 }
+
+# OMS Service Configuration
+variable "oms_service_lambda_invoke_arn" {
+  description = "Invoke ARN for OMS service Lambda function"
+  type        = string
+  default     = ""
+}
+
+variable "oms_service_lambda_function_name" {
+  description = "Name of the OMS service Lambda function"
+  type        = string
+  default     = ""
+}

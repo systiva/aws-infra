@@ -13,6 +13,13 @@ import { PermissionManagement } from './views/PermissionManagement';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleGuard } from './components/RoleGuard';
 import { GroupGuard } from './components/GroupGuard';
+
+// OMS Components
+import OMSDashboard from './views/OMSDashboard';
+import CustomerManagement from './views/CustomerManagement';
+import ProductManagement from './views/ProductManagement';
+import OrderManagement from './views/OrderManagement';
+import InventoryManagement from './views/InventoryManagement';
 import { LoginPage } from './components/LoginPage';
 import { useAuth } from './contexts/AuthContext';
 import './App.css';
@@ -124,6 +131,67 @@ function AppContent() {
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage permissions.</div>}
               >
                 <PermissionManagement />
+              </GroupGuard>
+            } 
+          />
+
+          {/* OMS Routes - All tenant users + platform admin */}
+          <Route 
+            path="/oms" 
+            element={
+              <GroupGuard 
+                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                fallback={<div className="access-denied">Access Denied: You don't have permission to access Order Management.</div>}
+              >
+                <OMSDashboard />
+              </GroupGuard>
+            } 
+          />
+
+          <Route 
+            path="/oms/customers" 
+            element={
+              <GroupGuard 
+                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                fallback={<div className="access-denied">Access Denied: You don't have permission to manage customers.</div>}
+              >
+                <CustomerManagement />
+              </GroupGuard>
+            } 
+          />
+
+          <Route 
+            path="/oms/products" 
+            element={
+              <GroupGuard 
+                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                fallback={<div className="access-denied">Access Denied: You don't have permission to manage products.</div>}
+              >
+                <ProductManagement />
+              </GroupGuard>
+            } 
+          />
+
+          <Route 
+            path="/oms/orders" 
+            element={
+              <GroupGuard 
+                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                fallback={<div className="access-denied">Access Denied: You don't have permission to manage orders.</div>}
+              >
+                <OrderManagement />
+              </GroupGuard>
+            } 
+          />
+
+          <Route 
+            path="/oms/inventory" 
+            element={
+              <GroupGuard 
+                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                fallback={<div className="access-denied">Access Denied: You don't have permission to manage inventory.</div>}
+              >
+                <InventoryManagement />
               </GroupGuard>
             } 
           />

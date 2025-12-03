@@ -168,6 +168,32 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: 'Super Admins',
     requiredGroups: ['platform-admin'],
   },
+  // OMS Navigation Items - Only for tenant users
+  {
+    path: '/oms',
+    label: 'OMS Dashboard',
+    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+  },
+  {
+    path: '/oms/customers',
+    label: 'Customers',
+    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+  },
+  {
+    path: '/oms/products',
+    label: 'Products',
+    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+  },
+  {
+    path: '/oms/orders',
+    label: 'Orders',
+    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+  },
+  {
+    path: '/oms/inventory',
+    label: 'Inventory',
+    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+  },
 ];
 
 // Filter navigation items based on user groups (preferred) or roles (fallback)

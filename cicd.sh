@@ -39,7 +39,7 @@ ALLOWED_WORKSPACES=("dev" "qa" "prd" "uat")
 WORKSPACE_PREFIX="${WORKSPACE_PREFIX:-}"
 
 # Valid service names
-VALID_SERVICES=("create-infra-worker" "delete-infra-worker" "poll-infra-worker" "create-admin-worker" "setup-rbac-worker" "jwt-authorizer" "admin-portal-be" "ims-service" "admin-portal-web-server" "admin-portal-fe")
+VALID_SERVICES=("create-infra-worker" "delete-infra-worker" "poll-infra-worker" "create-admin-worker" "setup-rbac-worker" "jwt-authorizer" "admin-portal-be" "ims-service" "oms-service" "admin-portal-web-server" "admin-portal-fe")
 
 # Directories
 IAC_DIR="admin-portal-iac"
@@ -509,7 +509,7 @@ build_service() {
         "create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"setup-rbac-worker"|"jwt-authorizer")
             build_lambda_service "$service_name"
             ;;
-        "admin-portal-be"|"ims-service")
+        "admin-portal-be"|"ims-service"|"oms-service")
             build_backend_service "$service_name"
             ;;
         *)
@@ -529,7 +529,7 @@ deploy_service() {
         "admin-portal-fe")
             deploy_react_frontend
             ;;
-        "admin-portal-web-server"|"create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"setup-rbac-worker"|"jwt-authorizer"|"admin-portal-be"|"ims-service")
+        "admin-portal-web-server"|"create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"setup-rbac-worker"|"jwt-authorizer"|"admin-portal-be"|"ims-service"|"oms-service")
             deploy_lambda_or_backend_service "$service_name"
             ;;
         *)
@@ -552,7 +552,7 @@ test_service() {
         "create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"setup-rbac-worker"|"jwt-authorizer")
             test_lambda_service "$service_name"
             ;;
-        "admin-portal-be"|"ims-service"|"admin-portal-web-server")
+        "admin-portal-be"|"ims-service"|"oms-service"|"admin-portal-web-server")
             test_backend_service "$service_name"
             ;;
         *)
@@ -718,16 +718,21 @@ get_lambda_function_name() {
     case "$service_name" in
         "admin-portal-web-server")
             terraform_function_name="web-server"
+            echo "admin-portal-${TERRAFORM_WORKSPACE:-dev}-${terraform_function_name}"
             ;;
         "admin-portal-be")
             terraform_function_name="backend"
+            echo "admin-portal-${TERRAFORM_WORKSPACE:-dev}-${terraform_function_name}"
+            ;;
+        "oms-service")
+            # OMS service uses its own naming convention
+            echo "oms-service-${TERRAFORM_WORKSPACE:-dev}"
             ;;
         *)
             terraform_function_name="$service_name"
+            echo "admin-portal-${TERRAFORM_WORKSPACE:-dev}-${terraform_function_name}"
             ;;
     esac
-    
-    echo "admin-portal-${TERRAFORM_WORKSPACE:-dev}-${terraform_function_name}"
 }
 
 deploy_lambda_or_backend_service() {

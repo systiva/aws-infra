@@ -220,7 +220,8 @@ function generatePolicy(principalId, effect, resource, context = {}) {
       email: context.email || '',
       tenantId: context.tenantId || '',
       userRole: context.userRole || '',
-      permissions: JSON.stringify(context.permissions || [])
+      permissions: JSON.stringify(context.permissions || []),
+      groups: JSON.stringify(context.groups || [])
     };
   }
 

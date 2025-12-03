@@ -20,6 +20,7 @@ locals {
     admin_portal_lambda_uri   = var.admin_portal_lambda_invoke_arn
     admin_backend_lambda_uri  = var.admin_backend_lambda_invoke_arn
     ims_service_lambda_uri    = var.ims_service_lambda_invoke_arn
+    oms_service_lambda_uri    = var.oms_service_lambda_invoke_arn
     jwt_authorizer_uri        = var.enable_jwt_authorizer ? var.jwt_authorizer_lambda_invoke_arn : ""
     jwt_authorizer_enabled    = var.enable_jwt_authorizer
   })
@@ -277,6 +278,90 @@ resource "aws_lambda_permission" "ims_context_endpoints" {
   function_name = var.ims_service_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/context/*"
+}
+
+# ==============================================
+# OMS Service Lambda Permissions
+# ==============================================
+
+# Permission 1: /api/v1/oms/customers (base endpoint)
+resource "aws_lambda_permission" "oms_customers_base" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSCustomersBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/customers"
+}
+
+# Permission 2: /api/v1/oms/customers/* (with path params)
+resource "aws_lambda_permission" "oms_customers_endpoints" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSCustomers"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/customers/*"
+}
+
+# Permission 3: /api/v1/oms/products (base endpoint)
+resource "aws_lambda_permission" "oms_products_base" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSProductsBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/products"
+}
+
+# Permission 4: /api/v1/oms/products/* (with path params)
+resource "aws_lambda_permission" "oms_products_endpoints" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSProducts"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/products/*"
+}
+
+# Permission 5: /api/v1/oms/orders (base endpoint)
+resource "aws_lambda_permission" "oms_orders_base" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSOrdersBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/orders"
+}
+
+# Permission 6: /api/v1/oms/orders/* (with path params)
+resource "aws_lambda_permission" "oms_orders_endpoints" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSOrders"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/orders/*"
+}
+
+# Permission 7: /api/v1/oms/inventory (base endpoint)
+resource "aws_lambda_permission" "oms_inventory_base" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSInventoryBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/inventory"
+}
+
+# Permission 8: /api/v1/oms/inventory/* (with path params)
+resource "aws_lambda_permission" "oms_inventory_endpoints" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSInventory"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/inventory/*"
 }
 
 # ==============================================

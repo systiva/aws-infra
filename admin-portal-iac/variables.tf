@@ -406,6 +406,28 @@ variable "ims_log_level" {
 }
 
 # ==============================================
+# OMS (Order Management Service) Configuration
+# ==============================================
+
+variable "enable_oms_service" {
+  description = "Enable Order Management Service Lambda"
+  type        = bool
+  default     = true
+}
+
+variable "oms_cross_account_role_name" {
+  description = "Name of the cross-account IAM role in tenant accounts for OMS"
+  type        = string
+  default     = "CrossAccountTenantRole"
+}
+
+variable "oms_log_level" {
+  description = "Log level for OMS Service"
+  type        = string
+  default     = "INFO"
+}
+
+# ==============================================
 # Platform Bootstrap Configuration
 # ==============================================
 

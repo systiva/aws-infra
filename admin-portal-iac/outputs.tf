@@ -68,6 +68,17 @@ output "ims_service_function_url" {
   value       = var.enable_ims_service && var.enable_cognito && var.enable_lambda_function_urls ? module.ims_service[0].lambda_function_url : null
 }
 
+# OMS Service Outputs
+output "oms_service_function_arn" {
+  description = "ARN of the OMS Service Lambda function"
+  value       = var.enable_oms_service ? module.oms_service[0].lambda_function_arn : null
+}
+
+output "oms_service_function_name" {
+  description = "Name of the OMS Service Lambda function"
+  value       = var.enable_oms_service ? module.oms_service[0].lambda_function_name : null
+}
+
 # ==============================================
 # Platform Bootstrap Outputs
 # ==============================================

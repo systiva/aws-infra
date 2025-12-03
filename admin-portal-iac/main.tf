@@ -273,6 +273,27 @@ module "create_admin_worker" {
   depends_on = [module.networking, module.ims_service, module.platform_bootstrap, module.setup_rbac_worker]
 }
 
+# OMS Service Lambda
+module "oms_service" {
+  count  = var.enable_oms_service ? 1 : 0
+  source = "./modules/oms-lambda"
+  
+  # Basic configuration
+  environment  = var.environment
+  aws_region   = var.aws_region
+  
+  # Lambda configuration
+  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  cross_account_role_name    = var.oms_cross_account_role_name
+  log_level                  = var.oms_log_level
+  log_retention_days         = var.log_retention_days
+  
+  # API Gateway reference (will be updated after API Gateway is created)
+  api_gateway_execution_arn  = var.enable_api_gateway ? module.api_gateway[0].api_gateway_execution_arn : ""
+  
+  depends_on = [module.networking]
+}
+
 # Private API Gateway for application access
 module "api_gateway" {
   count  = var.enable_api_gateway ? 1 : 0
@@ -303,6 +324,10 @@ module "api_gateway" {
   # IMS Service configuration
   ims_service_lambda_invoke_arn       = var.enable_ims_service && var.enable_cognito ? module.ims_service[0].lambda_function_invoke_arn : ""
   ims_service_lambda_function_name    = var.enable_ims_service && var.enable_cognito ? module.ims_service[0].lambda_function_name : ""
+  
+  # OMS Service configuration
+  oms_service_lambda_invoke_arn       = var.enable_oms_service ? module.oms_service[0].lambda_function_invoke_arn : ""
+  oms_service_lambda_function_name    = var.enable_oms_service ? module.oms_service[0].lambda_function_name : ""
   
   # Tags
   common_tags = local.common_tags

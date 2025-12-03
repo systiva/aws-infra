@@ -1,0 +1,296 @@
+service: oms-service
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 512
+  timeout: 30
+  
+  environment:
+    NODE_ENV: ${self:provider.stage}
+    AWS_ACCOUNT_ID: ${aws:accountId}
+    AWS_REGION: ${self:provider.region}
+    TENANT_REGISTRY_TABLE: ${self:custom.tenantRegistryTable}
+    CROSS_ACCOUNT_ROLE_NAME: OMS-CrossAccountRole
+    CROSS_ACCOUNT_ROLE_SESSION_NAME: oms-service-session
+    LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
+    API_PREFIX: /api/v1/oms
+  
+  iam:
+    role:
+      statements:
+        # Access to Tenant Registry DynamoDB table
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:Query
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.tenantRegistryTable}
+        
+        # STS AssumeRole permission for cross-account access
+        - Effect: Allow
+          Action:
+            - sts:AssumeRole
+          Resource:
+            - arn:aws:iam::*:role/OMS-CrossAccountRole
+        
+        # CloudWatch Logs
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource:
+            - arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-*:*
+
+custom:
+  tenantRegistryTable: TenantRegistry-${self:provider.stage}
+  
+  logLevel:
+    dev: debug
+    prod: info
+  
+  # Serverless offline plugin for local development
+  serverless-offline:
+    httpPort: 3002
+    lambdaPort: 3003
+
+functions:
+  api:
+    handler: lambda.handler
+    name: ${self:service}-${self:provider.stage}
+    description: Order Management Service API - Multi-tenant with cross-account access
+    events:
+      # Customer endpoints
+      - http:
+          path: /api/v1/oms/customers
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/customers/{customerId}
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/customers
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/customers/{customerId}
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/customers/{customerId}
+          method: delete
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      # Product endpoints
+      - http:
+          path: /api/v1/oms/products
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/products/{productId}
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/products
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/products/{productId}
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/products/{productId}
+          method: delete
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      # Order endpoints
+      - http:
+          path: /api/v1/oms/orders
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/orders/customer/{customerId}
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/orders/{orderId}
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/orders/{orderId}/status-history
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/orders
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/orders/{orderId}
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/orders/{orderId}/status
+          method: patch
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/orders/{orderId}
+          method: delete
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      # Inventory endpoints
+      - http:
+          path: /api/v1/oms/inventory
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/inventory/{productId}
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/inventory/{productId}/transactions
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/inventory
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/inventory/{productId}/quantity
+          method: patch
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/inventory/{productId}/reserve
+          method: patch
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/inventory/{productId}/release
+          method: patch
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+      
+      - http:
+          path: /api/v1/oms/inventory/{productId}/settings
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: ${cf:admin-portal-iac-${self:provider.stage}.CognitoAuthorizerId}
+    
+    tags:
+      Service: OMS
+      Environment: ${self:provider.stage}
+      ManagedBy: Serverless
+
+plugins:
+  - serverless-offline
+
+package:
+  exclude:
+    - node_modules/**
+    - .git/**
+    - .gitignore
+    - README.md
+    - scripts/**
+    - .env*
+    - test/**
