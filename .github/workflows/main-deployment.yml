@@ -412,10 +412,10 @@ jobs:
   deploy-lambdas:
     name: Deploy Lambda Functions
     runs-on: ubuntu-latest
-    needs: tenant-apply
+    needs: tenant-infrastructure
     if: |
       always() && 
-      (needs.tenant-apply.result == 'success' || needs.tenant-apply.result == 'skipped') &&
+      (needs.tenant-infrastructure.result == 'success' || needs.tenant-infrastructure.result == 'skipped') &&
       (inputs.deployment_stage == 'all' || 
        inputs.deployment_stage == 'services-all' || 
        inputs.deployment_stage == 'services-lambdas-only')
