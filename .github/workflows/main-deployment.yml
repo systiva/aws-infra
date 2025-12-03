@@ -217,14 +217,12 @@ jobs:
             --aws-account=${{ inputs.admin_account_id }} \
             --admin-profile=default
       
-      - name: Commit generated backend config
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add admin-portal-iac/backend-${{ inputs.workspace }}.conf || true
-          git diff --staged --quiet || git commit -m "chore: update backend-${{ inputs.workspace }}.conf from bootstrap"
-          git push || true
-        continue-on-error: true
+      - name: Upload generated backend config as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-backend-config-${{ inputs.workspace }}
+          path: admin-portal-iac/backend-${{ inputs.workspace }}.conf
+          retention-days: 90
 
   admin-plan:
     name: Admin Infrastructure Plan
@@ -239,6 +237,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Download backend config from bootstrap
+        uses: actions/download-artifact@v4
+        with:
+          name: admin-backend-config-${{ inputs.workspace }}
+          path: admin-portal-iac/
+        continue-on-error: true
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -276,6 +281,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Download backend config from bootstrap
+        uses: actions/download-artifact@v4
+        with:
+          name: admin-backend-config-${{ inputs.workspace }}
+          path: admin-portal-iac/
+        continue-on-error: true
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -336,14 +348,12 @@ jobs:
             --admin-account=${{ inputs.admin_account_id }} \
             --tenant-profile=default
       
-      - name: Commit generated backend config
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add tenant-iac/backend-${{ inputs.workspace }}.conf || true
-          git diff --staged --quiet || git commit -m "chore: update tenant backend-${{ inputs.workspace }}.conf from bootstrap"
-          git push || true
-        continue-on-error: true
+      - name: Upload generated backend config as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tenant-backend-config-${{ inputs.workspace }}
+          path: tenant-iac/backend-${{ inputs.workspace }}.conf
+          retention-days: 90
 
   tenant-plan:
     name: Tenant Infrastructure Plan
@@ -358,6 +368,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Download backend config from bootstrap
+        uses: actions/download-artifact@v4
+        with:
+          name: tenant-backend-config-${{ inputs.workspace }}
+          path: tenant-iac/
+        continue-on-error: true
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -394,6 +411,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Download backend config from bootstrap
+        uses: actions/download-artifact@v4
+        with:
+          name: tenant-backend-config-${{ inputs.workspace }}
+          path: tenant-iac/
+        continue-on-error: true
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
