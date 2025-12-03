@@ -345,72 +345,82 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       
-      - name: Deploy admin-portal-web-server
+      - name: Build and Deploy admin-portal-web-server
         run: |
           chmod +x ./cicd.sh
+          ./cicd.sh build --service=admin-portal-web-server
           ./cicd.sh deploy \
             --service=admin-portal-web-server \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy admin-portal-be
+      - name: Build and Deploy admin-portal-be
         run: |
+          ./cicd.sh build --service=admin-portal-be
           ./cicd.sh deploy \
             --service=admin-portal-be \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy ims-service
+      - name: Build and Deploy ims-service
         run: |
+          ./cicd.sh build --service=ims-service
           ./cicd.sh deploy \
             --service=ims-service \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy create-infra-worker
+      - name: Build and Deploy create-infra-worker
         run: |
+          ./cicd.sh build --service=create-infra-worker
           ./cicd.sh deploy \
             --service=create-infra-worker \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy delete-infra-worker
+      - name: Build and Deploy delete-infra-worker
         run: |
+          ./cicd.sh build --service=delete-infra-worker
           ./cicd.sh deploy \
             --service=delete-infra-worker \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy poll-infra-worker
+      - name: Build and Deploy poll-infra-worker
         run: |
+          ./cicd.sh build --service=poll-infra-worker
           ./cicd.sh deploy \
             --service=poll-infra-worker \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy create-admin-worker
+      - name: Build and Deploy create-admin-worker
         run: |
+          ./cicd.sh build --service=create-admin-worker
           ./cicd.sh deploy \
             --service=create-admin-worker \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy setup-rbac-worker
+      - name: Build and Deploy setup-rbac-worker
         run: |
+          ./cicd.sh build --service=setup-rbac-worker
           ./cicd.sh deploy \
             --service=setup-rbac-worker \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy jwt-authorizer
+      - name: Build and Deploy jwt-authorizer
         run: |
+          ./cicd.sh build --service=jwt-authorizer
           ./cicd.sh deploy \
             --service=jwt-authorizer \
             --workspace=${{ inputs.workspace }} \
             --admin-profile=default
       
-      - name: Deploy oms-service
+      - name: Build and Deploy oms-service
         run: |
+          ./cicd.sh build --service=oms-service
           ./cicd.sh deploy \
             --service=oms-service \
             --workspace=${{ inputs.workspace }} \
