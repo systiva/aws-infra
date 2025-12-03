@@ -23,9 +23,16 @@ provider "aws" {
   profile = var.tenant_aws_profile != "default" ? var.tenant_aws_profile : null
 }
 
-# Random suffix for unique resource names
+# Random suffix for unique resource names - keepers ensure same suffix for same workspace
 resource "random_id" "suffix" {
   byte_length = 4
+  
+  keepers = {
+    # Ensures the same suffix is generated for the same workspace and accounts
+    workspace        = var.workspace_prefix
+    tenant_account_id = var.tenant_account_id
+    admin_account_id  = var.admin_account_id
+  }
 }
 
 # Get current account ID to validate
@@ -121,11 +128,9 @@ resource "local_file" "backend_config" {
     admin_bucket     = "${var.workspace_prefix}-admin-portal-terraform-state-${var.admin_account_id}"
     admin_lock_table = "${var.workspace_prefix}-admin-portal-terraform-lock-${var.admin_account_id}"
     aws_region       = var.aws_region
-    aws_profile      = var.tenant_aws_profile
   }) : templatefile("${path.module}/templates/separate-account-backend.conf.tpl", {
     tenant_bucket     = aws_s3_bucket.tenant_terraform_state[0].bucket
     tenant_lock_table = aws_dynamodb_table.tenant_terraform_lock[0].name
     aws_region        = var.aws_region
-    aws_profile       = var.tenant_aws_profile
   })
 }

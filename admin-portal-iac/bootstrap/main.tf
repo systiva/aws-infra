@@ -25,9 +25,15 @@ provider "aws" {
   profile = var.aws_profile != "default" ? var.aws_profile : null
 }
 
-# Random suffix for unique resource names
+# Random suffix for unique resource names - keepers ensure same suffix for same workspace
 resource "random_id" "suffix" {
   byte_length = 4
+  
+  keepers = {
+    # Ensures the same suffix is generated for the same workspace and account
+    workspace  = var.workspace_prefix
+    account_id = var.admin_account_id
+  }
 }
 
 # Data sources
@@ -428,6 +434,5 @@ key            = "admin-portal-iac/terraform.tfstate"
 region         = "${var.aws_region}"
 dynamodb_table = "${aws_dynamodb_table.terraform_lock.name}"
 encrypt        = true
-profile        = "${var.aws_profile}"
 EOF
 }
