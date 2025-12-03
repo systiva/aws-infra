@@ -82,6 +82,12 @@ jobs:
             echo "❌ TEMPORARY_PASSWORD is NOT set"
           fi
           
+          if [ -n "${{ secrets.AWS_ADMIN_SESSION_TOKEN }}" ]; then
+            echo "✅ AWS_ADMIN_SESSION_TOKEN is set (temporary credentials)"
+          else
+            echo "⚠️  AWS_ADMIN_SESSION_TOKEN is NOT set (using permanent credentials)"
+          fi
+          
           echo ""
           echo "### Environment Information ###"
           echo "Region: ${{ env.AWS_REGION }}"
@@ -116,6 +122,12 @@ jobs:
           export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}"
           export AWS_DEFAULT_REGION="${{ env.AWS_REGION }}"
           
+          # Set session token if using temporary credentials
+          if [ -n "${{ secrets.AWS_ADMIN_SESSION_TOKEN }}" ]; then
+            export AWS_SESSION_TOKEN="${{ secrets.AWS_ADMIN_SESSION_TOKEN }}"
+            echo "Using temporary credentials with session token"
+          fi
+          
           # Try to call STS
           if aws sts get-caller-identity; then
             echo "✅ AWS credentials are VALID"
@@ -129,6 +141,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
         continue-on-error: true
       
@@ -189,6 +202,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Run admin bootstrap
@@ -223,6 +237,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Run admin plan
@@ -259,6 +274,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Run admin apply
@@ -295,6 +311,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Run tenant bootstrap
@@ -330,6 +347,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Run tenant plan
@@ -365,6 +383,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Run tenant apply
@@ -400,6 +419,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Build and deploy frontend
@@ -435,6 +455,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Build and Deploy admin-portal-web-server
