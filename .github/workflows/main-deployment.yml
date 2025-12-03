@@ -140,6 +140,8 @@ jobs:
             --workspace=${{ inputs.workspace }} \
             --aws-account=${{ inputs.admin_account_id }} \
             --admin-profile=default
+        env:
+          TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
 
   admin-apply:
     name: Admin Infrastructure Apply
@@ -174,6 +176,8 @@ jobs:
             --workspace=${{ inputs.workspace }} \
             --aws-account=${{ inputs.admin_account_id }} \
             --admin-profile=default
+        env:
+          TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
 
   tenant-bootstrap:
     name: Tenant Infrastructure Bootstrap

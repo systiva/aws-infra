@@ -448,5 +448,9 @@ variable "temporary_password" {
   description = "Temporary password for platform admin user"
   type        = string
   sensitive   = true
-  default     = "TempPass123!"
+  
+  validation {
+    condition     = length(var.temporary_password) >= 8
+    error_message = "Temporary password must be at least 8 characters long."
+  }
 }
