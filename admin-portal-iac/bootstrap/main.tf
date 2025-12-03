@@ -34,23 +34,25 @@ data "aws_region" "current" {}
 locals {
   account_id  = data.aws_caller_identity.current.account_id
   region      = data.aws_region.current.name
-  name_prefix = "${var.project_name}-${var.environment}"
+  name_prefix = "${var.project_name}-${var.workspace_prefix}"
   
   # Common tags for all resources
   common_tags = {
-    Environment   = var.environment
+    Environment   = var.workspace_prefix
     Project       = var.project_name
     Region        = var.aws_region
     AccountId     = local.account_id
+    AdminAccountId = var.admin_account_id
     ManagedBy     = "terraform"
     Component     = "bootstrap"
+    Workspace     = var.workspace_prefix
   }
 }
 
 # S3 bucket for Terraform state
 resource "aws_s3_bucket" "terraform_state" {
   bucket        = "${local.name_prefix}-terraform-state-${local.account_id}-${random_id.suffix.hex}"
-  force_destroy = var.environment == "dev" ? true : false
+  force_destroy = var.workspace_prefix == "dev" ? true : false
 
   tags = merge(local.common_tags, {
     Name    = "${local.name_prefix}-terraform-state"
@@ -160,7 +162,7 @@ resource "aws_sfn_state_machine" "tenant_operations" {
   role_arn = aws_iam_role.step_functions.arn
 
   definition = jsonencode({
-    Comment = "Tenant lifecycle operations with orchestration"
+    Comment = "Tenant lifecycle operations with orchestration and admin user creation"
     StartAt = "DetermineOperation"
     States = {
       DetermineOperation = {
@@ -224,7 +226,7 @@ resource "aws_sfn_state_machine" "tenant_operations" {
           {
             Variable = "$.status"
             StringEquals = "COMPLETE"
-            Next = "SuccessState"
+            Next = "DetermineNextStep"
           },
           {
             Variable = "$.status"
@@ -243,6 +245,95 @@ resource "aws_sfn_state_machine" "tenant_operations" {
         Type = "Wait"
         Seconds = 30
         Next = "PollInfrastructure"
+      }
+      DetermineNextStep = {
+        Type = "Choice"
+        Choices = [
+          {
+            Variable = "$.operation"
+            StringEquals = "CREATE"
+            Next = "SetupDefaultRBAC"
+          }
+        ]
+        Default = "SuccessState"
+      }
+      SetupDefaultRBAC = {
+        Type = "Task"
+        Resource = "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-setup-rbac-worker"
+        Parameters = {
+          "tenantId.$": "$.tenantId"
+        }
+        ResultPath = "$.rbacSetup"
+        Next = "CreateTenantAdmin"
+        Retry = [
+          {
+            ErrorEquals = ["States.TaskFailed"]
+            IntervalSeconds = 15
+            MaxAttempts = 2
+            BackoffRate = 2.0
+          }
+        ]
+        Catch = [
+          {
+            ErrorEquals = ["States.ALL"]
+            ResultPath = "$.rbacSetupError"
+            Next = "RBACSetupFailed"
+          }
+        ]
+      }
+      RBACSetupFailed = {
+        Type = "Pass"
+        Parameters = {
+          "message": "Infrastructure created successfully but RBAC setup failed",
+          "infrastructureStatus": "COMPLETE",
+          "rbacSetupStatus": "FAILED",
+          "error.$": "$.rbacSetupError"
+        }
+        End = true
+      }
+      CreateTenantAdmin = {
+        Type = "Task"
+        Resource = "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-create-admin-worker"
+        Parameters = {
+          "operation": "CREATE_ADMIN",
+          "tenantId.$": "$.tenantId",
+          "tenantName.$": "$.tenantName",
+          "firstName.$": "$.firstName",
+          "lastName.$": "$.lastName",
+          "adminUsername.$": "$.adminUsername",
+          "adminEmail.$": "$.adminEmail",
+          "adminPassword.$": "$.adminPassword",
+          "createdBy.$": "$.createdBy",
+          "registeredOn.$": "$.registeredOn",
+          "tenantAdminGroupId.$": "$.rbacSetup.tenantAdminGroupId"
+        }
+        ResultPath = "$.adminCreation"
+        Next = "SuccessState"
+        Retry = [
+          {
+            ErrorEquals = ["States.TaskFailed"]
+            IntervalSeconds = 15
+            MaxAttempts = 2
+            BackoffRate = 2.0
+          }
+        ]
+        Catch = [
+          {
+            ErrorEquals = ["States.ALL"]
+            ResultPath = "$.adminCreationError"
+            Next = "AdminCreationFailed"
+          }
+        ]
+      }
+      AdminCreationFailed = {
+        Type = "Pass"
+        Parameters = {
+          "message": "Infrastructure created successfully but tenant admin creation failed",
+          "infrastructureStatus": "COMPLETE",
+          "adminCreationStatus": "FAILED",
+          "error.$": "$.adminCreationError"
+        }
+        End = true
       }
       SuccessState = {
         Type = "Pass"
@@ -302,7 +393,9 @@ resource "aws_iam_role_policy" "step_functions" {
         Resource = [
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-create-infra-worker",
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-delete-infra-worker",
-          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-poll-infra-worker"
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-poll-infra-worker",
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-setup-rbac-worker",
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-create-admin-worker"
         ]
       },
       {
@@ -325,22 +418,10 @@ resource "aws_iam_role_policy" "step_functions" {
 
 # Generate backend configuration file
 resource "local_file" "backend_config" {
-  filename = "../backend-${var.environment}.conf"
-  content = templatefile("${path.module}/backend-config.tftpl", {
-    bucket         = aws_s3_bucket.terraform_state.bucket
-    key            = "admin-portal-iac/terraform.tfstate"
-    region         = var.aws_region
-    dynamodb_table = aws_dynamodb_table.terraform_lock.name
-    profile        = var.aws_profile
-  })
-}
-
-# Backend configuration template
-resource "local_file" "backend_template" {
-  filename = "backend-config.tftpl"
-  content  = <<-EOF
+  filename = "../backend-${var.workspace_prefix}.conf"
+  content = <<-EOF
 bucket         = "${aws_s3_bucket.terraform_state.bucket}"
-key            = "${var.terraform_state_key}"
+key            = "admin-portal-iac/terraform.tfstate"
 region         = "${var.aws_region}"
 dynamodb_table = "${aws_dynamodb_table.terraform_lock.name}"
 encrypt        = true

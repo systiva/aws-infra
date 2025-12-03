@@ -1,0 +1,198 @@
+/* Login Button Styles */
+.login-button-container {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 999;
+}
+
+.login-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0, 123, 255, 0.3);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  min-width: 100px;
+}
+
+.login-button:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(0, 123, 255, 0.4);
+}
+
+.login-button:active {
+  transform: translateY(0);
+}
+
+.login-button.authenticated {
+  background: linear-gradient(135deg, #28a745, #1e7e34);
+  min-width: 120px;
+}
+
+.login-button.authenticated:hover {
+  background: linear-gradient(135deg, #1e7e34, #155724);
+}
+
+.login-button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.login-button-text {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.user-info {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.3s ease;
+  margin-bottom: 10px;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.login-button:hover .user-info {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.user-info::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 20px;
+  border: 5px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+}
+
+.user-email {
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #fff;
+}
+
+.user-tenant,
+.user-role {
+  color: #ccc;
+  margin: 2px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .login-button-container {
+    bottom: 15px;
+    left: 15px;
+  }
+  
+  .login-button {
+    padding: 10px 16px;
+    font-size: 13px;
+    border-radius: 20px;
+  }
+  
+  .user-info {
+    font-size: 11px;
+    padding: 8px 12px;
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-button-container {
+    bottom: 10px;
+    left: 10px;
+  }
+  
+  .login-button {
+    padding: 8px 14px;
+    font-size: 12px;
+    min-width: 80px;
+  }
+  
+  .login-button.authenticated {
+    min-width: 100px;
+  }
+  
+  .user-info {
+    position: fixed;
+    bottom: 70px;
+    left: 10px;
+    right: 10px;
+    min-width: auto;
+    max-width: calc(100vw - 20px);
+  }
+  
+  .user-info::after {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/* Animation for new notifications or status changes */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 4px 20px rgba(0, 123, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(0, 123, 255, 0.6);
+  }
+  100% {
+    box-shadow: 0 4px 20px rgba(0, 123, 255, 0.3);
+  }
+}
+
+.login-button.pulse {
+  animation: pulse 2s infinite;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .login-button {
+    border: 2px solid white;
+  }
+  
+  .user-info {
+    border: 1px solid white;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .login-button,
+  .user-info {
+    transition: none;
+  }
+  
+  .login-button:hover {
+    transform: none;
+  }
+  
+  .login-button.pulse {
+    animation: none;
+  }
+}

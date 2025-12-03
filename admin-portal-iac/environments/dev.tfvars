@@ -1,6 +1,6 @@
 # Development environment configuration for admin portal
 aws_region  = "us-east-1"
-aws_profile = "fct_fct.admin"
+aws_profile = "admin"
 
 project_name = "admin-portal"
 environment  = "dev"
@@ -38,7 +38,7 @@ lambda_function_url_cors = {
 }
 
 # External Dependencies (using bootstrap created tables)
-tenant_registry_table_name = "platform-admin"  # From bootstrap
+tenant_registry_table_name = "admin-portal-dev-tenant-registry"  # From bootstrap
 step_functions_arn         = ""  # Optional - legacy
 
 # Step Functions Configuration for Tenant Lifecycle Management
@@ -80,3 +80,34 @@ common_tags = {
   Owner        = "platform-team"
   CostCenter   = "engineering"
 }
+
+# ==============================================
+# Identity Management System Configuration
+# ==============================================
+
+# Cognito Configuration
+enable_cognito                           = true
+cognito_admin_create_user_only          = true
+cognito_access_token_validity_minutes    = 60    # 1 hour
+cognito_id_token_validity_minutes        = 60    # 1 hour
+cognito_refresh_token_validity_days      = 30    # 30 days
+
+# OAuth URLs for development (can be updated later with actual frontend URLs)
+cognito_callback_urls = [
+  "http://localhost:3000/auth/callback",
+  "https://localhost:3000/auth/callback"
+]
+cognito_logout_urls = [
+  "http://localhost:3000/",
+  "https://localhost:3000/"
+]
+
+# JWT Authorizer Configuration
+enable_jwt_authorizer     = true
+jwt_authorizer_log_level  = "INFO"
+
+# IMS (Identity Management Service) Configuration
+enable_ims_service        = true
+ims_lambda_timeout        = 30
+ims_lambda_memory_size    = 512
+ims_log_level            = "INFO"

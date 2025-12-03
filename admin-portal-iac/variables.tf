@@ -1,4 +1,37 @@
 # Variables for admin portal infrastructure
+
+# Workspace Configuration
+variable "workspace_prefix" {
+  description = "Workspace prefix for resource naming (dev|qa|prd|uat)"
+  type        = string
+  
+  validation {
+    condition     = contains(["dev", "qa", "prd", "uat"], var.workspace_prefix)
+    error_message = "Workspace prefix must be one of: dev, qa, prd, uat."
+  }
+}
+
+# Account Configuration
+variable "admin_account_id" {
+  description = "AWS account ID for admin account"
+  type        = string
+  
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.admin_account_id))
+    error_message = "Admin account ID must be a 12-digit number."
+  }
+}
+
+variable "tenant_account_id" {
+  description = "AWS account ID for tenant account"
+  type        = string
+  
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.tenant_account_id))
+    error_message = "Tenant account ID must be a 12-digit number."
+  }
+}
+
 variable "aws_region" {
   description = "AWS region for resources"
   type        = string
@@ -6,9 +39,9 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS profile to use (configured for 'fct_fct.admin' profile - no SSO login required)"
+  description = "AWS profile to use for authentication"
   type        = string
-  default     = "fct_fct.admin"
+  default     = "admin"
 }
 
 variable "project_name" {
@@ -198,6 +231,31 @@ variable "delete_tenant_step_function_arn" {
   default     = ""
 }
 
+# Create Admin Worker Configuration (Tenant Admin User Creation)
+variable "ims_service_url" {
+  description = "Base URL for IMS service (Identity Management Service). If enable_api_gateway is true, this is dynamically resolved from API Gateway outputs."
+  type        = string
+  default     = ""
+}
+
+variable "ims_timeout" {
+  description = "IMS service timeout in milliseconds"
+  type        = number
+  default     = 30000
+}
+
+variable "tenant_platform_id" {
+  description = "Platform tenant ID where admin users are created. Dynamically resolved from platform-bootstrap module."
+  type        = string
+  default     = "PLATFORM"
+}
+
+variable "tenant_admin_group_id" {
+  description = "UUID of the tenant admin group in platform tenant. Dynamically resolved from platform-bootstrap module."
+  type        = string
+  default     = ""
+}
+
 # Cross-Account Access Configuration
 variable "tenant_account_role_name" {
   description = "Role name to assume in tenant accounts"
@@ -260,4 +318,139 @@ variable "admin_account_state_key" {
   description = "S3 key for admin account Terraform state"
   type        = string
   default     = "admin-account-iac/terraform.tfstate"
+}
+
+# ==============================================
+# Identity Management System Configuration
+# ==============================================
+
+# Cognito Configuration
+variable "enable_cognito" {
+  description = "Enable Cognito User Pool for authentication"
+  type        = bool
+  default     = true
+}
+
+variable "cognito_admin_create_user_only" {
+  description = "Only allow administrators to create users in Cognito"
+  type        = bool
+  default     = true
+}
+
+variable "cognito_access_token_validity_minutes" {
+  description = "Access token validity in minutes"
+  type        = number
+  default     = 60  # 1 hour
+}
+
+variable "cognito_id_token_validity_minutes" {
+  description = "ID token validity in minutes"
+  type        = number
+  default     = 60  # 1 hour
+}
+
+variable "cognito_refresh_token_validity_days" {
+  description = "Refresh token validity in days"
+  type        = number
+  default     = 30  # 30 days
+}
+
+variable "cognito_callback_urls" {
+  description = "List of allowed callback URLs for OAuth"
+  type        = list(string)
+  default     = []
+}
+
+variable "cognito_logout_urls" {
+  description = "List of allowed logout URLs for OAuth"
+  type        = list(string)
+  default     = []
+}
+
+# JWT Authorizer Configuration
+variable "enable_jwt_authorizer" {
+  description = "Enable JWT Authorizer Lambda for API Gateway"
+  type        = bool
+  default     = true
+}
+
+variable "jwt_authorizer_log_level" {
+  description = "Log level for JWT Authorizer"
+  type        = string
+  default     = "INFO"
+}
+
+# IMS (Identity Management Service) Configuration
+variable "enable_ims_service" {
+  description = "Enable Identity Management Service Lambda"
+  type        = bool
+  default     = true
+}
+
+variable "ims_lambda_timeout" {
+  description = "IMS Lambda timeout in seconds"
+  type        = number
+  default     = 30
+}
+
+variable "ims_lambda_memory_size" {
+  description = "IMS Lambda memory size in MB"
+  type        = number
+  default     = 512
+}
+
+variable "ims_log_level" {
+  description = "Log level for IMS Service"
+  type        = string
+  default     = "INFO"
+}
+
+# ==============================================
+# OMS (Order Management Service) Configuration
+# ==============================================
+
+variable "enable_oms_service" {
+  description = "Enable Order Management Service Lambda"
+  type        = bool
+  default     = true
+}
+
+variable "oms_cross_account_role_name" {
+  description = "Name of the cross-account IAM role in tenant accounts for OMS"
+  type        = string
+  default     = "CrossAccountTenantRole"
+}
+
+variable "oms_log_level" {
+  description = "Log level for OMS Service"
+  type        = string
+  default     = "INFO"
+}
+
+# ==============================================
+# Platform Bootstrap Configuration
+# ==============================================
+
+# Platform Bootstrap Configuration
+variable "enable_platform_bootstrap" {
+  description = "Enable platform admin user creation and RBAC bootstrap"
+  type        = bool
+  default     = true
+}
+
+variable "platform_admin_email" {
+  description = "Email address for the platform admin user"
+  type        = string
+  default     = "demo_platform_admin@platform.com"
+}
+
+variable "temporary_password" {
+  description = "Temporary password for platform admin user"
+  type        = string
+  sensitive   = true
+  
+  validation {
+    condition     = length(var.temporary_password) >= 8
+    error_message = "Temporary password must be at least 8 characters long."
+  }
 }

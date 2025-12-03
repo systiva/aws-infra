@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const TenantService = require('../services/tenant-service');
 const Logger = require('../../logger');
+const { authMiddleware } = require('../middlewares/auth');
+
+// Apply auth middleware to all tenant routes
+router.use(authMiddleware);
 
 // GET /tenants - Get all tenants and total count
 router.get('/', async (req, res, next) => {
@@ -12,6 +16,20 @@ router.get('/', async (req, res, next) => {
     res.status(serviceRes.status).json(serviceRes.json);
   } catch (error) {
     Logger.error(error, 'GET /tenants - Error occurred');
+    next(error);
+  }
+});
+
+// GET /tenants/:tenantId - Get single tenant by ID
+router.get('/:tenantId', async (req, res, next) => {
+  try {
+    const tenantId = req.params.tenantId;
+    Logger.debug({ tenantId }, 'GET /tenants/:tenantId - Retrieving tenant by ID');
+    const serviceRes = await TenantService.getTenantDetails(tenantId);
+    Logger.debug(serviceRes, 'GET /tenants/:tenantId - Service response');
+    res.status(serviceRes.status).json(serviceRes.json);
+  } catch (error) {
+    Logger.error(error, 'GET /tenants/:tenantId - Error occurred');
     next(error);
   }
 });
@@ -106,6 +124,20 @@ router.post('/complete-provisioning/:tenantId', async (req, res, next) => {
     res.status(serviceRes.status).json(serviceRes.json);
   } catch (error) {
     Logger.error(error, 'POST /complete-provisioning - Error occurred');
+    next(error);
+  }
+});
+
+// GET /:tenantId - Get individual tenant details
+router.get('/:tenantId', async (req, res, next) => {
+  try {
+    const tenantId = req.params.tenantId;
+    Logger.debug({ tenantId }, 'GET /:tenantId - Getting tenant details');
+    const serviceRes = await TenantService.getTenantDetails(tenantId);
+    Logger.debug(serviceRes, 'GET /:tenantId - Service response');
+    res.status(serviceRes.status).json(serviceRes.json);
+  } catch (error) {
+    Logger.error(error, 'GET /:tenantId - Error occurred');
     next(error);
   }
 });

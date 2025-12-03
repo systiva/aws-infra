@@ -23,6 +23,8 @@ out/
 .terraform.lock.hcl
 terraform.tfvars
 *.auto.tfvars
+*.out
+
 
 # IDE files
 .vscode/
@@ -70,3 +72,5 @@ jspm_packages/
 
 # Yarn Integrity file
 .yarn-integrity
+
+*.md

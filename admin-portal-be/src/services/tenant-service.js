@@ -42,6 +42,35 @@ class TenantService {
   }
 
   /**
+   * Get individual tenant details by ID
+   */
+  static async getTenantDetails(tenantId) {
+    Logger.debug({ tenantId }, 'TenantService.getTenantDetails - Getting tenant details');
+    
+    try {
+      const tenant = await Mapping.getTenant(tenantId);
+      if (!tenant) {
+        Logger.warn({ tenantId }, 'TenantService.getTenantDetails - Tenant not found');
+        return Commons.getRes(
+          Constants.HTTP_STATUS.NOT_FOUND,
+          'Tenant not found',
+          { tenantId }
+        );
+      }
+      
+      return Commons.getRes(
+        Constants.HTTP_STATUS.OK,
+        'Tenant details retrieved successfully',
+        tenant
+      );
+      
+    } catch (error) {
+      Logger.error(error, 'TenantService.getTenantDetails - Error occurred');
+      throw new InternalError(`Failed to get tenant details: ${error.message}`);
+    }
+  }
+
+  /**
    * Create a new tenant in DynamoDB
    */
   static async createTenant(tenantData) {
@@ -49,7 +78,7 @@ class TenantService {
     
     try {
       // Validate required fields
-      const requiredFields = ['tenantName', 'email', 'subscriptionTier'];
+      const requiredFields = ['tenantName', 'email', 'subscriptionTier', 'firstName', 'lastName', 'adminUsername', 'adminEmail'];
       for (const field of requiredFields) {
         if (!tenantData[field]) {
           throw new InternalError(`Missing required field: ${field}`);
@@ -85,6 +114,11 @@ class TenantService {
         tenantId: tenantId,
         tenantName: tenantData.tenantName,
         email: tenantData.email,
+        firstName: tenantData.firstName,
+        lastName: tenantData.lastName,
+        adminUsername: tenantData.adminUsername, // Username for Cognito login
+        adminEmail: tenantData.adminEmail,
+        adminPassword: tenantData.adminPassword, // Optional, will be filtered if undefined
         subscriptionTier: tenantData.subscriptionTier,
         provisioningState: 'creating',
         registeredOn: moment().toISOString(),
@@ -202,6 +236,11 @@ class TenantService {
         subscriptionTier: tenant.subscriptionTier,
         tenantName: tenant.tenantName,
         email: tenant.email,
+        firstName: tenant.firstName,
+        lastName: tenant.lastName,
+        adminUsername: tenant.adminUsername,
+        adminEmail: tenant.adminEmail,
+        adminPassword: tenant.adminPassword,
         createdBy: tenant.createdBy,
         registeredOn: tenant.registeredOn
       };
@@ -602,8 +641,8 @@ class TenantService {
       
       // Create tenant entry in TENANT_PUBLIC table
       const tenantEntry = {
-        pk: `TENANT#${tenantId}`,
-        sk: 'init',
+        PK: `TENANT#${tenantId}`,
+        SK: 'init',
         tenantId: tenantId,
         createdAt: moment().toISOString(),
         status: 'initialized',
@@ -616,7 +655,7 @@ class TenantService {
         TableName: 'TENANT_PUBLIC',
         Item: tenantEntry,
         // Ensure we don't overwrite existing entries
-        ConditionExpression: 'attribute_not_exists(pk)'
+        ConditionExpression: 'attribute_not_exists(PK)'
       };
       
       await dynamodb.put(putParams).promise();
@@ -650,21 +689,21 @@ class TenantService {
             TableName: tableName,
             AttributeDefinitions: [
               {
-                AttributeName: 'pk',
+                AttributeName: 'PK',
                 AttributeType: 'S'
               },
               {
-                AttributeName: 'sk',
+                AttributeName: 'SK',
                 AttributeType: 'S'
               }
             ],
             KeySchema: [
               {
-                AttributeName: 'pk',
+                AttributeName: 'PK',
                 KeyType: 'HASH'
               },
               {
-                AttributeName: 'sk',
+                AttributeName: 'SK',
                 KeyType: 'RANGE'
               }
             ],
@@ -907,8 +946,8 @@ class TenantService {
       
       // Create initial entry
       const initialEntry = {
-        pk: `TENANT#${tenantId}`,
-        sk: 'init',
+        PK: `TENANT#${tenantId}`,
+        SK: 'init',
         tenantId: tenantId,
         createdAt: moment().toISOString(),
         status: 'initialized',
@@ -1124,8 +1163,8 @@ class TenantService {
       const getParams = {
         TableName: 'TENANT_PUBLIC',
         Key: {
-          pk: `TENANT#${tenantId}`,
-          sk: 'init'
+          PK: `TENANT#${tenantId}`,
+          SK: 'init'
         }
       };
       
@@ -1334,7 +1373,7 @@ class TenantService {
       // Query all items with the tenant PK
       const queryParams = {
         TableName: tableName,
-        KeyConditionExpression: 'pk = :pk',
+        KeyConditionExpression: 'PK = :pk',
         ExpressionAttributeValues: {
           ':pk': tenantPK
         }
@@ -1367,8 +1406,8 @@ class TenantService {
         const deleteRequests = batch.map(item => ({
           DeleteRequest: {
             Key: {
-              pk: item.pk,
-              sk: item.sk
+              PK: item.PK,
+              SK: item.SK
             }
           }
         }));

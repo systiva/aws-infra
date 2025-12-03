@@ -57,3 +57,48 @@ variable "common_tags" {
   type        = map(string)
   default     = {}
 }
+
+# JWT Authorizer Configuration
+variable "enable_jwt_authorizer" {
+  description = "Enable JWT authorizer for API Gateway"
+  type        = bool
+  default     = false
+}
+
+variable "jwt_authorizer_lambda_invoke_arn" {
+  description = "Invoke ARN for JWT authorizer Lambda function"
+  type        = string
+  default     = ""
+}
+
+variable "jwt_authorizer_lambda_function_name" {
+  description = "Name of the JWT authorizer Lambda function"
+  type        = string
+  default     = ""
+}
+
+# IMS Service Configuration
+variable "ims_service_lambda_invoke_arn" {
+  description = "Invoke ARN for IMS service Lambda function"
+  type        = string
+  default     = ""
+}
+
+variable "ims_service_lambda_function_name" {
+  description = "Name of the IMS service Lambda function"
+  type        = string
+  default     = ""
+}
+
+# OMS Service Configuration
+variable "oms_service_lambda_invoke_arn" {
+  description = "Invoke ARN for OMS service Lambda function"
+  type        = string
+  default     = ""
+}
+
+variable "oms_service_lambda_function_name" {
+  description = "Name of the OMS service Lambda function"
+  type        = string
+  default     = ""
+}

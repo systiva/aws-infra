@@ -6,7 +6,7 @@ const env = process.env.ENV ? process.env.ENV.trim().toLowerCase() : null;
 Logger.info(`ENV: ${env}`);
 
 // Set table name based on environment
-const TABLE_NAME = 'platform-admin';
+const TABLE_NAME = 'admin-portal-dev-tenant-registry';
 Logger.info(`DynamoDB Table: ${TABLE_NAME}`);
 
 // Configure DynamoDB connection based on environment
@@ -15,12 +15,10 @@ let ddbConfig = {
 };
 
 if (env === 'local') {
-  // Local development with DynamoDB Local
-  ddbConfig.endpoint = 'http://localhost:8000';
-  ddbConfig.credentials = {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'fake-access-key',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'fake-secret-key'
-  };
+  // Local development - use IAM role credentials (no fake credentials)
+  // This will use the AWS credentials from your local environment (AWS CLI, IAM role, etc.)
+  ddbConfig.endpoint = `https://dynamodb.${ddbConfig.region}.amazonaws.com`;
+  Logger.info('Using local development with IAM role credentials');
 } else if (['dev', 'qa', 'uat', 'prod', 'production'].includes(env)) {
   // AWS environments - use IAM role credentials
   // Don't set explicit credentials, let AWS SDK use IAM role
@@ -40,9 +38,9 @@ dynamoose.aws.ddb.set(ddb);
 
 // Log connection details
 if (env === 'local') {
-  Logger.info('🔧 Connecting to DynamoDB Local at http://localhost:8000');
-  Logger.info(`AWS_ACCESS_KEY_ID: ${process.env.AWS_ACCESS_KEY_ID}`);
-  Logger.info(`AWS_SECRET_ACCESS_KEY: ${process.env.AWS_SECRET_ACCESS_KEY ? '***' : 'NOT_SET'}`);
+  Logger.info(`☁️ Connecting to AWS DynamoDB in region: ${ddbConfig.region}`);
+  Logger.info('🔐 Using local AWS credentials (AWS CLI, IAM role, etc.)');
+  Logger.info(`Endpoint: ${ddbConfig.endpoint}`);
 } else {
   Logger.info(`☁️ Connecting to AWS DynamoDB in region: ${ddbConfig.region}`);
   Logger.info('🔐 Using IAM role credentials (no explicit access keys)');
@@ -50,11 +48,11 @@ if (env === 'local') {
 
 const dbSchema = new dynamoose.Schema(
   {
-    pk: {
+    PK: {
       type: String,
       hashKey: true,
     },
-    sk: {
+    SK: {
       type: String,
       rangeKey: true,
       required: true,
@@ -67,6 +65,6 @@ const dbSchema = new dynamoose.Schema(
 
 Logger.info(`Connected to DynamoDB Table: ${TABLE_NAME}`);
 module.exports = dynamoose.model(TABLE_NAME, dbSchema, {
-  create: env === 'local' ? true : false, // Auto-create table in local environment
-  update: env === 'local' ? true : false, // Auto-update table schema in local environment
+  create: false, // Don't auto-create table - should exist in AWS
+  update: false, // Don't auto-update table schema
 });

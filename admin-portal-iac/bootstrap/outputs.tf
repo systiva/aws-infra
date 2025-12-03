@@ -56,8 +56,8 @@ output "next_steps" {
     2. Initialize Terraform with the generated backend config:
        terraform init -backend-config="${local_file.backend_config.filename}"
     3. Deploy the main infrastructure:
-       terraform plan -var-file="environments/${var.environment}.tfvars"
-       terraform apply -var-file="environments/${var.environment}.tfvars"
+       terraform plan -var-file="environments/${var.workspace_prefix}.tfvars"
+       terraform apply -var-file="environments/${var.workspace_prefix}.tfvars"
     
     Backend Configuration:
     - S3 Bucket: ${aws_s3_bucket.terraform_state.bucket}

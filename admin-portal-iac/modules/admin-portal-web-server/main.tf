@@ -30,7 +30,7 @@ resource "aws_lambda_function" "admin_portal_web_server" {
   environment {
     variables = {
       NODE_ENV                = var.environment
-      LOG_LEVEL              = "INFO"
+      LOG_LEVEL              = "info"
       S3_BUCKET_NAME         = var.portal_bucket_name  # Fixed: was PORTAL_BUCKET_NAME
       ADMIN_BACKEND_URL      = var.admin_backend_url
       CORS_ORIGIN            = "*"

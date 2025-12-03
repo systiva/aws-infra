@@ -1,0 +1,99 @@
+name: Frontend Deployment Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Terraform workspace (dev/qa/uat/prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - build-and-deploy
+          - build-only
+
+env:
+  AWS_REGION: us-east-1
+  NODE_VERSION: '18.x'
+
+concurrency:
+  group: frontend-${{ inputs.workspace }}
+  cancel-in-progress: false
+
+jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Build frontend
+        run: |
+          chmod +x ./cicd.sh
+          ./cicd.sh build --service=admin-portal-fe
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build-${{ inputs.workspace }}
+          path: admin-portal-fe/build/
+          retention-days: 7
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: build-frontend
+    if: inputs.action == 'build-and-deploy'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build-${{ inputs.workspace }}
+          path: admin-portal-fe/build/
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Deploy to S3 and CloudFront
+        run: |
+          chmod +x ./cicd.sh
+          ./cicd.sh deploy \
+            --service=admin-portal-fe \
+            --workspace=${{ inputs.workspace }} \
+            --admin-profile=default
+      
+      - name: Deployment summary
+        run: |
+          echo "### Frontend Deployment Complete :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workspace**: ${{ inputs.workspace }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action**: ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region**: ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: Success ✅" >> $GITHUB_STEP_SUMMARY

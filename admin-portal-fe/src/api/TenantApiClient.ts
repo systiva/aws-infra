@@ -1,6 +1,5 @@
 import { TenantData, TenantRegistrationRequest, BackendResponse, TenantsListResponse } from '../models/TenantModel';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api/v1';
+import { apiClient } from './ApiClient';
 
 export class TenantApiClient {
   private static instance: TenantApiClient;
@@ -12,30 +11,10 @@ export class TenantApiClient {
     return this.instance;
   }
 
-  private async makeRequest<T>(
-    url: string, 
-    options: RequestInit = {}
-  ): Promise<T> {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    return response.json();
-  }
-
   async registerTenant(request: TenantRegistrationRequest): Promise<TenantData> {
     try {
-      const response = await this.makeRequest<BackendResponse<TenantData>>(
-        `${API_BASE_URL}/tenants/onboard`,
+      const response = await apiClient.request<BackendResponse<TenantData>>(
+        '/tenants/onboard',
         {
           method: 'POST',
           body: JSON.stringify(request),
@@ -50,8 +29,8 @@ export class TenantApiClient {
 
   async fetchTenants(): Promise<TenantData[]> {
     try {
-      const response = await this.makeRequest<BackendResponse<TenantsListResponse>>(
-        `${API_BASE_URL}/tenants`
+      const response = await apiClient.request<BackendResponse<TenantsListResponse>>(
+        '/tenants'
       );
       return response.data.tenants;
     } catch (error) {
@@ -60,10 +39,22 @@ export class TenantApiClient {
     }
   }
 
+  async fetchTenantDetails(tenantId: string): Promise<TenantData> {
+    try {
+      const response = await apiClient.request<BackendResponse<TenantData>>(
+        `/tenants/${encodeURIComponent(tenantId)}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching tenant details:', error);
+      throw error;
+    }
+  }
+
   async updateTenant(tenantId: string, updateData: Partial<TenantData>): Promise<TenantData> {
     try {
-      const response = await this.makeRequest<BackendResponse<TenantData>>(
-        `${API_BASE_URL}/tenants/onboard`,
+      const response = await apiClient.request<BackendResponse<TenantData>>(
+        '/tenants/onboard',
         {
           method: 'PUT',
           body: JSON.stringify({ tenantId, ...updateData }),
@@ -87,8 +78,8 @@ export class TenantApiClient {
 
   async deleteTenant(tenantId: string): Promise<void> {
     try {
-      await this.makeRequest<BackendResponse<any>>(
-        `${API_BASE_URL}/tenants/offboard?tenantId=${encodeURIComponent(tenantId)}`,
+      await apiClient.request<BackendResponse<any>>(
+        `/tenants/offboard?tenantId=${encodeURIComponent(tenantId)}`,
         {
           method: 'DELETE',
         }
@@ -101,8 +92,8 @@ export class TenantApiClient {
 
   async suspendTenant(tenantId: string): Promise<TenantData> {
     try {
-      const response = await this.makeRequest<BackendResponse<TenantData>>(
-        `${API_BASE_URL}/tenants/suspend?tenantId=${encodeURIComponent(tenantId)}`,
+      const response = await apiClient.request<BackendResponse<TenantData>>(
+        `/tenants/suspend?tenantId=${encodeURIComponent(tenantId)}`,
         {
           method: 'PUT',
         }

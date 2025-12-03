@@ -1,0 +1,204 @@
+const { createTenantDynamooseInstance } = require('../db');
+const { wrapDynamoDBOperation } = require('../dynamodb-error');
+const logger = require('../../../logger');
+const { v4: uuidv4 } = require('uuid');
+
+/**
+ * Customer Management Access Patterns
+ * Handles all customer-related DynamoDB operations using AWS SDK DocumentClient
+ */
+class CustomerManagement {
+    
+    /**
+     * Create a new customer
+     */
+    static async createCustomer(tenantContext, customerData, userId) {
+        return wrapDynamoDBOperation(async () => {
+            const customerId = customerData.customerId || uuidv4();
+            const now = new Date().toISOString();
+            
+            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerSK = `CUSTOMER#${customerId}`;
+            
+            const customerItem = {
+                PK: customerPK,
+                SK: customerSK,
+                entityType: 'CUSTOMER',
+                customerId,
+                name: customerData.name,
+                email: customerData.email,
+                phone: customerData.phone,
+                address: customerData.address || {},
+                status: customerData.status || 'ACTIVE',
+                metadata: customerData.metadata || {},
+                createdAt: now,
+                updatedAt: now,
+                createdBy: userId
+            };
+            
+            logger.debug('Creating customer', { customerId, tenantId: tenantContext.tenantId });
+            
+            const dbClient = createTenantDynamooseInstance(
+                tenantContext.credentials,
+                tenantContext.orderTableName
+            );
+            
+            await dbClient.docClient.put({
+                TableName: dbClient.tableName,
+                Item: customerItem
+            }).promise();
+            
+            return this.cleanCustomerResponse(customerItem);
+            
+        }, 'createCustomer', { tenantId: tenantContext.tenantId });
+    }
+    
+    /**
+     * Get customer by ID
+     */
+    static async getCustomer(tenantContext, customerId) {
+        return wrapDynamoDBOperation(async () => {
+            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerSK = `CUSTOMER#${customerId}`;
+            
+            logger.debug('Getting customer', { customerId, tenantId: tenantContext.tenantId });
+            
+            const dbClient = createTenantDynamooseInstance(
+                tenantContext.credentials,
+                tenantContext.orderTableName
+            );
+            
+            const result = await dbClient.docClient.get({
+                TableName: dbClient.tableName,
+                Key: {
+                    PK: customerPK,
+                    SK: customerSK
+                }
+            }).promise();
+            
+            if (!result.Item) {
+                return null;
+            }
+            
+            return this.cleanCustomerResponse(result.Item);
+            
+        }, 'getCustomer', { tenantId: tenantContext.tenantId, customerId });
+    }
+    
+    /**
+     * Get all customers in tenant
+     */
+    static async getAllCustomers(tenantContext) {
+        return wrapDynamoDBOperation(async () => {
+            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            
+            logger.debug('Getting all customers', { tenantId: tenantContext.tenantId });
+            
+            const dbClient = createTenantDynamooseInstance(
+                tenantContext.credentials,
+                tenantContext.orderTableName
+            );
+            
+            const result = await dbClient.docClient.query({
+                TableName: dbClient.tableName,
+                KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+                ExpressionAttributeValues: {
+                    ':pk': customerPK,
+                    ':sk': 'CUSTOMER#'
+                }
+            }).promise();
+            
+            return result.Items.map(customer => this.cleanCustomerResponse(customer));
+            
+        }, 'getAllCustomers', { tenantId: tenantContext.tenantId });
+    }
+    
+    /**
+     * Update customer
+     */
+    static async updateCustomer(tenantContext, customerId, updateData, userId) {
+        return wrapDynamoDBOperation(async () => {
+            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerSK = `CUSTOMER#${customerId}`;
+            const now = new Date().toISOString();
+            
+            logger.debug('Updating customer', { customerId, tenantId: tenantContext.tenantId });
+            
+            const dbClient = createTenantDynamooseInstance(
+                tenantContext.credentials,
+                tenantContext.orderTableName
+            );
+            
+            const updateItem = {
+                ...updateData,
+                updatedAt: now,
+                updatedBy: userId
+            };
+            
+            // Build update expression
+            const updateExpressions = [];
+            const expressionAttributeNames = {};
+            const expressionAttributeValues = {};
+            
+            Object.keys(updateItem).forEach((key, index) => {
+                const attrName = `#attr${index}`;
+                const attrValue = `:val${index}`;
+                updateExpressions.push(`${attrName} = ${attrValue}`);
+                expressionAttributeNames[attrName] = key;
+                expressionAttributeValues[attrValue] = updateItem[key];
+            });
+            
+            const result = await dbClient.docClient.update({
+                TableName: dbClient.tableName,
+                Key: { PK: customerPK, SK: customerSK },
+                UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+                ExpressionAttributeNames: expressionAttributeNames,
+                ExpressionAttributeValues: expressionAttributeValues,
+                ReturnValues: 'ALL_NEW'
+            }).promise();
+            
+            return this.cleanCustomerResponse(result.Attributes);
+            
+        }, 'updateCustomer', { tenantId: tenantContext.tenantId, customerId });
+    }
+    
+    /**
+     * Delete customer
+     */
+    static async deleteCustomer(tenantContext, customerId) {
+        return wrapDynamoDBOperation(async () => {
+            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerSK = `CUSTOMER#${customerId}`;
+            
+            logger.debug('Deleting customer', { customerId, tenantId: tenantContext.tenantId });
+            
+            const dbClient = createTenantDynamooseInstance(
+                tenantContext.credentials,
+                tenantContext.orderTableName
+            );
+            
+            await dbClient.docClient.delete({
+                TableName: dbClient.tableName,
+                Key: { PK: customerPK, SK: customerSK }
+            }).promise();
+            
+            return { success: true, customerId };
+            
+        }, 'deleteCustomer', { tenantId: tenantContext.tenantId, customerId });
+    }
+    
+    /**
+     * Clean customer response
+     */
+    static cleanCustomerResponse(customer) {
+        if (!customer) return customer;
+        
+        const cleanCustomer = { ...customer };
+        delete cleanCustomer.PK;
+        delete cleanCustomer.SK;
+        
+        return cleanCustomer;
+    }
+}
+
+module.exports = CustomerManagement;

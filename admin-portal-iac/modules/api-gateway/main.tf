@@ -1,5 +1,5 @@
 # API Gateway Module for Admin Portal
-# Creates an API Gateway that can be PRIVATE (VPC-only) or REGIONAL (internet-accessible)
+# Uses OpenAPI/Swagger specification for API definition
 
 # Data sources
 data "aws_caller_identity" "current" {}
@@ -13,12 +13,25 @@ locals {
     Name = local.api_name
     Type = "APIGateway"
   })
+  
+  # Generate OpenAPI spec from template
+  openapi_spec = templatefile("${path.module}/swagger.yml.tpl", {
+    api_name                  = local.api_name
+    admin_portal_lambda_uri   = var.admin_portal_lambda_invoke_arn
+    admin_backend_lambda_uri  = var.admin_backend_lambda_invoke_arn
+    ims_service_lambda_uri    = var.ims_service_lambda_invoke_arn
+    oms_service_lambda_uri    = var.oms_service_lambda_invoke_arn
+    jwt_authorizer_uri        = var.enable_jwt_authorizer ? var.jwt_authorizer_lambda_invoke_arn : ""
+    jwt_authorizer_enabled    = var.enable_jwt_authorizer
+  })
 }
 
-# API Gateway (supports both PRIVATE and REGIONAL)
+# API Gateway REST API defined via OpenAPI/Swagger
 resource "aws_api_gateway_rest_api" "admin_api" {
   name        = local.api_name
   description = var.api_gateway_type == "PRIVATE" ? "Private API Gateway for Admin Portal - No internet access required" : "Regional API Gateway for Admin Portal - Internet accessible"
+  
+  body = local.openapi_spec
   
   endpoint_configuration {
     types            = [var.api_gateway_type]
@@ -49,283 +62,318 @@ resource "aws_api_gateway_rest_api" "admin_api" {
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "admin_api" {
   rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  stage_name  = var.stage_name
-
+  
   triggers = {
+    # Redeploy when OpenAPI spec changes
     redeployment = sha1(jsonencode([
+      local.openapi_spec,
       aws_api_gateway_rest_api.admin_api.body,
-      aws_api_gateway_rest_api.admin_api.policy, # Include policy changes
-      # Web server endpoints
-      aws_api_gateway_method.root.id,
-      aws_api_gateway_method.proxy_any.id,
-      aws_api_gateway_method.proxy_options.id,
-      aws_api_gateway_integration.root.id,
-      aws_api_gateway_integration.proxy_any.id,
-      aws_api_gateway_integration.proxy_options.id,
-      # Backend API endpoints
-      aws_api_gateway_resource.api.id,
-      aws_api_gateway_resource.v1.id,
-      aws_api_gateway_resource.tenants.id,
-      aws_api_gateway_method.tenants_get.id,
-      aws_api_gateway_integration.tenants_get.id,
-      aws_api_gateway_resource.offboard.id,
-      aws_api_gateway_method.offboard_delete.id,
-      aws_api_gateway_integration.offboard_delete.id,
-      aws_api_gateway_resource.onboard.id,
-      aws_api_gateway_method.onboard_post.id,
-      aws_api_gateway_method.onboard_put.id,
-      aws_api_gateway_integration.onboard_post.id,
-      aws_api_gateway_integration.onboard_put.id,
-      aws_api_gateway_resource.suspend.id,
-      aws_api_gateway_method.suspend_put.id,
-      aws_api_gateway_integration.suspend_put.id,
+      aws_api_gateway_rest_api.admin_api.policy,
     ]))
   }
 
   lifecycle {
     create_before_destroy = true
   }
-
-  depends_on = [
-    # Web server methods and integrations
-    aws_api_gateway_method.root,
-    aws_api_gateway_method.proxy_any,
-    aws_api_gateway_method.proxy_options,
-    aws_api_gateway_integration.root,
-    aws_api_gateway_integration.proxy_any,
-    aws_api_gateway_integration.proxy_options,
-    # Backend API methods and integrations
-    aws_api_gateway_method.tenants_get,
-    aws_api_gateway_integration.tenants_get,
-    aws_api_gateway_method.offboard_delete,
-    aws_api_gateway_integration.offboard_delete,
-    aws_api_gateway_method.onboard_post,
-    aws_api_gateway_method.onboard_put,
-    aws_api_gateway_integration.onboard_post,
-    aws_api_gateway_integration.onboard_put,
-    aws_api_gateway_method.suspend_put,
-    aws_api_gateway_integration.suspend_put
-  ]
 }
 
-# Resources and methods for web server (root path and proxy)
-
-# Root resource method (/)
-resource "aws_api_gateway_method" "root" {
+# API Gateway Stage
+resource "aws_api_gateway_stage" "admin_api" {
+  deployment_id = aws_api_gateway_deployment.admin_api.id
   rest_api_id   = aws_api_gateway_rest_api.admin_api.id
-  resource_id   = aws_api_gateway_rest_api.admin_api.root_resource_id
-  http_method   = "ANY"
-  authorization = "NONE"
+  stage_name    = var.stage_name
+
+  # Enable CloudWatch Logs
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      caller         = "$context.identity.caller"
+      user           = "$context.identity.user"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      resourcePath   = "$context.resourcePath"
+      status         = "$context.status"
+      protocol       = "$context.protocol"
+      responseLength = "$context.responseLength"
+    })
+  }
+
+  tags = local.common_tags
 }
 
-# Root integration to web server
-resource "aws_api_gateway_integration" "root" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  resource_id = aws_api_gateway_rest_api.admin_api.root_resource_id
-  http_method = aws_api_gateway_method.root.http_method
-
-  integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.admin_portal_lambda_invoke_arn
+# CloudWatch Log Group for API Gateway
+resource "aws_cloudwatch_log_group" "api_gateway" {
+  name              = "/aws/apigateway/${local.api_name}"
+  retention_in_days = 7
+  tags              = local.common_tags
 }
 
-# Proxy resource for web server ({proxy+})
-resource "aws_api_gateway_resource" "proxy" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  parent_id   = aws_api_gateway_rest_api.admin_api.root_resource_id
-  path_part   = "{proxy+}"
-}
+# ==============================================
+# Lambda Permissions for API Gateway
+# Explicit permissions for each endpoint to match Swagger configuration
+# ==============================================
 
-# Proxy method (ANY)
-resource "aws_api_gateway_method" "proxy_any" {
-  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
-  resource_id   = aws_api_gateway_resource.proxy.id
-  http_method   = "ANY"
-  authorization = "NONE"
-}
+# ==============================================
+# Admin Portal Lambda - Frontend Web Server
+# ==============================================
 
-# Proxy method (OPTIONS)
-resource "aws_api_gateway_method" "proxy_options" {
-  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
-  resource_id   = aws_api_gateway_resource.proxy.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-# Proxy integration (ANY)
-resource "aws_api_gateway_integration" "proxy_any" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  resource_id = aws_api_gateway_resource.proxy.id
-  http_method = aws_api_gateway_method.proxy_any.http_method
-
-  integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.admin_portal_lambda_invoke_arn
-}
-
-# Proxy integration (OPTIONS)
-resource "aws_api_gateway_integration" "proxy_options" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  resource_id = aws_api_gateway_resource.proxy.id
-  http_method = aws_api_gateway_method.proxy_options.http_method
-
-  integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.admin_portal_lambda_invoke_arn
-}
-
-# API resources for backend Lambda
-
-# /api resource
-resource "aws_api_gateway_resource" "api" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  parent_id   = aws_api_gateway_rest_api.admin_api.root_resource_id
-  path_part   = "api"
-}
-
-# /api/v1 resource
-resource "aws_api_gateway_resource" "v1" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  parent_id   = aws_api_gateway_resource.api.id
-  path_part   = "v1"
-}
-
-# /api/v1/tenants resource
-resource "aws_api_gateway_resource" "tenants" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  parent_id   = aws_api_gateway_resource.v1.id
-  path_part   = "tenants"
-}
-
-# /api/v1/tenants GET method
-resource "aws_api_gateway_method" "tenants_get" {
-  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
-  resource_id   = aws_api_gateway_resource.tenants.id
-  http_method   = "GET"
-  authorization = "NONE"
-}
-
-# /api/v1/tenants GET integration
-resource "aws_api_gateway_integration" "tenants_get" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  resource_id = aws_api_gateway_resource.tenants.id
-  http_method = aws_api_gateway_method.tenants_get.http_method
-
-  integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.admin_backend_lambda_invoke_arn
-}
-
-# /api/v1/tenants/offboard resource
-resource "aws_api_gateway_resource" "offboard" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  parent_id   = aws_api_gateway_resource.tenants.id
-  path_part   = "offboard"
-}
-
-# /api/v1/tenants/offboard DELETE method
-resource "aws_api_gateway_method" "offboard_delete" {
-  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
-  resource_id   = aws_api_gateway_resource.offboard.id
-  http_method   = "DELETE"
-  authorization = "NONE"
-}
-
-# /api/v1/tenants/offboard DELETE integration
-resource "aws_api_gateway_integration" "offboard_delete" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  resource_id = aws_api_gateway_resource.offboard.id
-  http_method = aws_api_gateway_method.offboard_delete.http_method
-
-  integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.admin_backend_lambda_invoke_arn
-}
-
-# /api/v1/tenants/onboard resource
-resource "aws_api_gateway_resource" "onboard" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  parent_id   = aws_api_gateway_resource.tenants.id
-  path_part   = "onboard"
-}
-
-# /api/v1/tenants/onboard POST method
-resource "aws_api_gateway_method" "onboard_post" {
-  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
-  resource_id   = aws_api_gateway_resource.onboard.id
-  http_method   = "POST"
-  authorization = "NONE"
-}
-
-# /api/v1/tenants/onboard PUT method
-resource "aws_api_gateway_method" "onboard_put" {
-  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
-  resource_id   = aws_api_gateway_resource.onboard.id
-  http_method   = "PUT"
-  authorization = "NONE"
-}
-
-# /api/v1/tenants/onboard POST integration
-resource "aws_api_gateway_integration" "onboard_post" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  resource_id = aws_api_gateway_resource.onboard.id
-  http_method = aws_api_gateway_method.onboard_post.http_method
-
-  integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.admin_backend_lambda_invoke_arn
-}
-
-# /api/v1/tenants/onboard PUT integration
-resource "aws_api_gateway_integration" "onboard_put" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  resource_id = aws_api_gateway_resource.onboard.id
-  http_method = aws_api_gateway_method.onboard_put.http_method
-
-  integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.admin_backend_lambda_invoke_arn
-}
-
-# /api/v1/tenants/suspend resource
-resource "aws_api_gateway_resource" "suspend" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  parent_id   = aws_api_gateway_resource.tenants.id
-  path_part   = "suspend"
-}
-
-# /api/v1/tenants/suspend PUT method
-resource "aws_api_gateway_method" "suspend_put" {
-  rest_api_id   = aws_api_gateway_rest_api.admin_api.id
-  resource_id   = aws_api_gateway_resource.suspend.id
-  http_method   = "PUT"
-  authorization = "NONE"
-}
-
-# /api/v1/tenants/suspend PUT integration
-resource "aws_api_gateway_integration" "suspend_put" {
-  rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  resource_id = aws_api_gateway_resource.suspend.id
-  http_method = aws_api_gateway_method.suspend_put.http_method
-
-  integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = var.admin_backend_lambda_invoke_arn
-}
-
-# Lambda permissions for API Gateway
-resource "aws_lambda_permission" "admin_portal_api_gateway" {
-  statement_id  = "AllowExecutionFromAPIGateway"
+# Permission for frontend (all methods, all paths via /{proxy+})
+resource "aws_lambda_permission" "admin_portal_frontend" {
+  statement_id  = "AllowAPIGateway-Frontend"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_portal_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
 }
 
-resource "aws_lambda_permission" "admin_backend_api_gateway" {
-  statement_id  = "AllowExecutionFromAPIGateway"
+# ==============================================
+# Admin Backend Lambda - Tenant Management APIs
+# ==============================================
+
+# Permission 1: GET /api/v1/tenants
+resource "aws_lambda_permission" "admin_backend_get_tenants" {
+  statement_id  = "AllowAPIGateway-GetTenants"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/GET/api/v1/tenants"
+}
+
+# Permission 2: GET /api/v1/tenants/{tenantId}
+resource "aws_lambda_permission" "admin_backend_get_tenant_by_id" {
+  statement_id  = "AllowAPIGateway-GetTenantById"
+  action        = "lambda:InvokeFunction"
+  function_name = var.admin_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/GET/api/v1/tenants/*"
+}
+
+# Permission 3: POST /api/v1/tenants/onboard
+resource "aws_lambda_permission" "admin_backend_post_onboard" {
+  statement_id  = "AllowAPIGateway-PostOnboard"
+  action        = "lambda:InvokeFunction"
+  function_name = var.admin_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/POST/api/v1/tenants/onboard"
+}
+
+# Permission 4: PUT /api/v1/tenants/onboard
+resource "aws_lambda_permission" "admin_backend_put_onboard" {
+  statement_id  = "AllowAPIGateway-PutOnboard"
+  action        = "lambda:InvokeFunction"
+  function_name = var.admin_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/PUT/api/v1/tenants/onboard"
+}
+
+# Permission 5: DELETE /api/v1/tenants/offboard
+resource "aws_lambda_permission" "admin_backend_delete_offboard" {
+  statement_id  = "AllowAPIGateway-DeleteOffboard"
+  action        = "lambda:InvokeFunction"
+  function_name = var.admin_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/DELETE/api/v1/tenants/offboard"
+}
+
+# Permission 6: PUT /api/v1/tenants/suspend
+resource "aws_lambda_permission" "admin_backend_put_suspend" {
+  statement_id  = "AllowAPIGateway-PutSuspend"
+  action        = "lambda:InvokeFunction"
+  function_name = var.admin_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/PUT/api/v1/tenants/suspend"
+}
+
+# ==============================================
+# IMS Service Lambda - Identity & Access Management APIs
+# ==============================================
+
+# Permission 1: /api/v1/auth/* (public - login, signup, etc.)
+resource "aws_lambda_permission" "ims_auth_endpoints" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Auth"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/auth/*"
+}
+
+# Permission 2: GET/POST/PUT/DELETE /api/v1/users (base endpoint)
+resource "aws_lambda_permission" "ims_users_base_endpoint" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UsersBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/users"
+}
+
+# Permission 3: /api/v1/users/* (protected - user management with path params)
+resource "aws_lambda_permission" "ims_users_endpoints" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Users"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/users/*"
+}
+
+# Permission 4: GET/POST/PUT/DELETE /api/v1/roles (base endpoint)
+resource "aws_lambda_permission" "ims_roles_base_endpoint" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-RolesBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/roles"
+}
+
+# Permission 5: /api/v1/roles/* (protected - role management with path params)
+resource "aws_lambda_permission" "ims_roles_endpoints" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Roles"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/roles/*"
+}
+
+# Permission 6: GET/POST/PUT/DELETE /api/v1/rbac (base endpoint)
+resource "aws_lambda_permission" "ims_rbac_base_endpoint" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-RBACBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/rbac"
+}
+
+# Permission 7: /api/v1/rbac/* (protected - RBAC management with path params)
+resource "aws_lambda_permission" "ims_rbac_endpoints" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-RBAC"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/rbac/*"
+}
+
+# Permission 8: GET/POST/PUT/DELETE /api/v1/context (base endpoint)
+resource "aws_lambda_permission" "ims_context_base_endpoint" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-ContextBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/context"
+}
+
+# Permission 9: /api/v1/context/* (protected - context management with path params)
+resource "aws_lambda_permission" "ims_context_endpoints" {
+  count         = var.ims_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Context"
+  action        = "lambda:InvokeFunction"
+  function_name = var.ims_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/context/*"
+}
+
+# ==============================================
+# OMS Service Lambda Permissions
+# ==============================================
+
+# Permission 1: /api/v1/oms/customers (base endpoint)
+resource "aws_lambda_permission" "oms_customers_base" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSCustomersBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/customers"
+}
+
+# Permission 2: /api/v1/oms/customers/* (with path params)
+resource "aws_lambda_permission" "oms_customers_endpoints" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSCustomers"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/customers/*"
+}
+
+# Permission 3: /api/v1/oms/products (base endpoint)
+resource "aws_lambda_permission" "oms_products_base" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSProductsBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/products"
+}
+
+# Permission 4: /api/v1/oms/products/* (with path params)
+resource "aws_lambda_permission" "oms_products_endpoints" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSProducts"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/products/*"
+}
+
+# Permission 5: /api/v1/oms/orders (base endpoint)
+resource "aws_lambda_permission" "oms_orders_base" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSOrdersBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/orders"
+}
+
+# Permission 6: /api/v1/oms/orders/* (with path params)
+resource "aws_lambda_permission" "oms_orders_endpoints" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSOrders"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/orders/*"
+}
+
+# Permission 7: /api/v1/oms/inventory (base endpoint)
+resource "aws_lambda_permission" "oms_inventory_base" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSInventoryBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/inventory"
+}
+
+# Permission 8: /api/v1/oms/inventory/* (with path params)
+resource "aws_lambda_permission" "oms_inventory_endpoints" {
+  count         = var.oms_service_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-OMSInventory"
+  action        = "lambda:InvokeFunction"
+  function_name = var.oms_service_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/inventory/*"
+}
+
+# ==============================================
+# JWT Authorizer Lambda
+# ==============================================
+
+# Lambda permission for JWT authorizer
+resource "aws_lambda_permission" "jwt_authorizer" {
+  count         = var.enable_jwt_authorizer ? 1 : 0
+  statement_id  = "AllowExecutionFromAPIGateway-JWTAuthorizer"
+  action        = "lambda:InvokeFunction"
+  function_name = var.jwt_authorizer_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/authorizers/*"
 }

@@ -1,0 +1,75 @@
+name: Lambda Deployment Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Terraform workspace (dev/qa/uat/prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      
+      service:
+        description: 'Lambda service to deploy'
+        required: true
+        type: choice
+        options:
+          - admin-portal-web-server
+          - admin-portal-be
+          - ims-service
+          - create-infra-worker
+          - delete-infra-worker
+          - poll-infra-worker
+          - create-admin-worker
+          - setup-rbac-worker
+          - jwt-authorizer
+          - oms-service
+
+env:
+  AWS_REGION: us-east-1
+  NODE_VERSION: '18.x'
+
+concurrency:
+  group: lambda-${{ inputs.service }}-${{ inputs.workspace }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-lambda:
+    name: Deploy ${{ inputs.service }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Deploy Lambda function
+        run: |
+          chmod +x ./cicd.sh
+          ./cicd.sh deploy \
+            --service=${{ inputs.service }} \
+            --workspace=${{ inputs.workspace }} \
+            --admin-profile=default
+      
+      - name: Deployment summary
+        run: |
+          echo "### Deployment Complete :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service**: ${{ inputs.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workspace**: ${{ inputs.workspace }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region**: ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: Success ✅" >> $GITHUB_STEP_SUMMARY

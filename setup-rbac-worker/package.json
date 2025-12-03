@@ -1,0 +1,21 @@
+{
+  "name": "setup-rbac-worker",
+  "version": "1.0.0",
+  "description": "Lambda function to setup default RBAC (permissions, roles, groups) for new tenants",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "lambda",
+    "rbac",
+    "dynamodb",
+    "tenant"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.0.0",
+    "pino": "^8.16.0"
+  }
+}

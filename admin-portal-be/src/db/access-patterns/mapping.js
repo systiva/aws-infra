@@ -2,8 +2,8 @@ const DB = require('../db');
 const dynamoose = require('dynamoose');
 const Logger = require('../../../logger');
 const DynamoDBError = require('../../utils/error/dynamodb-error');
-const HASH_KEY = 'pk';
-const RANGE_KEY = 'sk';
+const HASH_KEY = 'PK';
+const RANGE_KEY = 'SK';
 
 class MappingAccessPatterns {
   static async putItem(item) {
@@ -17,10 +17,10 @@ class MappingAccessPatterns {
 
   static async getItem(pk, sk) {
     try {
-      Logger.info(`Getting item with pk: ${pk} and sk: ${sk}`);
+      Logger.info(`Getting item with PK: ${pk} and SK: ${sk}`);
       return await DB.get({
-        pk: pk,
-        sk: sk,
+        PK: pk,
+        SK: sk,
       });
     } catch (err) {
       console.log(JSON.stringify(err));
@@ -31,10 +31,10 @@ class MappingAccessPatterns {
 
   static async deleteItem(pk, sk) {
     try {
-      Logger.info(`Deleting item with pk: ${pk} and sk: ${sk}`);
+      Logger.info(`Deleting item with PK: ${pk} and SK: ${sk}`);
       return await DB.delete({
-        pk: pk,
-        sk: sk,
+        PK: pk,
+        SK: sk,
       });
     } catch (err) {
       DynamoDBError.handleRequestExecutionError(err);
@@ -43,11 +43,11 @@ class MappingAccessPatterns {
 
   static async updateItem(pk, sk, item) {
     try {
-      Logger.info(`Updating item with pk: ${pk} and sk: ${sk}`);
+      Logger.info(`Updating item with PK: ${pk} and SK: ${sk}`);
       return await DB.update(
         {
-          pk: pk,
-          sk: sk,
+          PK: pk,
+          SK: sk,
         },
         {
           $SET: item,
@@ -60,7 +60,7 @@ class MappingAccessPatterns {
 
   static async queryItems(pk) {
     try {
-      Logger.info(`Querying items with pk: ${pk}`);
+      Logger.info(`Querying items with PK: ${pk}`);
       return await DB.query(pk).exec();
     } catch (err) {
       DynamoDBError.handleRequestExecutionError(err);
@@ -90,8 +90,8 @@ class MappingAccessPatterns {
     
     const cleanTenant = { ...tenant };
     // Remove internal DynamoDB keys and metadata
-    delete cleanTenant.pk;
-    delete cleanTenant.sk;
+    delete cleanTenant.PK;
+    delete cleanTenant.SK;
     delete cleanTenant.entityType;
     
     return cleanTenant;
@@ -108,8 +108,8 @@ class MappingAccessPatterns {
     try {
       Logger.info(`Creating tenant: ${JSON.stringify(tenant)}`);
       const item = {
-        pk: `TENANT#${tenant.tenantId}`,
-        sk: `METADATA`,
+        PK: `TENANT#${tenant.tenantId}`,
+        SK: `METADATA`,
         ...tenant,
         entityType: 'TENANT'
       };
@@ -185,7 +185,7 @@ class MappingAccessPatterns {
       const allItems = await this.scanItems();
       // Filter only tenant items
       const tenants = allItems.filter(item => 
-        item.pk && item.pk.startsWith('TENANT#') && item.sk === 'METADATA'
+        item.PK && item.PK.startsWith('TENANT#') && item.SK === 'METADATA'
       );
       Logger.info(`Found ${tenants.length} tenants`);
       return this.cleanTenantsResponse(tenants);

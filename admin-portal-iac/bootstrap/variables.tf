@@ -17,6 +17,26 @@ variable "environment" {
   }
 }
 
+variable "workspace_prefix" {
+  description = "Workspace prefix for resource naming"
+  type        = string
+  
+  validation {
+    condition     = contains(["dev", "qa", "prd", "uat"], var.workspace_prefix)
+    error_message = "Workspace prefix must be dev, qa, prd, or uat."
+  }
+}
+
+variable "admin_account_id" {
+  description = "AWS account ID for admin account"
+  type        = string
+  
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.admin_account_id))
+    error_message = "Admin account ID must be a 12-digit number."
+  }
+}
+
 variable "aws_region" {
   description = "AWS region"
   type        = string
@@ -27,12 +47,6 @@ variable "aws_profile" {
   description = "AWS profile to use"
   type        = string
   default     = "fct_fct.admin"
-}
-
-variable "terraform_state_key" {
-  description = "S3 key for Terraform state file"
-  type        = string
-  default     = "admin-portal-iac/terraform.tfstate"
 }
 
 variable "enable_session_storage" {

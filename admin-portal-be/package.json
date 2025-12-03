@@ -7,7 +7,7 @@
     "lint": "eslint src/",
     "test": "mocha ./test/**/*.test.js --timeout=10000 --exit",
     "start": "node ./app.js",
-    "local": "set ENV=local&& set AWS_ACCESS_KEY_ID=fake&& set AWS_SECRET_ACCESS_KEY=fake&& set AWS_DEFAULT_REGION=us-east-1&& node ./app.js | npx pino-pretty",
+    "local": "set ENV=local&& set AWS_DEFAULT_REGION=us-east-1&& node ./app.js | npx pino-pretty",
     "deploy:dev": "serverless deploy --stage dev",
     "deploy:qa": "serverless deploy --stage qa",
     "deploy:uat": "serverless deploy --stage uat",

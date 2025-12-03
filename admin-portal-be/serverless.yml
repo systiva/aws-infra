@@ -21,8 +21,8 @@ provider:
         - dynamodb:DescribeTable
         - dynamodb:CreateTable
       Resource: 
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/platform-admin*"
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/platform-admin*/index/*"
+  - "arn:aws:dynamodb:${self:provider.region}:*:table/admin-portal-dev-tenant-registry*"
+  - "arn:aws:dynamodb:${self:provider.region}:*:table/admin-portal-dev-tenant-registry*/index/*"
     # Cross-account permissions for tenant provisioning
     - Effect: Allow
       Action:
@@ -45,7 +45,7 @@ provider:
 
 functions:
   app:
-    handler: lambda.handler
+    handler: index.handler
     events:
       - http:
           path: /

@@ -54,7 +54,7 @@ class DynamoDBService {
       // Step 1: Query all items for this tenant (handle pagination)
       const queryParams = {
         TableName: tableName,
-        KeyConditionExpression: 'pk = :pk',
+        KeyConditionExpression: 'PK = :pk',
         ExpressionAttributeValues: {
           ':pk': tenantPk
         }
@@ -134,8 +134,8 @@ class DynamoDBService {
       const deleteRequests = allItems.map(item => ({
         DeleteRequest: {
           Key: {
-            pk: item.pk,
-            sk: item.sk
+            PK: item.PK,
+            SK: item.SK
           }
         }
       }));
@@ -366,8 +366,8 @@ class DynamoDBService {
       const params = {
         TableName: config.DYNAMODB.TENANT_REGISTRY_TABLE,
         Key: {
-          pk: `TENANT#${tenantId}`,
-          sk: 'METADATA'
+          PK: `TENANT#${tenantId}`,
+          SK: 'METADATA'
         },
         UpdateExpression: 'SET lastModified = :lastModified',
         ExpressionAttributeValues: {
@@ -442,8 +442,8 @@ class DynamoDBService {
       const params = {
         TableName: config.DYNAMODB.TENANT_REGISTRY_TABLE,
         Key: {
-          pk: `TENANT#${tenantId}`,
-          sk: 'METADATA'
+          PK: `TENANT#${tenantId}`,
+          SK: 'METADATA'
         },
         UpdateExpression: 'SET deletionAttempts = :attempts, lastDeletionAttempt = :timestamp',
         ExpressionAttributeValues: {
@@ -482,8 +482,8 @@ class DynamoDBService {
       const params = {
         TableName: config.DYNAMODB.TENANT_REGISTRY_TABLE,
         Key: {
-          pk: `TENANT#${tenantId}`,
-          sk: 'METADATA'
+          PK: `TENANT#${tenantId}`,
+          SK: 'METADATA'
         },
         UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
         ExpressionAttributeNames: {
