@@ -134,16 +134,13 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**This action is irreversible!**" >> $GITHUB_STEP_SUMMARY
 
-  destroy-tenant-infrastructure:
-    name: Destroy Tenant Infrastructure
+  check-tenant-backend:
+    name: Check Tenant Backend Bucket
     runs-on: ubuntu-latest
-    needs: 
-      - validate-confirmation
-      - check-tenant-backend
+    needs: validate-confirmation
     if: |
-      needs.check-tenant-backend.outputs.bucket_exists == 'true' &&
-      (inputs.destroy_target == 'tenant-infrastructure' || 
-       inputs.destroy_target == 'both-tenant-then-admin')
+      inputs.destroy_target == 'tenant-infrastructure' || 
+      inputs.destroy_target == 'both-tenant-then-admin'
     outputs:
       bucket_exists: ${{ steps.check.outputs.exists }}
       bucket_name: ${{ steps.check.outputs.name }}
@@ -236,10 +233,13 @@ jobs:
   destroy-tenant-infrastructure:
     name: Destroy Tenant Infrastructure
     runs-on: ubuntu-latest
-    needs: validate-confirmation
+    needs: 
+      - validate-confirmation
+      - check-tenant-backend
     if: |
-      inputs.destroy_target == 'tenant-infrastructure' || 
-      inputs.destroy_target == 'both-tenant-then-admin'
+      needs.check-tenant-backend.outputs.bucket_exists == 'true' &&
+      (inputs.destroy_target == 'tenant-infrastructure' || 
+       inputs.destroy_target == 'both-tenant-then-admin')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -254,6 +254,9 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
       - name: Destroy tenant infrastructure
         run: |
           chmod +x ./cicd.sh
@@ -265,9 +268,6 @@ jobs:
             --auto-approve
         env:
           TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
-            --auto-approve
-        env:
-          TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
       
       - name: Destruction summary
         run: |
@@ -276,6 +276,10 @@ jobs:
           echo "- **Workspace**: ${{ inputs.workspace }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tenant Account**: ${{ inputs.tenant_account_id }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: Destroyed ✅" >> $GITHUB_STEP_SUMMARY
+
+  destroy-admin-infrastructure:
+    name: Destroy Admin Infrastructure
+    runs-on: ubuntu-latest
     needs: 
       - validate-confirmation
       - check-admin-backend
@@ -284,10 +288,6 @@ jobs:
       always() &&
       needs.validate-confirmation.result == 'success' &&
       needs.check-admin-backend.outputs.bucket_exists == 'true' &&
-      (needs.destroy-tenant-infrastructure.result == 'success' || needs.destroy-tenant-infrastructure.result == 'skipped') &&
-      (inputs.destroy_target == 'admin-infrastructure' || 
-       inputs.destroy_target == 'both-tenant-then-admin')
-      needs.validate-confirmation.result == 'success' &&
       (needs.destroy-tenant-infrastructure.result == 'success' || needs.destroy-tenant-infrastructure.result == 'skipped') &&
       (inputs.destroy_target == 'admin-infrastructure' || 
        inputs.destroy_target == 'both-tenant-then-admin')
@@ -305,6 +305,9 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
       - name: Destroy admin infrastructure
         run: |
           chmod +x ./cicd.sh
@@ -313,9 +316,6 @@ jobs:
             --aws-account=${{ inputs.admin_account_id }} \
             --admin-profile=default \
             --backend-bucket=${{ needs.check-admin-backend.outputs.bucket_name }} \
-            --auto-approve
-        env:
-          TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
             --auto-approve
         env:
           TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
