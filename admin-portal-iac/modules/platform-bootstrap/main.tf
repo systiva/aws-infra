@@ -144,8 +144,7 @@ resource "null_resource" "set_platform_admin_attributes" {
         --user-attributes \
           Name=email,Value=${local.platform_admin_email} \
           Name=email_verified,Value=true \
-          Name=custom:tenant_id,Value=${local.platform_id} \
-        --region ${var.aws_region}
+          Name=custom:tenant_id,Value=${local.platform_id}
     EOT
   }
   
