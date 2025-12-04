@@ -465,6 +465,7 @@ destroy_admin_infrastructure() {
             -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
             -var="admin_account_id=${AWS_ACCOUNT_ID}" \
             -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var="temporary_password=DummyPassword123!" \
             -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
             -auto-approve
     else
@@ -472,6 +473,7 @@ destroy_admin_infrastructure() {
             -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
             -var="admin_account_id=${AWS_ACCOUNT_ID}" \
             -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var="temporary_password=DummyPassword123!" \
             -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
             -auto-approve
     fi
@@ -593,6 +595,7 @@ destroy_tenant_infrastructure() {
             -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
             -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
             -var="tenant_id=${TENANT_ID}" \
+            -var="temporary_password=DummyPassword123!" \
             -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
             -auto-approve
     else
@@ -601,6 +604,7 @@ destroy_tenant_infrastructure() {
             -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
             -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
             -var="tenant_id=${TENANT_ID}" \
+            -var="temporary_password=DummyPassword123!" \
             -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
             -auto-approve
     fi
