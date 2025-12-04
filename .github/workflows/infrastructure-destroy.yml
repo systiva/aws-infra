@@ -156,6 +156,8 @@ jobs:
             --aws-account=${{ inputs.tenant_account_id }} \
             --tenant-profile=default \
             --auto-approve
+        env:
+          TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
       
       - name: Destruction summary
         run: |
@@ -202,6 +204,8 @@ jobs:
             --aws-account=${{ inputs.admin_account_id }} \
             --admin-profile=default \
             --auto-approve
+        env:
+          TF_VAR_temporary_password: ${{ secrets.TEMPORARY_PASSWORD }}
       
       - name: Destruction summary
         run: |
