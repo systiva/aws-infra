@@ -69,7 +69,7 @@ locals {
   common_tags = merge(var.common_tags, {
     Workspace         = terraform.workspace
     WorkspacePrefix   = local.workspace_prefix
-    Environment       = var.environment
+    Environment       = local.workspace_prefix
     Project           = var.project_name
     Region            = var.aws_region
     AdminAccount      = local.admin_account_id
@@ -90,7 +90,7 @@ module "networking" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Network configuration
   vpc_cidr             = var.vpc_cidr
@@ -111,7 +111,7 @@ module "admin_portal_web_server" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Lambda configuration
   runtime     = var.lambda_runtime
@@ -139,7 +139,7 @@ module "admin_backend" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Lambda configuration
   runtime     = var.lambda_runtime
@@ -169,7 +169,7 @@ module "create_infra_worker" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Lambda configuration
   runtime     = var.lambda_runtime
@@ -191,7 +191,7 @@ module "delete_infra_worker" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Lambda configuration
   runtime     = var.lambda_runtime
@@ -212,7 +212,7 @@ module "poll_infra_worker" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Lambda configuration
   runtime     = var.lambda_runtime
@@ -234,7 +234,7 @@ module "setup_rbac_worker" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Lambda configuration
   runtime     = var.lambda_runtime
@@ -258,7 +258,7 @@ module "create_admin_worker" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Lambda configuration
   runtime     = var.lambda_runtime
@@ -282,7 +282,7 @@ module "oms_service" {
   source = "./modules/oms-lambda"
   
   # Basic configuration
-  environment  = var.environment
+  environment  = var.workspace_prefix
   aws_region   = var.aws_region
   
   # Lambda configuration
@@ -304,7 +304,7 @@ module "api_gateway" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # API Gateway configuration
   stage_name        = var.api_gateway_stage_name
@@ -344,7 +344,7 @@ module "vpc_endpoints" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # VPC configuration from new networking module
   vpc_id             = module.networking.vpc_id
@@ -362,7 +362,7 @@ module "vpc_endpoints" {
 # S3 bucket for React build files
 resource "aws_s3_bucket" "admin_portal" {
   bucket        = local.admin_portal_bucket_name
-  force_destroy = var.environment == "dev" ? true : false
+  force_destroy = var.workspace_prefix == "dev" ? true : false
 
   tags = merge(local.common_tags, {
     Name        = "${local.name_prefix}-admin-portal"
@@ -408,7 +408,7 @@ module "cognito" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Cognito configuration
   admin_create_user_only           = var.cognito_admin_create_user_only
@@ -429,7 +429,7 @@ module "jwt_authorizer" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Cognito configuration
   user_pool_id        = module.cognito[0].user_pool_id
@@ -458,7 +458,7 @@ module "ims_service" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Lambda configuration
   lambda_zip_path   = "${path.root}/lambda-packages/ims-service.zip"
@@ -499,7 +499,7 @@ module "platform_bootstrap" {
   
   # Basic configuration
   project_name = var.project_name
-  environment  = var.environment
+  environment  = var.workspace_prefix
   
   # Cognito configuration
   user_pool_id = module.cognito[0].user_pool_id

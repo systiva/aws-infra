@@ -402,15 +402,15 @@ plan_admin_infrastructure() {
             -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
             -var="admin_account_id=${AWS_ACCOUNT_ID}" \
             -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
-            -var-file="environments/${ENV}.tfvars" \
-            -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+            -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+            -out="tfplan-${TERRAFORM_WORKSPACE}"
     else
         terraform plan \
             -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
             -var="admin_account_id=${AWS_ACCOUNT_ID}" \
             -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
-            -var-file="environments/${ENV}.tfvars" \
-            -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+            -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+            -out="tfplan-${TERRAFORM_WORKSPACE}"
     fi
     cd - > /dev/null
     print_success "Admin infrastructure plan created for account: $AWS_ACCOUNT_ID"
@@ -426,16 +426,16 @@ apply_admin_infrastructure() {
     manage_admin_workspace
     cd "$IAC_DIR"
     
-    if [[ ! -f "tfplan-${TERRAFORM_WORKSPACE}-${ENV}" ]]; then
+    if [[ ! -f "tfplan-${TERRAFORM_WORKSPACE}" ]]; then
         print_error "Plan file not found. Run: ./cicd.sh admin-plan --workspace=${TERRAFORM_WORKSPACE} --aws-account=${AWS_ACCOUNT_ID}"
         exit 1
     fi
     
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
-        AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+        AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
     else
-        terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+        terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
     fi
     cd - > /dev/null
     print_success "Admin infrastructure applied for account: $AWS_ACCOUNT_ID"
@@ -454,7 +454,7 @@ destroy_admin_infrastructure() {
         -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
         -var="admin_account_id=${AWS_ACCOUNT_ID}" \
         -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
-        -var-file="environments/${ENV}.tfvars" \
+        -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
         -auto-approve
     cd - > /dev/null
     print_success "✅ Admin infrastructure destroyed for account: $AWS_ACCOUNT_ID"
@@ -512,18 +512,16 @@ plan_tenant_infrastructure() {
             -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
             -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
             -var="tenant_id=${TENANT_ID}" \
-            -var="environment=${ENV}" \
-            -var-file="environments/${ENV}.tfvars" \
-            -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+            -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+            -out="tfplan-${TERRAFORM_WORKSPACE}"
     else
         terraform plan \
             -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
             -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
             -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
             -var="tenant_id=${TENANT_ID}" \
-            -var="environment=${ENV}" \
-            -var-file="environments/${ENV}.tfvars" \
-            -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+            -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+            -out="tfplan-${TERRAFORM_WORKSPACE}"
     fi
     cd - > /dev/null
     print_success "✅ Tenant infrastructure plan created for account: $AWS_ACCOUNT_ID"
@@ -539,16 +537,16 @@ apply_tenant_infrastructure() {
     manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
     
-    if [[ ! -f "tfplan-${TERRAFORM_WORKSPACE}-${ENV}" ]]; then
+    if [[ ! -f "tfplan-${TERRAFORM_WORKSPACE}" ]]; then
         print_error "Plan file not found. Run tenant-plan first"
         exit 1
     fi
     
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
-        AWS_PROFILE="$AWS_TENANT_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+        AWS_PROFILE="$AWS_TENANT_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
     else
-        terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+        terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
     fi
     cd - > /dev/null
     print_success "✅ Tenant infrastructure applied for account: $AWS_ACCOUNT_ID"
@@ -568,8 +566,7 @@ destroy_tenant_infrastructure() {
         -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
         -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
         -var="tenant_id=${TENANT_ID}" \
-        -var="environment=${ENV}" \
-        -var-file="environments/${ENV}.tfvars" \
+        -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
         -auto-approve
     cd - > /dev/null
     print_success "✅ Tenant infrastructure destroyed for account: $AWS_ACCOUNT_ID"
@@ -1298,11 +1295,10 @@ deploy_infrastructure() {
         -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
         -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
         -var="tenant_account_id=${TENANT_ACCOUNT_ID}" \
-        -var="environment=${ENV}" \
-        -var-file="environments/${ENV}.tfvars" \
-        -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+        -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+        -out="tfplan-${TERRAFORM_WORKSPACE}"
     
-    terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
     
     cd - > /dev/null
     print_success "✅ Admin infrastructure deployed in workspace: $TERRAFORM_WORKSPACE"
@@ -1339,11 +1335,10 @@ deploy_tenant_infrastructure() {
         -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
         -var="tenant_account_id=${TENANT_ACCOUNT_ID}" \
         -var="tenant_id=${TENANT_ID}" \
-        -var="environment=${ENV}" \
-        -var-file="environments/${ENV}.tfvars" \
-        -out="tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+        -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+        -out="tfplan-${TERRAFORM_WORKSPACE}"
     
-    terraform apply "tfplan-${TERRAFORM_WORKSPACE}-${ENV}"
+    terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
     
     cd - > /dev/null
     print_success "✅ Tenant infrastructure deployed in workspace: $TERRAFORM_WORKSPACE"
@@ -1361,7 +1356,7 @@ deploy_tenant_bootstrap() {
         -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
         -var="tenant_account_id=${TENANT_ACCOUNT_ID}" \
         -var="tenant_aws_profile=${TENANT_AWS_PROFILE}" \
-        -var-file="../environments/${ENV}.tfvars" \
+        -var-file="../environments/${TERRAFORM_WORKSPACE}.tfvars" \
         -out="bootstrap-plan"
     
     terraform apply "bootstrap-plan"
