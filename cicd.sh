@@ -457,6 +457,10 @@ destroy_admin_infrastructure() {
     fi
     
     validate_admin_command
+    
+    # Export profile as Terraform variable for compatibility with CI/CD
+    export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
+    
     manage_admin_workspace
     cd "$IAC_DIR"
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
@@ -586,6 +590,10 @@ destroy_tenant_infrastructure() {
     fi
     
     validate_tenant_command
+    
+    # Export profile as Terraform variable for compatibility with CI/CD
+    export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
+    
     manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
