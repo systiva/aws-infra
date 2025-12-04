@@ -1,13 +1,13 @@
-# Development environment configuration for admin portal
+# UAT environment configuration for admin portal
 aws_region  = "us-east-1"
 
 project_name = "admin-portal"
-workspace_prefix  = "dev"
+workspace_prefix  = "uat"
 
 # Networking Configuration - Fully Private Architecture
-vpc_cidr             = "10.1.0.0/16"
+vpc_cidr             = "10.3.0.0/16"
 public_subnet_cidrs  = []  # No public subnets needed
-private_subnet_cidrs = ["10.1.11.0/24", "10.1.12.0/24"]
+private_subnet_cidrs = ["10.3.11.0/24", "10.3.12.0/24"]
 enable_nat_gateway   = false  # No internet access needed
 enable_flow_logs     = false
 enable_dns_hostnames = true
@@ -37,12 +37,12 @@ lambda_function_url_cors = {
 }
 
 # External Dependencies (using bootstrap created tables)
-tenant_registry_table_name = "admin-portal-dev-tenant-registry"  # From bootstrap
+tenant_registry_table_name = ""  # Will be auto-generated as admin-portal-uat-tenant-registry
 step_functions_arn         = ""  # Optional - legacy
 
 # Step Functions Configuration for Tenant Lifecycle Management
-create_tenant_step_function_arn = "arn:aws:states:us-east-1:583122682394:stateMachine:admin-portal-dev-tenant-operations"
-delete_tenant_step_function_arn = "arn:aws:states:us-east-1:583122682394:stateMachine:admin-portal-dev-tenant-operations"
+create_tenant_step_function_arn = ""  # To be updated after deployment
+delete_tenant_step_function_arn = ""  # To be updated after deployment
 
 # VPC Endpoints Configuration
 vpc_endpoint_services = [
@@ -64,7 +64,7 @@ trusted_tenant_account_ids = [
 
 # Monitoring and Logging
 enable_cloudwatch_logs = true
-log_retention_days     = 14
+log_retention_days     = 30
 enable_xray_tracing    = false
 
 # Security
@@ -91,14 +91,12 @@ cognito_access_token_validity_minutes    = 60    # 1 hour
 cognito_id_token_validity_minutes        = 60    # 1 hour
 cognito_refresh_token_validity_days      = 30    # 30 days
 
-# OAuth URLs for development (can be updated later with actual frontend URLs)
+# OAuth URLs for UAT (can be updated later with actual frontend URLs)
 cognito_callback_urls = [
-  "http://localhost:3000/auth/callback",
-  "https://localhost:3000/auth/callback"
+  "https://uat-admin-portal.example.com/auth/callback"
 ]
 cognito_logout_urls = [
-  "http://localhost:3000/",
-  "https://localhost:3000/"
+  "https://uat-admin-portal.example.com/"
 ]
 
 # JWT Authorizer Configuration
