@@ -38,6 +38,9 @@ TERRAFORM_WORKSPACE="${TERRAFORM_WORKSPACE:-}"  # Mandatory from user
 ALLOWED_WORKSPACES=("dev" "qa" "prd" "uat")
 WORKSPACE_PREFIX="${WORKSPACE_PREFIX:-}"
 
+# Global flags
+AUTO_APPROVE=false
+
 # Valid service names
 VALID_SERVICES=("create-infra-worker" "delete-infra-worker" "poll-infra-worker" "create-admin-worker" "setup-rbac-worker" "jwt-authorizer" "admin-portal-be" "ims-service" "oms-service" "admin-portal-web-server" "admin-portal-fe")
 
@@ -444,18 +447,34 @@ apply_admin_infrastructure() {
 destroy_admin_infrastructure() {
     print_header "💥 Destroying Admin Infrastructure"
     print_warning "⚠️  This will destroy all admin infrastructure!"
-    echo "Press Ctrl+C to cancel, or Enter to continue..."
-    read -r
+    
+    # Skip confirmation prompt if --auto-approve is set
+    if [[ "$AUTO_APPROVE" != "true" ]]; then
+        echo "Press Ctrl+C to cancel, or Enter to continue..."
+        read -r
+    else
+        print_info "Auto-approve enabled, skipping confirmation prompt"
+    fi
     
     validate_admin_command
     manage_admin_workspace
     cd "$IAC_DIR"
-    AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform destroy \
-        -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
-        -var="admin_account_id=${AWS_ACCOUNT_ID}" \
-        -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
-        -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
-        -auto-approve
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform destroy \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${AWS_ACCOUNT_ID}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+            -auto-approve
+    else
+        terraform destroy \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${AWS_ACCOUNT_ID}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+            -auto-approve
+    fi
     cd - > /dev/null
     print_success "✅ Admin infrastructure destroyed for account: $AWS_ACCOUNT_ID"
 }
@@ -555,19 +574,36 @@ apply_tenant_infrastructure() {
 destroy_tenant_infrastructure() {
     print_header "💥 Destroying Tenant Infrastructure"
     print_warning "⚠️  This will destroy all tenant infrastructure!"
-    echo "Press Ctrl+C to cancel, or Enter to continue..."
-    read -r
+    
+    # Skip confirmation prompt if --auto-approve is set
+    if [[ "$AUTO_APPROVE" != "true" ]]; then
+        echo "Press Ctrl+C to cancel, or Enter to continue..."
+        read -r
+    else
+        print_info "Auto-approve enabled, skipping confirmation prompt"
+    fi
     
     validate_tenant_command
     manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
-    AWS_PROFILE="$AWS_TENANT_PROFILE" terraform destroy \
-        -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
-        -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
-        -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
-        -var="tenant_id=${TENANT_ID}" \
-        -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
-        -auto-approve
+    # Only set AWS_PROFILE if not using default (CI/CD compatibility)
+    if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
+        AWS_PROFILE="$AWS_TENANT_PROFILE" terraform destroy \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var="tenant_id=${TENANT_ID}" \
+            -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+            -auto-approve
+    else
+        terraform destroy \
+            -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
+            -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
+            -var="tenant_account_id=${AWS_ACCOUNT_ID}" \
+            -var="tenant_id=${TENANT_ID}" \
+            -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
+            -auto-approve
+    fi
     cd - > /dev/null
     print_success "✅ Tenant infrastructure destroyed for account: $AWS_ACCOUNT_ID"
 }
@@ -652,7 +688,11 @@ build_react_frontend() {
     
     # Get API Gateway URL from Terraform outputs
     cd "$IAC_DIR"
-    API_GATEWAY_URL=$(AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform output -raw admin_backend_api_url 2>/dev/null || echo "")
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        API_GATEWAY_URL=$(AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform output -raw admin_backend_api_url 2>/dev/null || echo "")
+    else
+        API_GATEWAY_URL=$(terraform output -raw admin_backend_api_url 2>/dev/null || echo "")
+    fi
     cd - > /dev/null
     
     if [[ -z "$API_GATEWAY_URL" ]]; then
@@ -696,11 +736,20 @@ deploy_react_frontend() {
     
     cd "$IAC_DIR"
     # Use AWS_ADMIN_PROFILE for terraform output command
-    BUCKET_NAME=$(AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform output -raw admin_portal_bucket_name 2>/dev/null || echo "")
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        BUCKET_NAME=$(AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform output -raw admin_portal_bucket_name 2>/dev/null || echo "")
+    else
+        BUCKET_NAME=$(terraform output -raw admin_portal_bucket_name 2>/dev/null || echo "")
+    fi
     cd - > /dev/null
     
     if [[ -n "$BUCKET_NAME" ]]; then
-        aws s3 sync "$FE_DIR/build/" "s3://$BUCKET_NAME/" --delete --profile "$AWS_ADMIN_PROFILE"
+        # Use --profile only if not default
+        if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+            aws s3 sync "$FE_DIR/build/" "s3://$BUCKET_NAME/" --delete --profile "$AWS_ADMIN_PROFILE"
+        else
+            aws s3 sync "$FE_DIR/build/" "s3://$BUCKET_NAME/" --delete
+        fi
         print_success "admin-portal-fe deployed to S3: $BUCKET_NAME"
     else
         print_error "Could not get S3 bucket name from Terraform output"
@@ -847,15 +896,27 @@ deploy_lambda_or_backend_service() {
     fi
     
     print_info "Updating Lambda function code: $full_function_name"
-    if aws lambda update-function-code \
-        --function-name "$full_function_name" \
-        --zip-file "fileb://lambda-packages/${service_name}.zip" \
-        --profile "$AWS_ADMIN_PROFILE" > /dev/null; then
-        print_success "✅ $service_name deployed successfully to $full_function_name"
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        if aws lambda update-function-code \
+            --function-name "$full_function_name" \
+            --zip-file "fileb://lambda-packages/${service_name}.zip" \
+            --profile "$AWS_ADMIN_PROFILE" > /dev/null; then
+            print_success "✅ $service_name deployed successfully to $full_function_name"
+        else
+            print_error "Failed to deploy $service_name"
+            print_error "Check AWS credentials and permissions"
+            exit 1
+        fi
     else
-        print_error "Failed to deploy $service_name"
-        print_error "Check AWS credentials and permissions for profile: $AWS_ADMIN_PROFILE"
-        exit 1
+        if aws lambda update-function-code \
+            --function-name "$full_function_name" \
+            --zip-file "fileb://lambda-packages/${service_name}.zip" > /dev/null; then
+            print_success "✅ $service_name deployed successfully to $full_function_name"
+        else
+            print_error "Failed to deploy $service_name"
+            print_error "Check AWS credentials and permissions"
+            exit 1
+        fi
     fi
     
     cd - > /dev/null
@@ -975,6 +1036,10 @@ parse_args() {
                 # Legacy support - set both admin and tenant profile
                 AWS_ADMIN_PROFILE="${1#*=}"
                 AWS_TENANT_PROFILE="${1#*=}"
+                shift
+                ;;
+            --auto-approve)
+                AUTO_APPROVE=true
                 shift
                 ;;
             --tenant-id=*)
@@ -1413,13 +1478,23 @@ update_lambda_functions() {
             FUNCTION_NAME=$(basename "$zip" .zip)
             echo -e "${CYAN}  Updating $FUNCTION_NAME...${NC}"
             
-            if aws lambda update-function-code \
-                --function-name "$PROJECT_NAME-$ENV-$FUNCTION_NAME" \
-                --zip-file "fileb://$zip" \
-                --profile "$AWS_PROFILE" >/dev/null 2>&1; then
-                echo "  $FUNCTION_NAME updated successfully"
+            if [[ "$AWS_PROFILE" != "default" ]]; then
+                if aws lambda update-function-code \
+                    --function-name "$PROJECT_NAME-$ENV-$FUNCTION_NAME" \
+                    --zip-file "fileb://$zip" \
+                    --profile "$AWS_PROFILE" >/dev/null 2>&1; then
+                    echo "  $FUNCTION_NAME updated successfully"
+                else
+                    print_warning "Failed to update $FUNCTION_NAME"
+                fi
             else
-                print_warning "Failed to update $FUNCTION_NAME"
+                if aws lambda update-function-code \
+                    --function-name "$PROJECT_NAME-$ENV-$FUNCTION_NAME" \
+                    --zip-file "fileb://$zip" >/dev/null 2>&1; then
+                    echo "  $FUNCTION_NAME updated successfully"
+                else
+                    print_warning "Failed to update $FUNCTION_NAME"
+                fi
             fi
         fi
     done

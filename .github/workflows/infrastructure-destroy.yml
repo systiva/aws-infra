@@ -154,7 +154,8 @@ jobs:
           ./cicd.sh tenant-destroy \
             --workspace=${{ inputs.workspace }} \
             --aws-account=${{ inputs.tenant_account_id }} \
-            --tenant-profile=default
+            --tenant-profile=default \
+            --auto-approve
       
       - name: Destruction summary
         run: |
@@ -199,7 +200,8 @@ jobs:
           ./cicd.sh admin-destroy \
             --workspace=${{ inputs.workspace }} \
             --aws-account=${{ inputs.admin_account_id }} \
-            --admin-profile=default
+            --admin-profile=default \
+            --auto-approve
       
       - name: Destruction summary
         run: |
