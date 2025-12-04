@@ -128,13 +128,9 @@ resource "aws_cognito_user" "platform_admin" {
   # CRITICAL: Prevent Terraform from modifying user after creation
   # This prevents Terraform from resetting user attributes (including custom:tenant_id)
   # when the user updates their profile, changes password, etc.
+  # Also prevents "Provider produced inconsistent final plan" error
   lifecycle {
-    ignore_changes = [
-      attributes,           # Don't reset attributes when user updates profile
-      temporary_password,   # Password will change after first login
-      enabled,             # User might be enabled/disabled manually
-      message_action       # Don't resend messages
-    ]
+    ignore_changes = all  # Ignore all changes after initial creation
   }
 }
 
