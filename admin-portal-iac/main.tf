@@ -58,9 +58,9 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   region     = data.aws_region.current.name
   
-  # Workspace-based naming (workspace becomes primary prefix)
+  # Workspace-based naming (consistent with bootstrap module)
   workspace_prefix = var.workspace_prefix
-  name_prefix = "${local.workspace_prefix}-admin-portal"
+  name_prefix = "${var.project_name}-${local.workspace_prefix}"
   
   # S3 bucket names (must be globally unique)
   admin_portal_bucket_name = var.s3_admin_portal_bucket_name != "" ? var.s3_admin_portal_bucket_name : "${local.name_prefix}-portal-${random_id.suffix.hex}"
