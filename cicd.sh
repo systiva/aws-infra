@@ -40,6 +40,7 @@ WORKSPACE_PREFIX="${WORKSPACE_PREFIX:-}"
 
 # Global flags
 AUTO_APPROVE=false
+BACKEND_BUCKET=""
 
 # Valid service names
 VALID_SERVICES=("create-infra-worker" "delete-infra-worker" "poll-infra-worker" "create-admin-worker" "setup-rbac-worker" "jwt-authorizer" "admin-portal-be" "ims-service" "oms-service" "admin-portal-web-server" "admin-portal-fe")
@@ -463,6 +464,27 @@ destroy_admin_infrastructure() {
     
     manage_admin_workspace
     cd "$IAC_DIR"
+    
+    # Use custom backend bucket if provided (override backend config)
+    if [[ -n "$BACKEND_BUCKET" ]]; then
+        print_info "Using backend bucket: $BACKEND_BUCKET"
+        if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+            AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform init -reconfigure \
+                -backend-config="bucket=$BACKEND_BUCKET" \
+                -backend-config="key=admin-portal-iac/terraform.tfstate" \
+                -backend-config="region=${AWS_REGION}" \
+                -backend-config="dynamodb_table=admin-portal-${TERRAFORM_WORKSPACE}-terraform-lock" \
+                -backend-config="encrypt=true"
+        else
+            terraform init -reconfigure \
+                -backend-config="bucket=$BACKEND_BUCKET" \
+                -backend-config="key=admin-portal-iac/terraform.tfstate" \
+                -backend-config="region=${AWS_REGION}" \
+                -backend-config="dynamodb_table=admin-portal-${TERRAFORM_WORKSPACE}-terraform-lock" \
+                -backend-config="encrypt=true"
+        fi
+    fi
+    
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
         AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform destroy \
@@ -596,6 +618,27 @@ destroy_tenant_infrastructure() {
     
     manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
+    
+    # Use custom backend bucket if provided (override backend config)
+    if [[ -n "$BACKEND_BUCKET" ]]; then
+        print_info "Using backend bucket: $BACKEND_BUCKET"
+        if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
+            AWS_PROFILE="$AWS_TENANT_PROFILE" terraform init -reconfigure \
+                -backend-config="bucket=$BACKEND_BUCKET" \
+                -backend-config="key=tenant-iac/terraform.tfstate" \
+                -backend-config="region=${AWS_REGION}" \
+                -backend-config="dynamodb_table=tenant-${TERRAFORM_WORKSPACE}-terraform-lock" \
+                -backend-config="encrypt=true"
+        else
+            terraform init -reconfigure \
+                -backend-config="bucket=$BACKEND_BUCKET" \
+                -backend-config="key=tenant-iac/terraform.tfstate" \
+                -backend-config="region=${AWS_REGION}" \
+                -backend-config="dynamodb_table=tenant-${TERRAFORM_WORKSPACE}-terraform-lock" \
+                -backend-config="encrypt=true"
+        fi
+    fi
+    
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
         AWS_PROFILE="$AWS_TENANT_PROFILE" terraform destroy \
@@ -1052,6 +1095,10 @@ parse_args() {
                 ;;
             --auto-approve)
                 AUTO_APPROVE=true
+                shift
+                ;;
+            --backend-bucket=*)
+                BACKEND_BUCKET="${1#*=}"
                 shift
                 ;;
             --tenant-id=*)
