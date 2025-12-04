@@ -462,12 +462,13 @@ destroy_admin_infrastructure() {
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
     
-    manage_admin_workspace
     cd "$IAC_DIR"
     
-    # Use custom backend bucket if provided (override backend config)
+    # Use custom backend bucket if provided (skip manage_admin_workspace)
     if [[ -n "$BACKEND_BUCKET" ]]; then
-        print_info "Using backend bucket: $BACKEND_BUCKET"
+        print_info "Using custom backend bucket: $BACKEND_BUCKET"
+        
+        # Initialize with custom backend config
         if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
             AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform init -reconfigure \
                 -backend-config="bucket=$BACKEND_BUCKET" \
@@ -483,6 +484,22 @@ destroy_admin_infrastructure() {
                 -backend-config="dynamodb_table=admin-portal-${TERRAFORM_WORKSPACE}-terraform-lock" \
                 -backend-config="encrypt=true"
         fi
+        
+        # Select workspace
+        if ! terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${TERRAFORM_WORKSPACE}[[:space:]]*$"; then
+            print_info "Creating new workspace: $TERRAFORM_WORKSPACE"
+            terraform workspace new "$TERRAFORM_WORKSPACE"
+        else
+            print_info "Selecting existing workspace: $TERRAFORM_WORKSPACE"
+            terraform workspace select "$TERRAFORM_WORKSPACE"
+        fi
+        
+        print_success "Admin workspace ready: $TERRAFORM_WORKSPACE"
+    else
+        # Use standard workspace management
+        cd - > /dev/null
+        manage_admin_workspace
+        cd "$IAC_DIR"
     fi
     
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
@@ -616,12 +633,13 @@ destroy_tenant_infrastructure() {
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
     
-    manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
     
-    # Use custom backend bucket if provided (override backend config)
+    # Use custom backend bucket if provided (skip manage_tenant_workspace)
     if [[ -n "$BACKEND_BUCKET" ]]; then
-        print_info "Using backend bucket: $BACKEND_BUCKET"
+        print_info "Using custom backend bucket: $BACKEND_BUCKET"
+        
+        # Initialize with custom backend config
         if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
             AWS_PROFILE="$AWS_TENANT_PROFILE" terraform init -reconfigure \
                 -backend-config="bucket=$BACKEND_BUCKET" \
@@ -637,6 +655,22 @@ destroy_tenant_infrastructure() {
                 -backend-config="dynamodb_table=tenant-${TERRAFORM_WORKSPACE}-terraform-lock" \
                 -backend-config="encrypt=true"
         fi
+        
+        # Select workspace
+        if ! terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${TERRAFORM_WORKSPACE}[[:space:]]*$"; then
+            print_info "Creating new workspace: $TERRAFORM_WORKSPACE"
+            terraform workspace new "$TERRAFORM_WORKSPACE"
+        else
+            print_info "Selecting existing workspace: $TERRAFORM_WORKSPACE"
+            terraform workspace select "$TERRAFORM_WORKSPACE"
+        fi
+        
+        print_success "Tenant workspace ready: $TERRAFORM_WORKSPACE"
+    else
+        # Use standard workspace management
+        cd - > /dev/null
+        manage_tenant_workspace
+        cd "$TENANT_IAC_DIR"
     fi
     
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
