@@ -112,11 +112,8 @@ resource "aws_cognito_user" "platform_admin" {
   user_pool_id = var.user_pool_id
   username     = local.platform_admin_username
   
-  attributes = {
-    email              = local.platform_admin_email
-    email_verified     = "true"
-    "custom:tenant_id" = local.platform_id
-  }
+  # Don't set attributes here to avoid provider inconsistency bug
+  # Attributes will be set via null_resource provisioner below
   
   # Set temporary password initially
   temporary_password = random_password.platform_admin_password.result
@@ -126,12 +123,33 @@ resource "aws_cognito_user" "platform_admin" {
   depends_on = [random_integer.platform_id]
   
   # CRITICAL: Prevent Terraform from modifying user after creation
-  # This prevents Terraform from resetting user attributes (including custom:tenant_id)
-  # when the user updates their profile, changes password, etc.
-  # Also prevents "Provider produced inconsistent final plan" error
   lifecycle {
     ignore_changes = all  # Ignore all changes after initial creation
   }
+}
+
+# Set user attributes via AWS CLI to avoid provider bug
+resource "null_resource" "set_platform_admin_attributes" {
+  triggers = {
+    user_pool_id = var.user_pool_id
+    username     = local.platform_admin_username
+    platform_id  = local.platform_id
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws cognito-idp admin-update-user-attributes \
+        --user-pool-id ${var.user_pool_id} \
+        --username ${local.platform_admin_username} \
+        --user-attributes \
+          Name=email,Value=${local.platform_admin_email} \
+          Name=email_verified,Value=true \
+          Name=custom:tenant_id,Value=${local.platform_id} \
+        --region ${var.aws_region}
+    EOT
+  }
+  
+  depends_on = [aws_cognito_user.platform_admin]
 }
 
 # ==============================================
