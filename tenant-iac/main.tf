@@ -142,3 +142,32 @@ module "tenant_dynamodb" {
   
   common_tags = local.common_tags
 }
+
+# Store infrastructure outputs in SSM Parameter Store
+module "infrastructure_ssm_outputs" {
+  source = "../admin-portal-iac/modules/ssm-outputs"
+  
+  workspace    = var.workspace_prefix
+  account_type = "tenant"
+  category     = "infrastructure"
+  aws_region   = var.aws_region
+  
+  outputs = {
+    # DynamoDB Tables
+    "dynamodb/tenant-data-table"     = module.tenant_dynamodb.table_names.tenant_data
+    "dynamodb/tenant-data-table-arn" = module.tenant_dynamodb.table_arns.tenant_data
+    "dynamodb/tenant-config-table"   = module.tenant_dynamodb.table_names.tenant_config
+    "dynamodb/tenant-config-table-arn" = module.tenant_dynamodb.table_arns.tenant_config
+    
+    # Cross-account role (if created)
+    "cross-account-role-arn" = length(aws_iam_role.cross_account_tenant_role) > 0 ? aws_iam_role.cross_account_tenant_role[0].arn : "not-created"
+    
+    # Metadata
+    "tenant-id" = var.tenant_id
+  }
+  
+  depends_on = [
+    module.tenant_dynamodb,
+    aws_iam_role.cross_account_tenant_role
+  ]
+}

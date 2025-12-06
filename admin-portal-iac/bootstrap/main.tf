@@ -436,3 +436,29 @@ dynamodb_table = "${aws_dynamodb_table.terraform_lock.name}"
 encrypt        = true
 EOF
 }
+
+# Store bootstrap outputs in SSM Parameter Store
+module "bootstrap_ssm_outputs" {
+  source = "../modules/ssm-outputs"
+  
+  workspace    = var.workspace_prefix
+  account_type = "admin"
+  category     = "bootstrap"
+  aws_region   = var.aws_region
+  
+  outputs = {
+    backend-bucket       = aws_s3_bucket.terraform_state.id
+    backend-bucket-arn   = aws_s3_bucket.terraform_state.arn
+    dynamodb-table       = aws_dynamodb_table.terraform_lock.id
+    dynamodb-table-arn   = aws_dynamodb_table.terraform_lock.arn
+    kms-key-id           = aws_kms_key.terraform.key_id
+    kms-key-arn          = aws_kms_key.terraform.arn
+    region               = var.aws_region
+  }
+  
+  depends_on = [
+    aws_s3_bucket.terraform_state,
+    aws_dynamodb_table.terraform_lock,
+    aws_kms_key.terraform
+  ]
+}

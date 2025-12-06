@@ -1,0 +1,307 @@
+name: 08 - Destroy Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      destroy_target:
+        description: 'What to destroy'
+        required: true
+        type: choice
+        options:
+          - admin-bootstrap
+          - admin-infrastructure
+          - tenant-bootstrap
+          - tenant-infrastructure
+      workspace:
+        description: 'Workspace (dev/qa/uat/prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+      tenant_account_id:
+        description: 'Tenant AWS Account ID (required for tenant targets)'
+        required: false
+        type: string
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ inputs.aws_region }}
+  WORKSPACE: ${{ inputs.workspace }}
+  DESTROY_TARGET: ${{ inputs.destroy_target }}
+
+jobs:
+  validate:
+    name: Validate Destroy Request
+    runs-on: ubuntu-latest
+    outputs:
+      is_bootstrap: ${{ steps.check.outputs.is_bootstrap }}
+      is_infrastructure: ${{ steps.check.outputs.is_infrastructure }}
+      is_admin: ${{ steps.check.outputs.is_admin }}
+      is_tenant: ${{ steps.check.outputs.is_tenant }}
+      account_type: ${{ steps.check.outputs.account_type }}
+      resource_type: ${{ steps.check.outputs.resource_type }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Validate Confirmation
+        run: |
+          if [[ "${{ inputs.confirm_destroy }}" != "DESTROY" ]]; then
+            echo "❌ Destruction not confirmed. You must type 'DESTROY' to proceed."
+            exit 1
+          fi
+          echo "✅ Destruction confirmed"
+      
+      - name: Parse Destroy Target
+        id: check
+        run: |
+          TARGET="${{ inputs.destroy_target }}"
+          
+          # Determine account type and resource type
+          if [[ "$TARGET" == admin-* ]]; then
+            echo "is_admin=true" >> $GITHUB_OUTPUT
+            echo "account_type=admin" >> $GITHUB_OUTPUT
+          else
+            echo "is_admin=false" >> $GITHUB_OUTPUT
+            echo "account_type=tenant" >> $GITHUB_OUTPUT
+          fi
+          
+          if [[ "$TARGET" == *-bootstrap ]]; then
+            echo "is_bootstrap=true" >> $GITHUB_OUTPUT
+            echo "is_infrastructure=false" >> $GITHUB_OUTPUT
+            echo "resource_type=bootstrap" >> $GITHUB_OUTPUT
+          else
+            echo "is_bootstrap=false" >> $GITHUB_OUTPUT
+            echo "is_infrastructure=true" >> $GITHUB_OUTPUT
+            echo "resource_type=infrastructure" >> $GITHUB_OUTPUT
+          fi
+          
+          if [[ "$TARGET" == tenant-* ]]; then
+            echo "is_tenant=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_tenant=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "📋 Destroy Configuration:"
+          echo "  Target: $TARGET"
+          echo "  Workspace: ${{ inputs.workspace }}"
+          echo "  Region: ${{ inputs.aws_region }}"
+      
+      - name: Validate Tenant Account ID
+        if: steps.check.outputs.is_tenant == 'true'
+        run: |
+          if [[ -z "${{ inputs.tenant_account_id }}" ]]; then
+            echo "❌ Tenant Account ID is required for tenant resources"
+            exit 1
+          fi
+          echo "✅ Tenant Account ID: ${{ inputs.tenant_account_id }}"
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ steps.check.outputs.is_tenant == 'true' && secrets.TENANT_AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ steps.check.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ steps.check.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SESSION_TOKEN || secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Check Dependencies
+        if: steps.check.outputs.is_bootstrap == 'true'
+        run: |
+          source ./cicd.sh
+          
+          ACCOUNT_TYPE="${{ steps.check.outputs.account_type }}"
+          INFRA_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/infrastructure/status"
+          
+          echo "🔍 Checking if infrastructure exists..."
+          
+          if ssm_parameter_exists "$INFRA_PATH"; then
+            echo "❌ Cannot destroy bootstrap: Infrastructure still exists"
+            echo "📋 You must destroy ${ACCOUNT_TYPE}-infrastructure first"
+            echo "💡 Run workflow: 08-destroy with target=${ACCOUNT_TYPE}-infrastructure"
+            exit 1
+          fi
+          
+          echo "✅ No infrastructure found. Safe to destroy bootstrap."
+      
+      - name: Check Resources Exist
+        run: |
+          source ./cicd.sh
+          
+          ACCOUNT_TYPE="${{ steps.check.outputs.account_type }}"
+          RESOURCE_TYPE="${{ steps.check.outputs.resource_type }}"
+          STATUS_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/${RESOURCE_TYPE}/status"
+          
+          echo "🔍 Checking if resources exist..."
+          echo "📍 SSM Path: ${STATUS_PATH}"
+          
+          if ! ssm_parameter_exists "$STATUS_PATH"; then
+            echo "⚠️ Resources not found in SSM"
+            echo "💡 Path: ${STATUS_PATH}"
+            echo "💡 Resources may already be destroyed or never created"
+            exit 1
+          fi
+          
+          echo "✅ Resources found. Proceeding with destroy."
+
+  destroy-infrastructure:
+    name: Destroy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: needs.validate.outputs.is_infrastructure == 'true'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SESSION_TOKEN || secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Get Bootstrap Configuration
+        id: bootstrap
+        run: |
+          source ./cicd.sh
+          
+          ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap"
+          
+          BACKEND_BUCKET=$(get_ssm_parameter "${BOOTSTRAP_PATH}/backend-bucket" "false")
+          DYNAMODB_TABLE=$(get_ssm_parameter "${BOOTSTRAP_PATH}/dynamodb-table" "false")
+          
+          echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
+          
+          echo "📦 Backend Config:"
+          echo "  Bucket: ${BACKEND_BUCKET}"
+          echo "  Table: ${DYNAMODB_TABLE}"
+      
+      - name: Terraform Init
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && './admin-portal-iac' || './tenant-iac' }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+            -backend-config="key=terraform-${{ inputs.workspace }}.tfstate" \
+            -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="encrypt=true"
+      
+      - name: Terraform Workspace
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && './admin-portal-iac' || './tenant-iac' }}
+        run: |
+          terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
+      
+      - name: Terraform Destroy
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && './admin-portal-iac' || './tenant-iac' }}
+        run: |
+          terraform destroy \
+            -var-file="environments/${{ inputs.workspace }}.tfvars" \
+            -auto-approve
+      
+      - name: Cleanup SSM Parameters
+        run: |
+          source ./cicd.sh
+          
+          ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
+          cleanup_ssm_parameters "${{ inputs.workspace }}" "${ACCOUNT_TYPE}/infrastructure"
+          
+          echo "✅ Infrastructure destroyed and SSM parameters cleaned up"
+
+  destroy-bootstrap:
+    name: Destroy Bootstrap
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: needs.validate.outputs.is_bootstrap == 'true'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SESSION_TOKEN || secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Destroy Bootstrap Resources
+        run: |
+          source ./cicd.sh
+          
+          export AWS_REGION="${{ inputs.aws_region }}"
+          
+          destroy_bootstrap_resources \
+            "${{ inputs.workspace }}" \
+            "${{ needs.validate.outputs.account_type }}" \
+            "${{ inputs.aws_region }}"
+
+  summary:
+    name: Destruction Summary
+    runs-on: ubuntu-latest
+    needs: [validate, destroy-infrastructure, destroy-bootstrap]
+    if: always()
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Display Summary
+        run: |
+          echo "🔥 Destruction Complete"
+          echo ""
+          echo "═══════════════════════════════════════════════════"
+          echo "📋 Destroy Summary"
+          echo "═══════════════════════════════════════════════════"
+          echo ""
+          echo "Target:      ${{ inputs.destroy_target }}"
+          echo "Workspace:   ${{ inputs.workspace }}"
+          echo "Region:      ${{ inputs.aws_region }}"
+          echo ""
+          
+          if [[ "${{ needs.destroy-infrastructure.result }}" == "success" ]]; then
+            echo "✅ Infrastructure Destroyed"
+          elif [[ "${{ needs.destroy-infrastructure.result }}" == "skipped" ]]; then
+            echo "⏭️  Infrastructure Destroy Skipped"
+          else
+            echo "❌ Infrastructure Destroy Failed"
+          fi
+          
+          if [[ "${{ needs.destroy-bootstrap.result }}" == "success" ]]; then
+            echo "✅ Bootstrap Destroyed"
+          elif [[ "${{ needs.destroy-bootstrap.result }}" == "skipped" ]]; then
+            echo "⏭️  Bootstrap Destroy Skipped"
+          else
+            echo "❌ Bootstrap Destroy Failed"
+          fi
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════"
+          
+          if [[ "${{ needs.destroy-infrastructure.result }}" == "failure" ]] || \
+             [[ "${{ needs.destroy-bootstrap.result }}" == "failure" ]]; then
+            echo "❌ Destruction completed with errors"
+            exit 1
+          fi
+          
+          echo "✅ Destruction completed successfully"

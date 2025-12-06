@@ -134,3 +134,27 @@ resource "local_file" "backend_config" {
     aws_region        = var.aws_region
   })
 }
+
+# Store bootstrap outputs in SSM Parameter Store
+module "bootstrap_ssm_outputs" {
+  source = "../../admin-portal-iac/modules/ssm-outputs"
+  
+  workspace    = var.workspace_prefix
+  account_type = "tenant"
+  category     = "bootstrap"
+  aws_region   = var.aws_region
+  
+  outputs = {
+    backend-bucket     = local.is_same_account ? "${var.workspace_prefix}-admin-portal-terraform-state-${var.admin_account_id}" : aws_s3_bucket.tenant_terraform_state[0].id
+    backend-bucket-arn = local.is_same_account ? "shared-with-admin" : aws_s3_bucket.tenant_terraform_state[0].arn
+    dynamodb-table     = local.is_same_account ? "${var.workspace_prefix}-admin-portal-terraform-lock-${var.admin_account_id}" : aws_dynamodb_table.tenant_terraform_lock[0].id
+    dynamodb-table-arn = local.is_same_account ? "shared-with-admin" : aws_dynamodb_table.tenant_terraform_lock[0].arn
+    account-id         = local.tenant_account_id
+    region             = var.aws_region
+  }
+  
+  depends_on = [
+    aws_s3_bucket.tenant_terraform_state,
+    aws_dynamodb_table.tenant_terraform_lock
+  ]
+}

@@ -1,0 +1,286 @@
+name: 06 - Frontend Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+
+jobs:
+  get-config:
+    name: Get Configuration from SSM
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.config.outputs.api_url }}
+      cognito_user_pool_id: ${{ steps.config.outputs.cognito_user_pool_id }}
+      cognito_client_id: ${{ steps.config.outputs.cognito_client_id }}
+      cognito_domain: ${{ steps.config.outputs.cognito_domain }}
+      s3_bucket: ${{ steps.config.outputs.s3_bucket }}
+      cloudfront_id: ${{ steps.config.outputs.cloudfront_id }}
+    
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Admin Infrastructure Config from SSM
+        id: config
+        run: |
+          # Validate admin infrastructure exists
+          if ! STATUS=$(aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null); then
+            echo "Admin infrastructure not found. Please run '02 - Admin Infrastructure' first."
+            exit 1
+          fi
+          
+          # Get API Gateway URL
+          API_URL=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-url" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          # Get Cognito configuration
+          COGNITO_USER_POOL_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          COGNITO_CLIENT_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-client-id" \
+            --region "${{ inputs.aws_region }}" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          COGNITO_DOMAIN=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-domain" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          # Get S3 and CloudFront configuration
+          S3_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/frontend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          CLOUDFRONT_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cloudfront-distribution-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          # Export outputs
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "cognito_user_pool_id=$COGNITO_USER_POOL_ID" >> $GITHUB_OUTPUT
+          echo "cognito_client_id=$COGNITO_CLIENT_ID" >> $GITHUB_OUTPUT
+          echo "cognito_domain=$COGNITO_DOMAIN" >> $GITHUB_OUTPUT
+          echo "s3_bucket=$S3_BUCKET" >> $GITHUB_OUTPUT
+          echo "cloudfront_id=$CLOUDFRONT_ID" >> $GITHUB_OUTPUT
+          
+          echo "Configuration retrieved successfully"
+          echo "API URL: $API_URL"
+          echo "Cognito User Pool: $COGNITO_USER_POOL_ID"
+          echo "S3 Bucket: $S3_BUCKET"
+          echo "CloudFront Distribution: $CLOUDFRONT_ID"
+
+  build-and-deploy:
+    name: Build and Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [get-config]
+    
+    defaults:
+      run:
+        working-directory: admin-portal-fe
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: admin-portal-fe/package-lock.json
+      
+      - name: Install Dependencies
+        run: |
+          npm ci
+      
+      - name: Create Environment Configuration
+        run: |
+          cat > .env.production << EOF
+          REACT_APP_ENV=${{ inputs.workspace }}
+          REACT_APP_API_URL=${{ needs.get-config.outputs.api_url }}
+          REACT_APP_COGNITO_USER_POOL_ID=${{ needs.get-config.outputs.cognito_user_pool_id }}
+          REACT_APP_COGNITO_CLIENT_ID=${{ needs.get-config.outputs.cognito_client_id }}
+          REACT_APP_COGNITO_DOMAIN=${{ needs.get-config.outputs.cognito_domain }}
+          REACT_APP_AWS_REGION=${{ inputs.aws_region }}
+          REACT_APP_VERSION=${{ github.sha }}
+          EOF
+          
+          echo "Environment configuration created"
+      
+      - name: Build Frontend
+        run: |
+          npm run build
+          
+          echo "Build completed successfully"
+          echo "Build size:"
+          du -sh build/
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Upload to S3
+        run: |
+          echo "Uploading build to S3 bucket: ${{ needs.get-config.outputs.s3_bucket }}"
+          
+          # Sync build directory to S3
+          aws s3 sync build/ s3://${{ needs.get-config.outputs.s3_bucket }}/ \
+            --delete \
+            --cache-control "public, max-age=31536000" \
+            --exclude "index.html" \
+            --exclude "service-worker.js" \
+            --region "${{ inputs.aws_region }}"
+          
+          # Upload index.html and service-worker.js with no-cache
+          aws s3 cp build/index.html s3://${{ needs.get-config.outputs.s3_bucket }}/index.html \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --region "${{ inputs.aws_region }}"
+          
+          if [ -f build/service-worker.js ]; then
+            aws s3 cp build/service-worker.js s3://${{ needs.get-config.outputs.s3_bucket }}/service-worker.js \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --region "${{ inputs.aws_region }}"
+          fi
+          
+          echo "Upload to S3 completed"
+      
+      - name: Invalidate CloudFront Cache
+        id: invalidate
+        run: |
+          echo "Creating CloudFront invalidation for distribution: ${{ needs.get-config.outputs.cloudfront_id }}"
+          
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "${{ needs.get-config.outputs.cloudfront_id }}" \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+          
+          echo "invalidation_id=$INVALIDATION_ID" >> $GITHUB_OUTPUT
+          echo "CloudFront invalidation created: $INVALIDATION_ID"
+      
+      - name: Update SSM with Deployment Metadata
+        run: |
+          # Store frontend deployment metadata
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/frontend/last-deployment-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/frontend/build-number" \
+            --value "${{ github.run_number }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/frontend/cloudfront-invalidation-id" \
+            --value "${{ steps.invalidate.outputs.invalidation_id }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          # Get CloudFront URL
+          CLOUDFRONT_URL=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cloudfront-domain-name" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/frontend/deployment-url" \
+            --value "$CLOUDFRONT_URL" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          # Update shared deployment metadata
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/last-deployment-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/workflow-run-id" \
+            --value "${{ github.run_id }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/commit-sha" \
+            --value "${{ github.sha }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+      
+      - name: Display Deployment Summary
+        run: |
+          CLOUDFRONT_URL=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cloudfront-domain-name" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "=========================================="
+          echo "Frontend Deployment Complete"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Build Number: ${{ github.run_number }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo ""
+          echo "Application URL: https://$CLOUDFRONT_URL"
+          echo ""
+          echo "CloudFront Invalidation ID: ${{ steps.invalidate.outputs.invalidation_id }}"
+          echo "Note: CloudFront invalidation may take 5-15 minutes to complete"
+          echo ""
+          echo "Configuration:"
+          echo "  - API URL: ${{ needs.get-config.outputs.api_url }}"
+          echo "  - Cognito Pool: ${{ needs.get-config.outputs.cognito_user_pool_id }}"
+          echo "  - Region: ${{ inputs.aws_region }}"
+          echo "=========================================="

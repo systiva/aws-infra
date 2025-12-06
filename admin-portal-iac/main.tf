@@ -451,6 +451,66 @@ module "jwt_authorizer" {
   depends_on = [module.cognito]
 }
 
+# ==============================================
+# SSM Parameter Store Outputs
+# ==============================================
+
+# Store infrastructure outputs in SSM for cross-pipeline communication
+module "infrastructure_ssm_outputs" {
+  source = "./modules/ssm-outputs"
+  
+  workspace    = var.workspace_prefix
+  account_type = "admin"
+  category     = "infrastructure"
+  aws_region   = var.aws_region
+  
+  outputs = {
+    # Networking
+    vpc-id               = module.networking.vpc_id
+    vpc-cidr             = module.networking.vpc_cidr
+    private-subnet-ids   = join(",", module.networking.private_subnet_ids)
+    public-subnet-ids    = join(",", module.networking.public_subnet_ids)
+    availability-zones   = join(",", module.networking.availability_zones)
+    
+    # Cognito
+    cognito-user-pool-id        = var.enable_cognito ? module.cognito[0].user_pool_id : ""
+    cognito-user-pool-arn       = var.enable_cognito ? module.cognito[0].user_pool_arn : ""
+    cognito-user-pool-client-id = var.enable_cognito ? module.cognito[0].user_pool_client_id : ""
+    cognito-user-pool-domain    = var.enable_cognito ? module.cognito[0].user_pool_domain : ""
+    
+    # API Gateway
+    api-gateway-id           = var.enable_api_gateway ? module.api_gateway[0].api_id : ""
+    api-gateway-url          = var.enable_api_gateway ? module.api_gateway[0].api_url : ""
+    api-gateway-execution-arn = var.enable_api_gateway ? module.api_gateway[0].api_execution_arn : ""
+    api-gateway-root-resource-id = var.enable_api_gateway ? module.api_gateway[0].api_root_resource_id : ""
+    
+    # Lambda
+    jwt-authorizer-function-name = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_name : ""
+    jwt-authorizer-function-arn  = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_arn : ""
+    
+    # CloudFront
+    cloudfront-distribution-id = var.enable_cloudfront ? module.cloudfront[0].distribution_id : ""
+    cloudfront-domain-name     = var.enable_cloudfront ? module.cloudfront[0].cloudfront_url : ""
+    
+    # S3
+    frontend-bucket     = var.enable_cloudfront ? module.cloudfront[0].frontend_bucket_name : ""
+    frontend-bucket-arn = var.enable_cloudfront ? module.cloudfront[0].frontend_bucket_arn : ""
+    
+    # Platform Bootstrap
+    platform-admin-user-id = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_user_id : ""
+    platform-tenant-id     = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_tenant_id : ""
+  }
+  
+  depends_on = [
+    module.networking,
+    module.cognito,
+    module.api_gateway,
+    module.jwt_authorizer,
+    module.cloudfront,
+    module.platform_bootstrap
+  ]
+}
+
 # Identity Management Service (IMS) Lambda
 module "ims_service" {
   count  = var.enable_ims_service && var.enable_cognito ? 1 : 0

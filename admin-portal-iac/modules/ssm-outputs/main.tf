@@ -1,0 +1,88 @@
+# SSM Outputs Module
+# Automatically stores Terraform outputs in AWS Systems Manager Parameter Store
+
+locals {
+  ssm_prefix = "/admin-portal/${var.workspace}/${var.account_type}/${var.category}"
+  
+  # Flatten nested maps for parameter creation
+  flattened_outputs = {
+    for key, value in var.outputs :
+    replace(key, "_", "-") => (
+      try(jsonencode(value), tostring(value))
+    )
+  }
+}
+
+# Store each output as SSM parameter
+resource "aws_ssm_parameter" "outputs" {
+  for_each = var.enabled ? local.flattened_outputs : {}
+  
+  name = "${local.ssm_prefix}/${each.key}"
+  
+  # Determine parameter type based on key name
+  type = can(regex("(password|secret|key-id|client-id|kms-key)", each.key)) ? "SecureString" : "String"
+  
+  # Store value as string
+  value = each.value
+  
+  # Enable overwrite for updates
+  overwrite = true
+  
+  # Add tags for organization
+  tags = {
+    Workspace   = var.workspace
+    AccountType = var.account_type
+    Category    = var.category
+    ManagedBy   = "Terraform"
+    Module      = "ssm-outputs"
+  }
+}
+
+# Metadata parameters
+resource "aws_ssm_parameter" "deployed_at" {
+  count = var.enabled ? 1 : 0
+  
+  name      = "${local.ssm_prefix}/metadata/deployed-at"
+  type      = "String"
+  value     = timestamp()
+  overwrite = true
+  
+  tags = {
+    Workspace   = var.workspace
+    AccountType = var.account_type
+    Category    = var.category
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_ssm_parameter" "version" {
+  count = var.enabled ? 1 : 0
+  
+  name      = "${local.ssm_prefix}/metadata/version"
+  type      = "String"
+  value     = "1.0"
+  overwrite = true
+  
+  tags = {
+    Workspace   = var.account_type
+    AccountType = var.account_type
+    Category    = var.category
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_ssm_parameter" "status" {
+  count = var.enabled ? 1 : 0
+  
+  name      = "${local.ssm_prefix}/status"
+  type      = "String"
+  value     = "completed"
+  overwrite = true
+  
+  tags = {
+    Workspace   = var.workspace
+    AccountType = var.account_type
+    Category    = var.category
+    ManagedBy   = "Terraform"
+  }
+}
