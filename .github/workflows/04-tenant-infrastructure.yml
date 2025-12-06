@@ -17,14 +17,6 @@ on:
         required: true
         type: string
         default: 'us-east-1'
-      tenant_account_id:
-        description: 'Tenant AWS Account ID'
-        required: true
-        type: string
-      admin_account_id:
-        description: 'Admin AWS Account ID'
-        required: true
-        type: string
 
 jobs:
   validate-prerequisites:
@@ -35,6 +27,7 @@ jobs:
       tenant_dynamodb_table: ${{ steps.tenant.outputs.dynamodb_table }}
       admin_vpc_id: ${{ steps.admin.outputs.vpc_id }}
       admin_api_gateway_id: ${{ steps.admin.outputs.api_gateway_id }}
+      admin_account_id: ${{ steps.admin_account.outputs.account_id }}
     
     steps:
       - name: Configure AWS Credentials (Tenant Account)
@@ -84,6 +77,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Admin Account ID
+        id: admin_account
+        run: |
+          ADMIN_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ADMIN_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "Admin Account ID: $ADMIN_ACCOUNT_ID"
       
       - name: Read Admin Infrastructure Config
         id: admin
@@ -144,6 +144,13 @@ jobs:
           aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
+      - name: Get Tenant Account ID
+        id: account
+        run: |
+          TENANT_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "tenant_account_id=$TENANT_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "Tenant Account ID: $TENANT_ACCOUNT_ID"
+      
       - name: Terraform Init
         run: |
           terraform init \
@@ -168,8 +175,8 @@ jobs:
           terraform plan \
             -var="workspace_prefix=${{ inputs.workspace }}" \
             -var="aws_region=${{ inputs.aws_region }}" \
-            -var="admin_account_id=${{ inputs.admin_account_id }}" \
-            -var="tenant_account_id=${{ inputs.tenant_account_id }}" \
+            -var="admin_account_id=${{ needs.validate-prerequisites.outputs.admin_account_id }}" \
+            -var="tenant_account_id=${{ steps.account.outputs.tenant_account_id }}" \
             -var="tenant_id=default" \
             -var-file="environments/${{ inputs.workspace }}.tfvars" \
             -out=tfplan
@@ -203,9 +210,9 @@ jobs:
         run: |
           echo "=========================================="
           echo "Tenant Infrastructure Deployed"
-          echo "=========================================="
+          echo "========================================="
           echo "Workspace: ${{ inputs.workspace }}"
-          echo "Tenant Account: ${{ inputs.tenant_account_id }}"
+          echo "Tenant Account: ${{ steps.account.outputs.tenant_account_id }}"
           echo ""
           
           TENANT_TABLE=$(aws ssm get-parameter \

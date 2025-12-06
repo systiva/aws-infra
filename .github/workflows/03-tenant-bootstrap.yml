@@ -17,10 +17,6 @@ on:
         required: true
         type: string
         default: 'us-east-1'
-      tenant_account_id:
-        description: 'Tenant AWS Account ID'
-        required: true
-        type: string
 
 jobs:
   validate:
@@ -28,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_proceed: ${{ steps.check.outputs.should_proceed }}
+      tenant_account_id: ${{ steps.account.outputs.tenant_account_id }}
     
     steps:
       - name: Checkout Code
@@ -41,14 +38,12 @@ jobs:
           aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
-      - name: Validate Account ID
+      - name: Get Tenant Account ID
+        id: account
         run: |
-          ACTUAL_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-          if [[ "$ACTUAL_ACCOUNT" != "${{ inputs.tenant_account_id }}" ]]; then
-            echo "Error: Credentials are for account $ACTUAL_ACCOUNT but expected ${{ inputs.tenant_account_id }}"
-            exit 1
-          fi
-          echo "Account ID validated: $ACTUAL_ACCOUNT"
+          TENANT_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "tenant_account_id=$TENANT_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "Tenant Account ID: $TENANT_ACCOUNT_ID"
       
       - name: Check if Bootstrap Already Exists
         id: check
@@ -107,7 +102,7 @@ jobs:
           terraform plan \
             -var="workspace_prefix=${{ inputs.workspace }}" \
             -var="aws_region=${{ inputs.aws_region }}" \
-            -var="tenant_account_id=${{ inputs.tenant_account_id }}" \
+            -var="tenant_account_id=${{ needs.validate.outputs.tenant_account_id }}" \
             -out=tfplan
       
       - name: Terraform Apply
@@ -144,9 +139,9 @@ jobs:
         run: |
           echo "=========================================="
           echo "Tenant Bootstrap Complete"
-          echo "=========================================="
+          echo "========================================="
           echo "Workspace: ${{ inputs.workspace }}"
-          echo "Tenant Account: ${{ inputs.tenant_account_id }}"
+          echo "Tenant Account: ${{ needs.validate.outputs.tenant_account_id }}"
           echo "Region: ${{ inputs.aws_region }}"
           echo ""
           echo "SSM Parameters stored at:"

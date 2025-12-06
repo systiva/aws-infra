@@ -141,6 +141,7 @@ jobs:
             -var="aws_region=${{ inputs.aws_region }}" \
             -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
             -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \
             -var-file="environments/${{ inputs.workspace }}.tfvars" \
             -out=tfplan
       
