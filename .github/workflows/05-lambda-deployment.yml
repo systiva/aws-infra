@@ -134,12 +134,12 @@ jobs:
         with:
           node-version: '18'
       
-      - name: Configure AWS Credentials (Tenant Account)
+      - name: Configure AWS Credentials (Admin Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Build Lambda Package
@@ -196,23 +196,23 @@ jobs:
             --query 'Configuration.CodeSha256' \
             --output text)
           
-          # Update SSM parameters
+          # Update SSM parameters in admin account
           aws ssm put-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/lambda/${{ matrix.function }}/version" \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/lambda/${{ matrix.function }}/version" \
             --value "$VERSION" \
             --type "String" \
             --overwrite \
             --region "${{ inputs.aws_region }}"
           
           aws ssm put-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/lambda/${{ matrix.function }}/code-sha256" \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/lambda/${{ matrix.function }}/code-sha256" \
             --value "$CODE_SHA" \
             --type "String" \
             --overwrite \
             --region "${{ inputs.aws_region }}"
           
           aws ssm put-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/lambda/${{ matrix.function }}/deployed-at" \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/lambda/${{ matrix.function }}/deployed-at" \
             --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --type "String" \
             --overwrite \
@@ -224,39 +224,39 @@ jobs:
     needs: [deploy-lambda]
     
     steps:
-      - name: Configure AWS Credentials (Tenant Account)
+      - name: Configure AWS Credentials (Admin Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Store Deployment Metadata
         run: |
           aws ssm put-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/shared/lambda-builds/last-build-timestamp" \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/lambda-builds/last-build-timestamp" \
             --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --type "String" \
             --overwrite \
             --region "${{ inputs.aws_region }}"
           
           aws ssm put-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/last-deployment-timestamp" \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/deployment/last-deployment-timestamp" \
             --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --type "String" \
             --overwrite \
             --region "${{ inputs.aws_region }}"
           
           aws ssm put-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/workflow-run-id" \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/deployment/workflow-run-id" \
             --value "${{ github.run_id }}" \
             --type "String" \
             --overwrite \
             --region "${{ inputs.aws_region }}"
           
           aws ssm put-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/commit-sha" \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/deployment/commit-sha" \
             --value "${{ github.sha }}" \
             --type "String" \
             --overwrite \
