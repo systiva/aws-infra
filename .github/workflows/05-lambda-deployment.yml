@@ -1,0 +1,274 @@
+name: 05 - Lambda Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+      function_name:
+        description: 'Lambda function to deploy'
+        required: true
+        type: choice
+        options:
+          - all
+          - create-admin-worker
+          - create-infra-worker
+          - delete-infra-worker
+          - poll-infra-worker
+          - setup-rbac-worker
+          - jwt-authorizer
+          - ims-service
+          - oms-service
+
+jobs:
+  get-config:
+    name: Get Configuration from SSM
+    runs-on: ubuntu-latest
+    outputs:
+      vpc_id: ${{ steps.admin.outputs.vpc_id }}
+      subnet_ids: ${{ steps.admin.outputs.subnet_ids }}
+      api_gateway_id: ${{ steps.admin.outputs.api_gateway_id }}
+      rbac_table: ${{ steps.tenant.outputs.rbac_table }}
+      tenant_table: ${{ steps.tenant.outputs.tenant_table }}
+      functions_to_deploy: ${{ steps.functions.outputs.list }}
+    
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Admin Infrastructure Config
+        id: admin
+        run: |
+          VPC_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/vpc-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          SUBNET_IDS=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/private-subnet-ids" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          API_GATEWAY_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
+          echo "subnet_ids=$SUBNET_IDS" >> $GITHUB_OUTPUT
+          echo "api_gateway_id=$API_GATEWAY_ID" >> $GITHUB_OUTPUT
+      
+      - name: Configure Tenant Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Tenant Infrastructure Config
+        id: tenant
+        run: |
+          RBAC_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/dynamodb/rbac-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          TENANT_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/dynamodb/tenant-registry-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          echo "rbac_table=$RBAC_TABLE" >> $GITHUB_OUTPUT
+          echo "tenant_table=$TENANT_TABLE" >> $GITHUB_OUTPUT
+      
+      - name: Determine Functions to Deploy
+        id: functions
+        run: |
+          if [[ "${{ inputs.function_name }}" == "all" ]]; then
+            FUNCTIONS="create-admin-worker create-infra-worker delete-infra-worker poll-infra-worker setup-rbac-worker jwt-authorizer ims-service oms-service"
+          else
+            FUNCTIONS="${{ inputs.function_name }}"
+          fi
+          
+          # Convert to JSON array for matrix
+          echo "list=$(echo $FUNCTIONS | jq -R -s -c 'split(" ")')" >> $GITHUB_OUTPUT
+
+  deploy-lambda:
+    name: Deploy ${{ matrix.function }}
+    runs-on: ubuntu-latest
+    needs: [get-config]
+    strategy:
+      matrix:
+        function: ${{ fromJson(needs.get-config.outputs.functions_to_deploy) }}
+      fail-fast: false
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Configure AWS Credentials (Tenant Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Build Lambda Package
+        working-directory: ${{ matrix.function }}
+        run: |
+          echo "Building ${{ matrix.function }}..."
+          
+          # Install dependencies
+          npm install --production
+          
+          # Create deployment package
+          zip -r function.zip . -x "*.git*" "test/*" "*.md"
+      
+      - name: Deploy Lambda Function
+        working-directory: ${{ matrix.function }}
+        run: |
+          FUNCTION_NAME="${{ inputs.workspace }}-${{ matrix.function }}"
+          
+          echo "Deploying to function: $FUNCTION_NAME"
+          
+          # Update function code
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://function.zip \
+            --region "${{ inputs.aws_region }}"
+          
+          # Wait for update to complete
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}"
+          
+          echo "Deployment complete for ${{ matrix.function }}"
+      
+      - name: Update SSM with Deployment Info
+        run: |
+          FUNCTION_NAME="${{ inputs.workspace }}-${{ matrix.function }}"
+          
+          # Get function details
+          FUNCTION_ARN=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.FunctionArn' \
+            --output text)
+          
+          VERSION=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.Version' \
+            --output text)
+          
+          CODE_SHA=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.CodeSha256' \
+            --output text)
+          
+          # Update SSM parameters
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/lambda/${{ matrix.function }}/version" \
+            --value "$VERSION" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/lambda/${{ matrix.function }}/code-sha256" \
+            --value "$CODE_SHA" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/lambda/${{ matrix.function }}/deployed-at" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+
+  update-metadata:
+    name: Update Deployment Metadata
+    runs-on: ubuntu-latest
+    needs: [deploy-lambda]
+    
+    steps:
+      - name: Configure AWS Credentials (Tenant Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Update Shared Deployment Metadata
+        run: |
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/lambda-builds/last-build-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/last-deployment-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/workflow-run-id" \
+            --value "${{ github.run_id }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/deployment/commit-sha" \
+            --value "${{ github.sha }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+      
+      - name: Display Summary
+        run: |
+          echo "=========================================="
+          echo "Lambda Deployment Complete"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Functions deployed: ${{ inputs.function_name }}"
+          echo "Workflow Run ID: ${{ github.run_id }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "=========================================="

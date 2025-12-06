@@ -98,6 +98,380 @@ handle_error() {
 trap 'handle_error $LINENO' ERR
 
 # ============================================================================
+# SSM PARAMETER STORE FUNCTIONS
+# ============================================================================
+
+# Get SSM parameter path prefix
+get_ssm_prefix() {
+    local workspace=$1
+    echo "/admin-portal/${workspace}"
+}
+
+# Put parameter to SSM
+put_ssm_parameter() {
+    local param_path=$1
+    local param_value=$2
+    local param_type=${3:-"String"}  # String, StringList, SecureString
+    local description=${4:-"Managed by admin-portal CI/CD"}
+    local overwrite=${5:-"true"}
+    
+    print_info "Setting SSM parameter: ${param_path}"
+    
+    local put_cmd="aws ssm put-parameter \
+        --name \"${param_path}\" \
+        --value \"${param_value}\" \
+        --type \"${param_type}\" \
+        --region \"${AWS_REGION}\""
+    
+    if [[ -n "$description" ]]; then
+        put_cmd="${put_cmd} --description \"${description}\""
+    fi
+    
+    if [[ "$overwrite" == "true" ]]; then
+        put_cmd="${put_cmd} --overwrite"
+    fi
+    
+    if ! eval "$put_cmd" 2>/dev/null; then
+        print_error "Failed to set parameter: ${param_path}"
+        return 1
+    fi
+    
+    print_success "Parameter set: ${param_path}"
+}
+
+# Get parameter from SSM
+get_ssm_parameter() {
+    local param_path=$1
+    local with_decryption=${2:-"true"}
+    
+    local get_cmd="aws ssm get-parameter \
+        --name \"${param_path}\" \
+        --region \"${AWS_REGION}\" \
+        --query 'Parameter.Value' \
+        --output text"
+    
+    if [[ "$with_decryption" == "true" ]]; then
+        get_cmd="${get_cmd} --with-decryption"
+    fi
+    
+    local value
+    if ! value=$(eval "$get_cmd" 2>/dev/null); then
+        print_error "Parameter not found: ${param_path}"
+        return 1
+    fi
+    
+    echo "$value"
+}
+
+# Get parameter or return default
+get_ssm_parameter_or_default() {
+    local param_path=$1
+    local default_value=$2
+    local with_decryption=${3:-"true"}
+    
+    local value
+    if value=$(get_ssm_parameter "$param_path" "$with_decryption" 2>/dev/null); then
+        echo "$value"
+    else
+        echo "$default_value"
+    fi
+}
+
+# Check if parameter exists
+ssm_parameter_exists() {
+    local param_path=$1
+    
+    if aws ssm get-parameter \
+        --name "$param_path" \
+        --region "${AWS_REGION}" \
+        --query 'Parameter.Name' \
+        --output text >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Delete parameter
+delete_ssm_parameter() {
+    local param_path=$1
+    
+    print_info "Deleting SSM parameter: ${param_path}"
+    
+    if ! aws ssm delete-parameter \
+        --name "$param_path" \
+        --region "${AWS_REGION}" 2>/dev/null; then
+        print_warning "Parameter not found or already deleted: ${param_path}"
+        return 0
+    fi
+    
+    print_success "Parameter deleted: ${param_path}"
+}
+
+# Get all parameters by path
+get_ssm_parameters_by_path() {
+    local path_prefix=$1
+    local recursive=${2:-"true"}
+    local with_decryption=${3:-"true"}
+    
+    local get_cmd="aws ssm get-parameters-by-path \
+        --path \"${path_prefix}\" \
+        --region \"${AWS_REGION}\" \
+        --query 'Parameters[*].[Name,Value]' \
+        --output text"
+    
+    if [[ "$recursive" == "true" ]]; then
+        get_cmd="${get_cmd} --recursive"
+    fi
+    
+    if [[ "$with_decryption" == "true" ]]; then
+        get_cmd="${get_cmd} --with-decryption"
+    fi
+    
+    eval "$get_cmd"
+}
+
+# Bulk upload Terraform outputs to SSM
+upload_terraform_outputs_to_ssm() {
+    local workspace=$1
+    local account_type=$2  # admin/tenant
+    local category=$3      # bootstrap/infrastructure
+    
+    local ssm_prefix=$(get_ssm_prefix "$workspace")
+    local base_path="${ssm_prefix}/${account_type}/${category}"
+    
+    print_header "📤 Uploading Terraform Outputs to SSM"
+    print_info "Base path: ${base_path}"
+    
+    # Get Terraform outputs as JSON
+    local outputs_json
+    outputs_json=$(terraform output -json 2>/dev/null)
+    
+    if [[ -z "$outputs_json" || "$outputs_json" == "{}" ]]; then
+        print_warning "No Terraform outputs found"
+        return 0
+    fi
+    
+    # Parse and upload each output
+    echo "$outputs_json" | jq -r 'to_entries[] | "\(.key)=\(.value.value)"' | while IFS='=' read -r key value; do
+        # Handle nested outputs (convert dots/underscores to slashes)
+        local param_path="${base_path}/${key}"
+        param_path=$(echo "$param_path" | tr '_' '-')
+        
+        # Determine parameter type
+        local param_type="String"
+        if [[ "$key" =~ (password|secret|key-id|client-id) ]]; then
+            param_type="SecureString"
+        elif [[ "$value" =~ ^\[.*\]$ ]]; then
+            param_type="StringList"
+            # Convert JSON array to comma-separated string
+            value=$(echo "$value" | jq -r 'if type == "array" then join(",") else . end')
+        fi
+        
+        # Upload parameter
+        put_ssm_parameter "$param_path" "$value" "$param_type"
+    done
+    
+    # Set metadata
+    put_ssm_parameter "${base_path}/metadata/deployed-at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    put_ssm_parameter "${base_path}/metadata/version" "1.0"
+    
+    local tf_version
+    tf_version=$(terraform version -json 2>/dev/null | jq -r '.terraform_version' || echo "unknown")
+    put_ssm_parameter "${base_path}/metadata/terraform-version" "$tf_version"
+    
+    # Set status
+    put_ssm_parameter "${base_path}/status" "completed"
+    
+    print_success "✅ All outputs uploaded to SSM"
+}
+
+# Download parameters from SSM and set as environment variables
+download_ssm_parameters_as_env() {
+    local workspace=$1
+    local account_type=$2
+    local category=$3
+    
+    local ssm_prefix=$(get_ssm_prefix "$workspace")
+    local base_path="${ssm_prefix}/${account_type}/${category}"
+    
+    print_header "📥 Downloading SSM Parameters"
+    print_info "Base path: ${base_path}"
+    
+    # Get all parameters recursively
+    local params
+    params=$(get_ssm_parameters_by_path "$base_path" "true" "true")
+    
+    if [[ -z "$params" ]]; then
+        print_error "No parameters found at: ${base_path}"
+        return 1
+    fi
+    
+    # Parse and export as environment variables
+    echo "$params" | while read -r param_name param_value; do
+        # Convert parameter path to env var name
+        # /admin-portal/qa/admin/bootstrap/backend-bucket -> ADMIN_BOOTSTRAP_BACKEND_BUCKET
+        local env_var_name
+        env_var_name=$(echo "$param_name" | sed "s|${ssm_prefix}/||" | tr '/' '_' | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+        
+        export "${env_var_name}=${param_value}"
+        print_success "Exported: ${env_var_name}"
+    done
+}
+
+# Validate required parameters exist
+validate_ssm_parameters() {
+    local workspace=$1
+    shift
+    local required_params=("$@")
+    
+    local ssm_prefix=$(get_ssm_prefix "$workspace")
+    local missing_params=()
+    
+    print_header "🔍 Validating Required Parameters"
+    
+    for param_path in "${required_params[@]}"; do
+        local full_path="${ssm_prefix}/${param_path}"
+        if ! ssm_parameter_exists "$full_path"; then
+            missing_params+=("$full_path")
+            print_error "Missing: ${full_path}"
+        else
+            print_success "Found: ${full_path}"
+        fi
+    done
+    
+    if [[ ${#missing_params[@]} -gt 0 ]]; then
+        print_error "❌ Missing ${#missing_params[@]} required parameters"
+        return 1
+    fi
+    
+    print_success "✅ All required parameters exist"
+    return 0
+}
+
+# Clean up all parameters for a workspace
+cleanup_ssm_parameters() {
+    local workspace=$1
+    local account_type=$2  # admin/tenant/shared or empty for all
+    
+    local ssm_prefix=$(get_ssm_prefix "$workspace")
+    local base_path="$ssm_prefix"
+    
+    if [[ -n "$account_type" ]]; then
+        base_path="${ssm_prefix}/${account_type}"
+    fi
+    
+    print_header "🗑️  Cleaning up SSM Parameters"
+    print_warning "This will delete all parameters under: ${base_path}"
+    
+    # Get all parameters
+    local params
+    params=$(aws ssm get-parameters-by-path \
+        --path "$base_path" \
+        --recursive \
+        --region "${AWS_REGION}" \
+        --query 'Parameters[*].Name' \
+        --output text 2>/dev/null || echo "")
+    
+    if [[ -z "$params" ]]; then
+        print_info "No parameters found to delete"
+        return 0
+    fi
+    
+    # Delete each parameter
+    for param_name in $params; do
+        delete_ssm_parameter "$param_name"
+    done
+    
+    print_success "✅ Cleanup complete"
+}
+
+# Destroy bootstrap resources (S3 bucket, DynamoDB table, SSM parameters)
+destroy_bootstrap_resources() {
+    local workspace=$1
+    local account_type=$2  # admin or tenant
+    local region=${3:-"${AWS_REGION}"}
+    
+    print_header "🔥 Destroying Bootstrap Resources"
+    print_warning "Workspace: ${workspace}"
+    print_warning "Account Type: ${account_type}"
+    print_warning "Region: ${region}"
+    
+    local ssm_prefix=$(get_ssm_prefix "$workspace")
+    local bootstrap_path="${ssm_prefix}/${account_type}/bootstrap"
+    
+    # Step 1: Read bootstrap configuration from SSM
+    print_info "📖 Reading bootstrap configuration from SSM..."
+    
+    local backend_bucket
+    local dynamodb_table
+    
+    backend_bucket=$(get_ssm_parameter "${bootstrap_path}/backend-bucket" "false")
+    dynamodb_table=$(get_ssm_parameter "${bootstrap_path}/dynamodb-table" "false")
+    
+    if [[ -z "$backend_bucket" ]]; then
+        print_error "Bootstrap configuration not found in SSM"
+        print_info "Expected path: ${bootstrap_path}"
+        return 1
+    fi
+    
+    print_info "Backend Bucket: ${backend_bucket}"
+    print_info "DynamoDB Table: ${dynamodb_table}"
+    
+    # Step 2: Empty and delete S3 bucket
+    print_header "🗑️  Deleting S3 Bucket"
+    
+    if aws s3 ls "s3://${backend_bucket}" --region "${region}" 2>/dev/null; then
+        print_info "Emptying bucket: ${backend_bucket}"
+        if aws s3 rm "s3://${backend_bucket}" --recursive --region "${region}"; then
+            print_success "Bucket emptied successfully"
+        else
+            print_error "Failed to empty bucket"
+            return 1
+        fi
+        
+        print_info "Deleting bucket: ${backend_bucket}"
+        if aws s3 rb "s3://${backend_bucket}" --force --region "${region}"; then
+            print_success "S3 bucket deleted: ${backend_bucket}"
+        else
+            print_error "Failed to delete bucket"
+            return 1
+        fi
+    else
+        print_warning "Bucket not found or already deleted: ${backend_bucket}"
+    fi
+    
+    # Step 3: Delete DynamoDB table
+    print_header "🗑️  Deleting DynamoDB Table"
+    
+    if aws dynamodb describe-table --table-name "${dynamodb_table}" --region "${region}" 2>/dev/null; then
+        print_info "Deleting table: ${dynamodb_table}"
+        if aws dynamodb delete-table --table-name "${dynamodb_table}" --region "${region}"; then
+            print_success "DynamoDB table deletion initiated: ${dynamodb_table}"
+            print_info "Waiting for table deletion to complete..."
+            aws dynamodb wait table-not-exists --table-name "${dynamodb_table}" --region "${region}"
+            print_success "DynamoDB table deleted successfully"
+        else
+            print_error "Failed to delete DynamoDB table"
+            return 1
+        fi
+    else
+        print_warning "Table not found or already deleted: ${dynamodb_table}"
+    fi
+    
+    # Step 4: Cleanup SSM parameters
+    print_header "🗑️  Cleaning up SSM Parameters"
+    cleanup_ssm_parameters "$workspace" "${account_type}/bootstrap"
+    
+    print_success "✅ Bootstrap resources destroyed successfully"
+    print_info ""
+    print_info "Summary:"
+    print_info "  ✓ S3 Bucket: ${backend_bucket}"
+    print_info "  ✓ DynamoDB Table: ${dynamodb_table}"
+    print_info "  ✓ SSM Parameters: ${bootstrap_path}/*"
+}
+
+# ============================================================================
 # Enhanced Validation Functions
 # ============================================================================
 

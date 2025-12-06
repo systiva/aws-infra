@@ -1,0 +1,157 @@
+name: 03 - Tenant Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to bootstrap'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+      tenant_account_id:
+        description: 'Tenant AWS Account ID'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    name: Validate Prerequisites
+    runs-on: ubuntu-latest
+    outputs:
+      should_proceed: ${{ steps.check.outputs.should_proceed }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials (Tenant Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Validate Account ID
+        run: |
+          ACTUAL_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          if [[ "$ACTUAL_ACCOUNT" != "${{ inputs.tenant_account_id }}" ]]; then
+            echo "Error: Credentials are for account $ACTUAL_ACCOUNT but expected ${{ inputs.tenant_account_id }}"
+            exit 1
+          fi
+          echo "Account ID validated: $ACTUAL_ACCOUNT"
+      
+      - name: Check if Bootstrap Already Exists
+        id: check
+        run: |
+          # Check if SSM parameters already exist
+          if aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
+            
+            echo "❌ Bootstrap already exists for workspace: ${{ inputs.workspace }}"
+            echo "💡 SSM Parameter: /admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status"
+            echo "💡 To recreate, first run workflow: 08-destroy with target=tenant-bootstrap"
+            exit 1
+          else
+            echo "✅ Bootstrap does not exist. Proceeding with creation."
+            echo "should_proceed=true" >> $GITHUB_OUTPUT
+          fi
+
+  bootstrap:
+    name: Bootstrap Tenant Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: needs.validate.outputs.should_proceed == 'true'
+    
+    defaults:
+      run:
+        working-directory: c20_prj/tenant-iac/bootstrap
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+      
+      - name: Configure AWS Credentials (Tenant Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Terraform Init
+        run: |
+          terraform init
+      
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="workspace_prefix=${{ inputs.workspace }}" \
+            -var="aws_region=${{ inputs.aws_region }}" \
+            -var="tenant_account_id=${{ inputs.tenant_account_id }}" \
+            -out=tfplan
+      
+      - name: Terraform Apply
+        run: |
+          terraform apply -auto-approve tfplan
+      
+      - name: Verify SSM Parameters
+        run: |
+          echo "Verifying SSM parameters were created..."
+          
+          PARAMS=(
+            "backend-bucket"
+            "backend-bucket-arn"
+            "dynamodb-table"
+            "dynamodb-table-arn"
+            "account-id"
+            "region"
+            "status"
+          )
+          
+          for param in "${PARAMS[@]}"; do
+            FULL_PATH="/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/${param}"
+            if aws ssm get-parameter --name "$FULL_PATH" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
+              echo "✓ Parameter exists: $FULL_PATH"
+            else
+              echo "✗ Parameter missing: $FULL_PATH"
+              exit 1
+            fi
+          done
+          
+          echo "All SSM parameters verified successfully!"
+      
+      - name: Display Bootstrap Summary
+        run: |
+          echo "=========================================="
+          echo "Tenant Bootstrap Complete"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Tenant Account: ${{ inputs.tenant_account_id }}"
+          echo "Region: ${{ inputs.aws_region }}"
+          echo ""
+          echo "SSM Parameters stored at:"
+          echo "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/*"
+          echo ""
+          echo "Next Steps:"
+          echo "1. Run '04 - Tenant Infrastructure' workflow"
+          echo "=========================================="

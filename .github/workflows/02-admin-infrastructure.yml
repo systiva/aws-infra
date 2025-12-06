@@ -1,0 +1,200 @@
+name: 02 - Admin Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+
+jobs:
+  validate-bootstrap:
+    name: Validate Bootstrap Exists
+    runs-on: ubuntu-latest
+    outputs:
+      backend_bucket: ${{ steps.config.outputs.backend_bucket }}
+      dynamodb_table: ${{ steps.config.outputs.dynamodb_table }}
+      bootstrap_exists: ${{ steps.check.outputs.exists }}
+    
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Check Bootstrap Status
+        id: check
+        run: |
+          if STATUS=$(aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null); then
+            
+            if [[ "$STATUS" == "completed" ]]; then
+              echo "Bootstrap status: completed"
+              echo "exists=true" >> $GITHUB_OUTPUT
+            else
+              echo "Bootstrap exists but status is: $STATUS"
+              echo "exists=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          else
+            echo "Bootstrap not found. Please run '01 - Admin Bootstrap' first."
+            echo "exists=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      - name: Download Bootstrap Config from SSM
+        id: config
+        run: |
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "backend_bucket=$BACKEND_BUCKET" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=$DYNAMODB_TABLE" >> $GITHUB_OUTPUT
+          
+          echo "Backend Bucket: $BACKEND_BUCKET"
+          echo "DynamoDB Table: $DYNAMODB_TABLE"
+
+  deploy:
+    name: Deploy Admin Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate-bootstrap]
+    if: needs.validate-bootstrap.outputs.bootstrap_exists == 'true'
+    
+    defaults:
+      run:
+        working-directory: c20_prj/admin-portal-iac
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+      
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ needs.validate-bootstrap.outputs.backend_bucket }}" \
+            -backend-config="dynamodb_table=${{ needs.validate-bootstrap.outputs.dynamodb_table }}" \
+            -backend-config="key=admin-portal-iac/terraform.tfstate" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="encrypt=true"
+      
+      - name: Select/Create Workspace
+        run: |
+          if terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${{ inputs.workspace }}[[:space:]]*$"; then
+            echo "Selecting existing workspace: ${{ inputs.workspace }}"
+            terraform workspace select ${{ inputs.workspace }}
+          else
+            echo "Creating new workspace: ${{ inputs.workspace }}"
+            terraform workspace new ${{ inputs.workspace }}
+          fi
+      
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="workspace_prefix=${{ inputs.workspace }}" \
+            -var="aws_region=${{ inputs.aws_region }}" \
+            -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var-file="environments/${{ inputs.workspace }}.tfvars" \
+            -out=tfplan
+      
+      - name: Terraform Apply
+        run: |
+          terraform apply -auto-approve tfplan
+      
+      - name: Verify SSM Infrastructure Parameters
+        run: |
+          echo "Verifying infrastructure outputs in SSM..."
+          
+          PARAMS=(
+            "vpc-id"
+            "cognito-user-pool-id"
+            "api-gateway-id"
+            "status"
+          )
+          
+          for param in "${PARAMS[@]}"; do
+            FULL_PATH="/admin-portal/${{ inputs.workspace }}/admin/infrastructure/${param}"
+            if aws ssm get-parameter --name "$FULL_PATH" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
+              VALUE=$(aws ssm get-parameter --name "$FULL_PATH" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text)
+              echo "✓ $param: $VALUE"
+            else
+              echo "✗ Parameter missing: $FULL_PATH"
+              exit 1
+            fi
+          done
+      
+      - name: Display Infrastructure Summary
+        run: |
+          echo "=========================================="
+          echo "Admin Infrastructure Deployed"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo ""
+          
+          VPC_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/vpc-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' --output text)
+          
+          API_URL=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-url" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' --output text)
+          
+          echo "VPC ID: $VPC_ID"
+          echo "API Gateway URL: $API_URL"
+          echo ""
+          echo "Configuration available in SSM at:"
+          echo "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/*"
+          echo ""
+          echo "Next Steps:"
+          echo "1. Run '03 - Tenant Bootstrap' workflow"
+          echo "2. Then run '04 - Tenant Infrastructure' workflow"
+          echo "=========================================="

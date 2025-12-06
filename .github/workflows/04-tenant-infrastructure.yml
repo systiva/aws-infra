@@ -1,0 +1,230 @@
+name: 04 - Tenant Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+      tenant_account_id:
+        description: 'Tenant AWS Account ID'
+        required: true
+        type: string
+      admin_account_id:
+        description: 'Admin AWS Account ID'
+        required: true
+        type: string
+
+jobs:
+  validate-prerequisites:
+    name: Validate Prerequisites
+    runs-on: ubuntu-latest
+    outputs:
+      tenant_backend_bucket: ${{ steps.tenant.outputs.backend_bucket }}
+      tenant_dynamodb_table: ${{ steps.tenant.outputs.dynamodb_table }}
+      admin_vpc_id: ${{ steps.admin.outputs.vpc_id }}
+      admin_api_gateway_id: ${{ steps.admin.outputs.api_gateway_id }}
+    
+    steps:
+      - name: Configure AWS Credentials (Tenant Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Check Tenant Bootstrap
+        id: tenant
+        run: |
+          if ! STATUS=$(aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null); then
+            echo "Tenant bootstrap not found. Please run '03 - Tenant Bootstrap' first."
+            exit 1
+          fi
+          
+          if [[ "$STATUS" != "completed" ]]; then
+            echo "Tenant bootstrap status is: $STATUS (expected: completed)"
+            exit 1
+          fi
+          
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "backend_bucket=$BACKEND_BUCKET" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=$DYNAMODB_TABLE" >> $GITHUB_OUTPUT
+      
+      - name: Configure AWS Credentials (Admin Account - Read Only)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Read Admin Infrastructure Config
+        id: admin
+        run: |
+          if ! STATUS=$(aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null); then
+            echo "Admin infrastructure not found. Please run '02 - Admin Infrastructure' first."
+            exit 1
+          fi
+          
+          VPC_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/vpc-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          API_GATEWAY_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
+          echo "api_gateway_id=$API_GATEWAY_ID" >> $GITHUB_OUTPUT
+          
+          echo "Admin VPC ID: $VPC_ID"
+          echo "Admin API Gateway ID: $API_GATEWAY_ID"
+
+  deploy:
+    name: Deploy Tenant Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate-prerequisites]
+    if: inputs.destroy == false
+    
+    defaults:
+      run:
+        working-directory: c20_prj/tenant-iac
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+      
+      - name: Configure AWS Credentials (Tenant Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ needs.validate-prerequisites.outputs.tenant_backend_bucket }}" \
+            -backend-config="dynamodb_table=${{ needs.validate-prerequisites.outputs.tenant_dynamodb_table }}" \
+            -backend-config="key=tenant-iac/terraform.tfstate" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="encrypt=true"
+      
+      - name: Select/Create Workspace
+        run: |
+          if terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${{ inputs.workspace }}[[:space:]]*$"; then
+            echo "Selecting existing workspace: ${{ inputs.workspace }}"
+            terraform workspace select ${{ inputs.workspace }}
+          else
+            echo "Creating new workspace: ${{ inputs.workspace }}"
+            terraform workspace new ${{ inputs.workspace }}
+          fi
+      
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="workspace_prefix=${{ inputs.workspace }}" \
+            -var="aws_region=${{ inputs.aws_region }}" \
+            -var="admin_account_id=${{ inputs.admin_account_id }}" \
+            -var="tenant_account_id=${{ inputs.tenant_account_id }}" \
+            -var="tenant_id=default" \
+            -var-file="environments/${{ inputs.workspace }}.tfvars" \
+            -out=tfplan
+      
+      - name: Terraform Apply
+        run: |
+          terraform apply -auto-approve tfplan
+      
+      - name: Verify SSM Infrastructure Parameters
+        run: |
+          echo "Verifying infrastructure outputs in SSM..."
+          
+          PARAMS=(
+            "dynamodb/tenant-data-table"
+            "dynamodb/tenant-config-table"
+            "status"
+          )
+          
+          for param in "${PARAMS[@]}"; do
+            FULL_PATH="/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/${param}"
+            if aws ssm get-parameter --name "$FULL_PATH" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
+              VALUE=$(aws ssm get-parameter --name "$FULL_PATH" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text)
+              echo "✓ $param: $VALUE"
+            else
+              echo "✗ Parameter missing: $FULL_PATH"
+              exit 1
+            fi
+          done
+      
+      - name: Display Infrastructure Summary
+        run: |
+          echo "=========================================="
+          echo "Tenant Infrastructure Deployed"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Tenant Account: ${{ inputs.tenant_account_id }}"
+          echo ""
+          
+          TENANT_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/dynamodb/tenant-data-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' --output text)
+          
+          CONFIG_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/dynamodb/tenant-config-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' --output text)
+          
+          echo "Tenant Data Table: $TENANT_TABLE"
+          echo "Tenant Config Table: $CONFIG_TABLE"
+          echo ""
+          echo "Configuration available in SSM at:"
+          echo "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/*"
+          echo ""
+          echo "Next Steps:"
+          echo "1. Run '05 - Lambda Deployment' to update Lambda functions"
+          echo "2. Run '06 - Frontend Deployment' to deploy the UI"
+          echo "=========================================="
