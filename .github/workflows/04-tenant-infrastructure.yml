@@ -119,7 +119,6 @@ jobs:
     name: Deploy Tenant Infrastructure
     runs-on: ubuntu-latest
     needs: [validate-prerequisites]
-    if: inputs.destroy == false
     
     defaults:
       run:

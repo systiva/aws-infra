@@ -488,14 +488,6 @@ module "infrastructure_ssm_outputs" {
     jwt-authorizer-function-name = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_name : ""
     jwt-authorizer-function-arn  = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_arn : ""
     
-    # CloudFront
-    cloudfront-distribution-id = var.enable_cloudfront ? module.cloudfront[0].distribution_id : ""
-    cloudfront-domain-name     = var.enable_cloudfront ? module.cloudfront[0].cloudfront_url : ""
-    
-    # S3
-    frontend-bucket     = var.enable_cloudfront ? module.cloudfront[0].frontend_bucket_name : ""
-    frontend-bucket-arn = var.enable_cloudfront ? module.cloudfront[0].frontend_bucket_arn : ""
-    
     # Platform Bootstrap
     platform-admin-user-id = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_user_id : ""
     platform-tenant-id     = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_tenant_id : ""
@@ -506,7 +498,6 @@ module "infrastructure_ssm_outputs" {
     module.cognito,
     module.api_gateway,
     module.jwt_authorizer,
-    module.cloudfront,
     module.platform_bootstrap
   ]
 }

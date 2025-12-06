@@ -95,8 +95,7 @@ jobs:
               ref: context.ref,
               inputs: {
                 workspace: '${{ inputs.workspace }}',
-                aws_region: '${{ inputs.aws_region }}',
-                force_recreate: 'false'
+                aws_region: '${{ inputs.aws_region }}'
               }
             });
             
@@ -129,8 +128,7 @@ jobs:
               ref: context.ref,
               inputs: {
                 workspace: '${{ inputs.workspace }}',
-                aws_region: '${{ inputs.aws_region }}',
-                destroy: 'false'
+                aws_region: '${{ inputs.aws_region }}'
               }
             });
             
