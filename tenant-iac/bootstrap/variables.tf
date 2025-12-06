@@ -29,9 +29,9 @@ variable "tenant_account_id" {
 }
 
 variable "tenant_aws_profile" {
-  description = "AWS profile for tenant account authentication"
+  description = "AWS profile for tenant account authentication (only for local development, CI/CD uses environment variables)"
   type        = string
-  default     = "tenant"
+  default     = "default"
 }
 
 variable "aws_region" {
