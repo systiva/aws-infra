@@ -39,9 +39,9 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS profile to use for authentication"
+  description = "AWS profile to use for authentication (only for local development, CI/CD uses environment variables)"
   type        = string
-  default     = "admin"
+  default     = "default"
 }
 
 variable "project_name" {

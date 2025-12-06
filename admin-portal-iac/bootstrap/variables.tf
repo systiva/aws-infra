@@ -44,9 +44,9 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS profile to use"
+  description = "AWS profile to use (only for local development, CI/CD uses environment variables)"
   type        = string
-  default     = "fct_fct.admin"
+  default     = "default"
 }
 
 variable "enable_session_storage" {
