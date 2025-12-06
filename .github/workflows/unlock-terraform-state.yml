@@ -1,0 +1,220 @@
+name: Unlock Terraform State
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which Terraform state to unlock'
+        required: true
+        type: choice
+        options:
+          - admin-bootstrap
+          - admin-infrastructure
+          - tenant-bootstrap
+          - tenant-infrastructure
+      workspace:
+        description: 'Terraform workspace'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      lock_id:
+        description: 'Lock ID from Terraform error message'
+        required: true
+        type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+
+jobs:
+  unlock-state:
+    name: Unlock Terraform State
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Display Unlock Information
+        run: |
+          echo "=========================================="
+          echo "⚠️  TERRAFORM STATE UNLOCK"
+          echo "=========================================="
+          echo "Target: ${{ inputs.target }}"
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Lock ID: ${{ inputs.lock_id }}"
+          echo "Region: ${{ inputs.aws_region }}"
+          echo "=========================================="
+          echo ""
+          echo "⚠️  WARNING: This will force unlock the Terraform state."
+          echo "⚠️  Only proceed if you are certain no other operations are running."
+          echo ""
+      
+      - name: Configure AWS Credentials (Admin)
+        if: startsWith(inputs.target, 'admin-')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Configure AWS Credentials (Tenant)
+        if: startsWith(inputs.target, 'tenant-')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Backend Configuration from SSM
+        id: backend
+        run: |
+          # Determine account type and path based on target
+          if [[ "${{ inputs.target }}" == admin-* ]]; then
+            ACCOUNT_TYPE="admin"
+          else
+            ACCOUNT_TYPE="tenant"
+          fi
+          
+          # Determine component (bootstrap or infrastructure)
+          if [[ "${{ inputs.target }}" == *-bootstrap ]]; then
+            COMPONENT="bootstrap"
+          else
+            COMPONENT="infrastructure"
+          fi
+          
+          echo "Account Type: $ACCOUNT_TYPE"
+          echo "Component: $COMPONENT"
+          
+          # Read backend configuration from SSM (always from bootstrap)
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "backend_bucket=$BACKEND_BUCKET" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=$DYNAMODB_TABLE" >> $GITHUB_OUTPUT
+          echo "account_type=$ACCOUNT_TYPE" >> $GITHUB_OUTPUT
+          echo "component=$COMPONENT" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "Backend Configuration:"
+          echo "  S3 Bucket: $BACKEND_BUCKET"
+          echo "  DynamoDB Table: $DYNAMODB_TABLE"
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+      
+      - name: Determine Working Directory and State Key
+        id: paths
+        run: |
+          case "${{ inputs.target }}" in
+            admin-bootstrap)
+              WORKING_DIR="c20_prj/admin-portal-iac/bootstrap"
+              STATE_KEY="admin-portal-iac/bootstrap/terraform.tfstate"
+              ;;
+            admin-infrastructure)
+              WORKING_DIR="c20_prj/admin-portal-iac"
+              STATE_KEY="admin-portal-iac/terraform.tfstate"
+              ;;
+            tenant-bootstrap)
+              WORKING_DIR="c20_prj/tenant-iac/bootstrap"
+              STATE_KEY="tenant-iac/bootstrap/terraform.tfstate"
+              ;;
+            tenant-infrastructure)
+              WORKING_DIR="c20_prj/tenant-iac"
+              STATE_KEY="tenant-iac/terraform.tfstate"
+              ;;
+            *)
+              echo "Unknown target: ${{ inputs.target }}"
+              exit 1
+              ;;
+          esac
+          
+          echo "working_dir=$WORKING_DIR" >> $GITHUB_OUTPUT
+          echo "state_key=$STATE_KEY" >> $GITHUB_OUTPUT
+          
+          echo "Working Directory: $WORKING_DIR"
+          echo "State Key: $STATE_KEY"
+      
+      - name: Terraform Init
+        working-directory: ${{ steps.paths.outputs.working_dir }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ steps.backend.outputs.backend_bucket }}" \
+            -backend-config="dynamodb_table=${{ steps.backend.outputs.dynamodb_table }}" \
+            -backend-config="key=${{ steps.paths.outputs.state_key }}" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="encrypt=true"
+      
+      - name: Select Workspace
+        working-directory: ${{ steps.paths.outputs.working_dir }}
+        run: |
+          # For bootstrap, workspace doesn't exist in Terraform
+          if [[ "${{ inputs.target }}" == *-bootstrap ]]; then
+            echo "Bootstrap components don't use Terraform workspaces, using default"
+          else
+            # For infrastructure, select the workspace
+            if terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${{ inputs.workspace }}[[:space:]]*$"; then
+              echo "Selecting workspace: ${{ inputs.workspace }}"
+              terraform workspace select ${{ inputs.workspace }}
+            else
+              echo "Warning: Workspace ${{ inputs.workspace }} not found"
+              echo "Available workspaces:"
+              terraform workspace list
+              exit 1
+            fi
+          fi
+      
+      - name: Force Unlock Terraform State
+        working-directory: ${{ steps.paths.outputs.working_dir }}
+        run: |
+          echo "Attempting to force unlock state with Lock ID: ${{ inputs.lock_id }}"
+          terraform force-unlock -force "${{ inputs.lock_id }}"
+      
+      - name: Verify Unlock Success
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "✅ Terraform State Unlocked Successfully"
+          echo "=========================================="
+          echo "Target: ${{ inputs.target }}"
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Lock ID: ${{ inputs.lock_id }}"
+          echo ""
+          echo "You can now retry your Terraform operation."
+          echo "=========================================="
+      
+      - name: Display Unlock Audit Trail
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "📋 UNLOCK AUDIT TRAIL"
+          echo "=========================================="
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "Target: ${{ inputs.target }}"
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Lock ID: ${{ inputs.lock_id }}"
+          echo "Region: ${{ inputs.aws_region }}"
+          echo "=========================================="
