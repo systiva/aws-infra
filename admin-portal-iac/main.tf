@@ -467,7 +467,7 @@ module "infrastructure_ssm_outputs" {
   outputs = {
     # Networking
     vpc-id               = module.networking.vpc_id
-    vpc-cidr             = module.networking.vpc_cidr
+    vpc-cidr             = module.networking.vpc_cidr_block
     private-subnet-ids   = join(",", module.networking.private_subnet_ids)
     public-subnet-ids    = join(",", module.networking.public_subnet_ids)
     availability-zones   = join(",", module.networking.availability_zones)
@@ -479,18 +479,20 @@ module "infrastructure_ssm_outputs" {
     cognito-user-pool-domain    = var.enable_cognito ? module.cognito[0].user_pool_domain : ""
     
     # API Gateway
-    api-gateway-id           = var.enable_api_gateway ? module.api_gateway[0].api_id : ""
-    api-gateway-url          = var.enable_api_gateway ? module.api_gateway[0].api_url : ""
-    api-gateway-execution-arn = var.enable_api_gateway ? module.api_gateway[0].api_execution_arn : ""
-    api-gateway-root-resource-id = var.enable_api_gateway ? module.api_gateway[0].api_root_resource_id : ""
+    api-gateway-id           = var.enable_api_gateway ? module.api_gateway[0].api_gateway_id : ""
+    api-gateway-url          = var.enable_api_gateway ? module.api_gateway[0].api_gateway_url : ""
+    api-gateway-execution-arn = var.enable_api_gateway ? module.api_gateway[0].api_gateway_execution_arn : ""
     
     # Lambda
     jwt-authorizer-function-name = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_name : ""
     jwt-authorizer-function-arn  = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_arn : ""
     
     # Platform Bootstrap
-    platform-admin-user-id = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_user_id : ""
+    platform-admin-user-id = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_cognito_user_id : ""
     platform-tenant-id     = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_tenant_id : ""
+    
+    # Deployment Status
+    status = "completed"
   }
   
   depends_on = [
