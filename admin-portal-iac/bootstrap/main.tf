@@ -451,14 +451,11 @@ module "bootstrap_ssm_outputs" {
     backend-bucket-arn   = aws_s3_bucket.terraform_state.arn
     dynamodb-table       = aws_dynamodb_table.terraform_lock.id
     dynamodb-table-arn   = aws_dynamodb_table.terraform_lock.arn
-    kms-key-id           = aws_kms_key.terraform.key_id
-    kms-key-arn          = aws_kms_key.terraform.arn
     region               = var.aws_region
   }
   
   depends_on = [
     aws_s3_bucket.terraform_state,
-    aws_dynamodb_table.terraform_lock,
-    aws_kms_key.terraform
+    aws_dynamodb_table.terraform_lock
   ]
 }
