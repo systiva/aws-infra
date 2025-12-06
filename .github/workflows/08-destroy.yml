@@ -111,9 +111,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ steps.check.outputs.is_tenant == 'true' && secrets.TENANT_AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ steps.check.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ steps.check.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SESSION_TOKEN || secrets.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Check Dependencies
@@ -168,9 +168,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SESSION_TOKEN || secrets.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Setup Terraform
@@ -240,9 +240,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.TENANT_AWS_SESSION_TOKEN || secrets.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Destroy Bootstrap Resources
