@@ -117,8 +117,6 @@ jobs:
             "backend-bucket-arn"
             "dynamodb-table"
             "dynamodb-table-arn"
-            "kms-key-id"
-            "kms-key-arn"
             "region"
             "status"
           )
