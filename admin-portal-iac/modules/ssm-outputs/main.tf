@@ -8,8 +8,7 @@ locals {
   flattened_outputs = {
     for key, value in var.outputs :
     replace(key, "_", "-") => (
-      # Use jsonencode only for complex types (maps, lists), tostring for primitives
-      can(tostring(value)) && !can(tomap(value)) && !can(tolist(value)) ? tostring(value) : jsonencode(value)
+      try(jsonencode(value), tostring(value))
     )
   }
 }
