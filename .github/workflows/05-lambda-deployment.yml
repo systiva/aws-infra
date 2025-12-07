@@ -114,6 +114,20 @@ jobs:
           aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
+      - name: Debug - List Directories
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Function to build: ${{ matrix.function }}"
+          echo "Checking if directory exists:"
+          ls -la | grep -E "(create-|delete-|poll-|setup-|jwt-|ims-|oms-)"
+          if [ -d "${{ matrix.function }}" ]; then
+            echo "Directory ${{ matrix.function }} exists"
+            ls -la "${{ matrix.function }}"
+          else
+            echo "ERROR: Directory ${{ matrix.function }} does not exist"
+            exit 1
+          fi
+      
       - name: Build Lambda Package
         working-directory: ${{ matrix.function }}
         run: |
