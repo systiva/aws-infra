@@ -23,6 +23,8 @@ on:
         type: choice
         options:
           - all
+          - admin-portal-be
+          - admin-portal-web-server
           - create-admin-worker
           - create-infra-worker
           - delete-infra-worker
@@ -80,7 +82,7 @@ jobs:
         id: functions
         run: |
           if [[ "${{ inputs.function_name }}" == "all" ]]; then
-            FUNCTIONS="create-admin-worker create-infra-worker delete-infra-worker poll-infra-worker setup-rbac-worker jwt-authorizer ims-service oms-service"
+            FUNCTIONS="admin-portal-be admin-portal-web-server create-admin-worker create-infra-worker delete-infra-worker poll-infra-worker setup-rbac-worker jwt-authorizer ims-service oms-service"
           else
             FUNCTIONS="${{ inputs.function_name }}"
           fi
