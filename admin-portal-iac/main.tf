@@ -491,7 +491,7 @@ module "infrastructure_ssm_outputs" {
     admin-portal-web-server-function-name = module.admin_portal_web_server.lambda_function_name
     admin-portal-web-server-function-arn  = module.admin_portal_web_server.lambda_function_arn
     admin-portal-web-server-function-url  = module.admin_portal_web_server.function_url
-    admin-portal-web-server-s3-bucket     = module.admin_portal_web_server.lambda_code_bucket_name
+    admin-portal-web-server-s3-bucket     = local.admin_portal_bucket_name
     
     # Platform Bootstrap
     platform-admin-user-id = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_cognito_user_id : ""
