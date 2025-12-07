@@ -85,8 +85,8 @@ jobs:
             FUNCTIONS="${{ inputs.function_name }}"
           fi
           
-          # Convert to JSON array for matrix
-          echo "list=$(echo $FUNCTIONS | jq -R -s -c 'split(" ")')" >> $GITHUB_OUTPUT
+          # Convert to JSON array for matrix (trim whitespace)
+          echo "list=$(echo $FUNCTIONS | tr -s ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
 
   deploy-lambda:
     name: Deploy ${{ matrix.function }}
