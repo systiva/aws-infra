@@ -128,7 +128,7 @@ jobs:
       - name: Deploy Lambda Function
         working-directory: ${{ matrix.function }}
         run: |
-          FUNCTION_NAME="${{ inputs.workspace }}-${{ matrix.function }}"
+          FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-${{ matrix.function }}"
           
           echo "Deploying to function: $FUNCTION_NAME"
           
@@ -147,7 +147,7 @@ jobs:
       
       - name: Update SSM with Deployment Info
         run: |
-          FUNCTION_NAME="${{ inputs.workspace }}-${{ matrix.function }}"
+          FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-${{ matrix.function }}"
           
           # Get function details
           FUNCTION_ARN=$(aws lambda get-function \
