@@ -480,7 +480,7 @@ module "infrastructure_ssm_outputs" {
     
     # API Gateway
     api-gateway-id           = var.enable_api_gateway ? module.api_gateway[0].api_gateway_id : ""
-    api-gateway-url          = var.enable_api_gateway ? module.api_gateway[0].api_gateway_url : ""
+    api-gateway-url          = var.enable_api_gateway ? module.api_gateway[0].admin_backend_base_url : ""
     api-gateway-execution-arn = var.enable_api_gateway ? module.api_gateway[0].api_gateway_execution_arn : ""
     
     # Lambda
