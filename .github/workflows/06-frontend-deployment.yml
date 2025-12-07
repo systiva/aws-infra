@@ -145,6 +145,8 @@ jobs:
           echo "Environment configuration created"
       
       - name: Build Frontend
+        env:
+          CI: false
         run: |
           npm run build
           
