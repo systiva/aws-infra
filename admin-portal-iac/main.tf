@@ -487,6 +487,12 @@ module "infrastructure_ssm_outputs" {
     jwt-authorizer-function-name = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_name : ""
     jwt-authorizer-function-arn  = var.enable_jwt_authorizer && var.enable_cognito ? module.jwt_authorizer[0].lambda_function_arn : ""
     
+    # Admin Portal Web Server
+    admin-portal-web-server-function-name = module.admin_portal_web_server.lambda_function_name
+    admin-portal-web-server-function-arn  = module.admin_portal_web_server.lambda_function_arn
+    admin-portal-web-server-function-url  = module.admin_portal_web_server.function_url
+    admin-portal-web-server-s3-bucket     = module.admin_portal_web_server.lambda_code_bucket_name
+    
     # Platform Bootstrap
     platform-admin-user-id = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_cognito_user_id : ""
     platform-tenant-id     = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_tenant_id : ""
@@ -500,7 +506,8 @@ module "infrastructure_ssm_outputs" {
     module.cognito,
     module.api_gateway,
     module.jwt_authorizer,
-    module.platform_bootstrap
+    module.platform_bootstrap,
+    module.admin_portal_web_server
   ]
 }
 
