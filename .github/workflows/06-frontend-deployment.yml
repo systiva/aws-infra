@@ -28,7 +28,7 @@ jobs:
       cognito_client_id: ${{ steps.config.outputs.cognito_client_id }}
       cognito_domain: ${{ steps.config.outputs.cognito_domain }}
       s3_bucket: ${{ steps.config.outputs.s3_bucket }}
-      cloudfront_id: ${{ steps.config.outputs.cloudfront_id }}
+      web_server_url: ${{ steps.config.outputs.web_server_url }}
     
     steps:
       - name: Configure AWS Credentials
@@ -79,15 +79,15 @@ jobs:
             --query 'Parameter.Value' \
             --output text)
           
-          # Get S3 and CloudFront configuration
+          # Get S3 bucket and web server URL
           S3_BUCKET=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/frontend-bucket" \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/admin-portal-web-server-s3-bucket" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' \
             --output text)
           
-          CLOUDFRONT_ID=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cloudfront-distribution-id" \
+          WEB_SERVER_URL=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/admin-portal-web-server-function-url" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' \
             --output text)
@@ -98,13 +98,13 @@ jobs:
           echo "cognito_client_id=$COGNITO_CLIENT_ID" >> $GITHUB_OUTPUT
           echo "cognito_domain=$COGNITO_DOMAIN" >> $GITHUB_OUTPUT
           echo "s3_bucket=$S3_BUCKET" >> $GITHUB_OUTPUT
-          echo "cloudfront_id=$CLOUDFRONT_ID" >> $GITHUB_OUTPUT
+          echo "web_server_url=$WEB_SERVER_URL" >> $GITHUB_OUTPUT
           
           echo "Configuration retrieved successfully"
           echo "API URL: $API_URL"
           echo "Cognito User Pool: $COGNITO_USER_POOL_ID"
           echo "S3 Bucket: $S3_BUCKET"
-          echo "CloudFront Distribution: $CLOUDFRONT_ID"
+          echo "Web Server URL: $WEB_SERVER_URL"
 
   build-and-deploy:
     name: Build and Deploy Frontend
@@ -185,20 +185,6 @@ jobs:
           
           echo "Upload to S3 completed"
       
-      - name: Invalidate CloudFront Cache
-        id: invalidate
-        run: |
-          echo "Creating CloudFront invalidation for distribution: ${{ needs.get-config.outputs.cloudfront_id }}"
-          
-          INVALIDATION_ID=$(aws cloudfront create-invalidation \
-            --distribution-id "${{ needs.get-config.outputs.cloudfront_id }}" \
-            --paths "/*" \
-            --query 'Invalidation.Id' \
-            --output text)
-          
-          echo "invalidation_id=$INVALIDATION_ID" >> $GITHUB_OUTPUT
-          echo "CloudFront invalidation created: $INVALIDATION_ID"
-      
       - name: Update SSM with Deployment Metadata
         run: |
           # Store frontend deployment metadata
@@ -217,22 +203,8 @@ jobs:
             --region "${{ inputs.aws_region }}"
           
           aws ssm put-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/shared/frontend/cloudfront-invalidation-id" \
-            --value "${{ steps.invalidate.outputs.invalidation_id }}" \
-            --type "String" \
-            --overwrite \
-            --region "${{ inputs.aws_region }}"
-          
-          # Get CloudFront URL
-          CLOUDFRONT_URL=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cloudfront-domain-name" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' \
-            --output text)
-          
-          aws ssm put-parameter \
             --name "/admin-portal/${{ inputs.workspace }}/shared/frontend/deployment-url" \
-            --value "$CLOUDFRONT_URL" \
+            --value "${{ needs.get-config.outputs.web_server_url }}" \
             --type "String" \
             --overwrite \
             --region "${{ inputs.aws_region }}"
@@ -261,12 +233,6 @@ jobs:
       
       - name: Display Deployment Summary
         run: |
-          CLOUDFRONT_URL=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cloudfront-domain-name" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' \
-            --output text)
-          
           echo "=========================================="
           echo "Frontend Deployment Complete"
           echo "=========================================="
@@ -274,10 +240,8 @@ jobs:
           echo "Build Number: ${{ github.run_number }}"
           echo "Commit SHA: ${{ github.sha }}"
           echo ""
-          echo "Application URL: https://$CLOUDFRONT_URL"
-          echo ""
-          echo "CloudFront Invalidation ID: ${{ steps.invalidate.outputs.invalidation_id }}"
-          echo "Note: CloudFront invalidation may take 5-15 minutes to complete"
+          echo "Application URL: ${{ needs.get-config.outputs.web_server_url }}"
+          echo "S3 Bucket: ${{ needs.get-config.outputs.s3_bucket }}"
           echo ""
           echo "Configuration:"
           echo "  - API URL: ${{ needs.get-config.outputs.api_url }}"
