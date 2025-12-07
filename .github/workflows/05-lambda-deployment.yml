@@ -40,12 +40,10 @@ jobs:
       vpc_id: ${{ steps.admin.outputs.vpc_id }}
       subnet_ids: ${{ steps.admin.outputs.subnet_ids }}
       api_gateway_id: ${{ steps.admin.outputs.api_gateway_id }}
-      rbac_table: ${{ steps.tenant.outputs.rbac_table }}
-      tenant_table: ${{ steps.tenant.outputs.tenant_table }}
       functions_to_deploy: ${{ steps.functions.outputs.list }}
     
     steps:
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (Admin Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
@@ -77,32 +75,6 @@ jobs:
           echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
           echo "subnet_ids=$SUBNET_IDS" >> $GITHUB_OUTPUT
           echo "api_gateway_id=$API_GATEWAY_ID" >> $GITHUB_OUTPUT
-      
-      - name: Configure Tenant Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
-          aws-region: ${{ inputs.aws_region }}
-      
-      - name: Get Tenant Infrastructure Config
-        id: tenant
-        run: |
-          RBAC_TABLE=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/dynamodb/rbac-table" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' \
-            --output text 2>/dev/null || echo "")
-          
-          TENANT_TABLE=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/dynamodb/tenant-registry-table" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' \
-            --output text 2>/dev/null || echo "")
-          
-          echo "rbac_table=$RBAC_TABLE" >> $GITHUB_OUTPUT
-          echo "tenant_table=$TENANT_TABLE" >> $GITHUB_OUTPUT
       
       - name: Determine Functions to Deploy
         id: functions
