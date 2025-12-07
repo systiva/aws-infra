@@ -128,7 +128,12 @@ jobs:
       - name: Deploy Lambda Function
         working-directory: ${{ matrix.function }}
         run: |
-          FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-${{ matrix.function }}"
+          # OMS service uses different naming pattern
+          if [[ "${{ matrix.function }}" == "oms-service" ]]; then
+            FUNCTION_NAME="oms-service-${{ inputs.workspace }}"
+          else
+            FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-${{ matrix.function }}"
+          fi
           
           echo "Deploying to function: $FUNCTION_NAME"
           
@@ -147,7 +152,12 @@ jobs:
       
       - name: Update SSM with Deployment Info
         run: |
-          FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-${{ matrix.function }}"
+          # OMS service uses different naming pattern
+          if [[ "${{ matrix.function }}" == "oms-service" ]]; then
+            FUNCTION_NAME="oms-service-${{ inputs.workspace }}"
+          else
+            FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-${{ matrix.function }}"
+          fi
           
           # Get function details
           FUNCTION_ARN=$(aws lambda get-function \
