@@ -136,6 +136,7 @@ jobs:
           REACT_APP_ENV=${{ inputs.workspace }}
           REACT_APP_API_BASE_URL=${{ needs.get-config.outputs.api_url }}
           REACT_APP_API_URL=${{ needs.get-config.outputs.api_url }}
+          REACT_APP_IMS_BASE_URL=${{ needs.get-config.outputs.api_url }}
           REACT_APP_COGNITO_USER_POOL_ID=${{ needs.get-config.outputs.cognito_user_pool_id }}
           REACT_APP_COGNITO_CLIENT_ID=${{ needs.get-config.outputs.cognito_client_id }}
           REACT_APP_COGNITO_DOMAIN=${{ needs.get-config.outputs.cognito_domain }}
