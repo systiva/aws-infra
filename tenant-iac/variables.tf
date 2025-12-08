@@ -80,3 +80,28 @@ variable "common_tags" {
   type        = map(string)
   default     = {}
 }
+
+# DynamoDB Configuration
+variable "dynamodb_billing_mode" {
+  description = "DynamoDB billing mode (PROVISIONED or PAY_PER_REQUEST)"
+  type        = string
+  default     = "PAY_PER_REQUEST"
+}
+
+variable "point_in_time_recovery" {
+  description = "Enable point-in-time recovery for DynamoDB"
+  type        = bool
+  default     = true
+}
+
+variable "server_side_encryption" {
+  description = "Enable server-side encryption with KMS"
+  type        = bool
+  default     = true
+}
+
+variable "deletion_protection" {
+  description = "Enable deletion protection for DynamoDB table"
+  type        = bool
+  default     = true
+}

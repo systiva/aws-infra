@@ -62,6 +62,9 @@ locals {
   workspace_prefix = var.workspace_prefix
   name_prefix = "${var.project_name}-${local.workspace_prefix}"
   
+  # DynamoDB table naming
+  tenant_public_table_name = "${local.workspace_prefix}-tenant-public"
+  
   # S3 bucket names (must be globally unique)
   admin_portal_bucket_name = var.s3_admin_portal_bucket_name != "" ? var.s3_admin_portal_bucket_name : "${local.name_prefix}-portal-${random_id.suffix.hex}"
   
@@ -178,7 +181,7 @@ module "create_infra_worker" {
   
   # DynamoDB table for tenant registry
   tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
-  tenant_public_table_name   = var.tenant_public_table_name
+  tenant_public_table_name   = local.tenant_public_table_name
   
   # Tags
   common_tags = local.common_tags
@@ -200,6 +203,7 @@ module "delete_infra_worker" {
   
   # DynamoDB table for tenant registry
   tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  tenant_public_table_name   = local.tenant_public_table_name
   
   # Tags
   common_tags = local.common_tags
@@ -221,6 +225,7 @@ module "poll_infra_worker" {
   
   # DynamoDB table for tenant registry
   tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  tenant_public_table_name   = local.tenant_public_table_name
   
   # Tags
   common_tags = local.common_tags

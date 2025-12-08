@@ -32,6 +32,13 @@ exports.handler = async (event, context) => {
     functionVersion: context.functionVersion
   }, 'Create Infrastructure Worker - Lambda invoked');
 
+  // Validate required environment variables
+  if (!config.DYNAMODB.TENANT_PUBLIC_TABLE) {
+    const error = new Error('Missing required environment variable: TENANT_PUBLIC_DYNAMO_DB');
+    logger.error({ error: error.message }, 'Configuration validation failed');
+    throw error;
+  }
+
   // Initialize services
   const crossAccountService = new CrossAccountService();
   const adminDynamoDBService = new DynamoDBService(); // For admin account tenant registry
