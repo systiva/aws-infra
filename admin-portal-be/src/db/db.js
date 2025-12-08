@@ -6,7 +6,7 @@ const env = process.env.ENV ? process.env.ENV.trim().toLowerCase() : null;
 Logger.info(`ENV: ${env}`);
 
 // Set table name based on environment
-const TABLE_NAME = 'admin-portal-dev-tenant-registry';
+const TABLE_NAME = process.env.TENANT_REGISTRY_TABLE_NAME || 'admin-portal-dev-tenant-registry';
 Logger.info(`DynamoDB Table: ${TABLE_NAME}`);
 
 // Configure DynamoDB connection based on environment
