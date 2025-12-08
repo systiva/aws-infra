@@ -122,23 +122,18 @@ resource "aws_iam_role_policy" "cross_account_permissions" {
   })
 }
 
-# Tenant-specific DynamoDB Tables (Always Created)
+# Tenant-specific DynamoDB Table (Always Created)
 module "tenant_dynamodb" {
   source = "./modules/dynamodb"
   
-  workspace_prefix = var.workspace_prefix
-  project_name     = var.project_name
-  environment      = var.environment
+  project_name = var.project_name
+  environment  = var.workspace_prefix
   
-  # Account IDs for comparison (required by local.is_same_account)
-  admin_account_id  = var.admin_account_id
-  tenant_account_id = var.tenant_account_id
-  
-  # Tenant-specific table configuration
-  tenant_id = var.tenant_id
-  
-  # Conditional naming to avoid conflicts in same account
-  table_name_suffix = local.is_same_account ? "tenant-${var.tenant_id}" : ""
+  # DynamoDB configuration
+  billing_mode           = var.dynamodb_billing_mode
+  point_in_time_recovery = var.point_in_time_recovery
+  server_side_encryption = var.server_side_encryption
+  deletion_protection    = var.deletion_protection
   
   common_tags = local.common_tags
 }
@@ -153,17 +148,15 @@ module "infrastructure_ssm_outputs" {
   aws_region   = var.aws_region
   
   outputs = {
-    # DynamoDB Tables
-    "dynamodb/tenant-data-table"     = module.tenant_dynamodb.table_names.tenant_data
-    "dynamodb/tenant-data-table-arn" = module.tenant_dynamodb.table_arns.tenant_data
-    "dynamodb/tenant-config-table"   = module.tenant_dynamodb.table_names.tenant_config
-    "dynamodb/tenant-config-table-arn" = module.tenant_dynamodb.table_arns.tenant_config
+    # DynamoDB Table
+    "tenant_public_table_name" = module.tenant_dynamodb.tenant_public_table_name
+    "tenant_public_table_arn"  = module.tenant_dynamodb.tenant_public_table_arn
     
     # Cross-account role (if created)
-    "cross-account-role-arn" = length(aws_iam_role.cross_account_tenant_role) > 0 ? aws_iam_role.cross_account_tenant_role[0].arn : "not-created"
+    "cross_account_role_arn" = length(aws_iam_role.cross_account_tenant_role) > 0 ? aws_iam_role.cross_account_tenant_role[0].arn : "not-created"
     
     # Metadata
-    "tenant-id" = var.tenant_id
+    "tenant_id" = var.tenant_id
   }
   
   depends_on = [

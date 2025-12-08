@@ -4,10 +4,19 @@ output "cross_account_role_arn" {
   value       = length(aws_iam_role.cross_account_tenant_role) > 0 ? aws_iam_role.cross_account_tenant_role[0].arn : null
 }
 
-output "tenant_dynamodb_tables" {
-  description = "DynamoDB tables created for tenant"
-  value       = module.tenant_dynamodb.table_names
-  sensitive   = false
+output "tenant_public_table_name" {
+  description = "Name of the tenant public DynamoDB table"
+  value       = module.tenant_dynamodb.tenant_public_table_name
+}
+
+output "tenant_public_table_arn" {
+  description = "ARN of the tenant public DynamoDB table"
+  value       = module.tenant_dynamodb.tenant_public_table_arn
+}
+
+output "table_schema" {
+  description = "DynamoDB table schema information"
+  value       = module.tenant_dynamodb.table_schema
 }
 
 output "workspace_prefix" {
@@ -34,6 +43,6 @@ output "deployment_summary" {
     tenant_account_id         = var.tenant_account_id
     is_same_account           = local.is_same_account
     cross_account_role_created = length(aws_iam_role.cross_account_tenant_role) > 0
-    dynamodb_tables_created   = true
+    tenant_public_table        = module.tenant_dynamodb.tenant_public_table_name
   }
 }

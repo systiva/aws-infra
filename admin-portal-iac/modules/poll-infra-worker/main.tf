@@ -47,6 +47,7 @@ resource "aws_lambda_function" "poll_infra_worker" {
       NODE_ENV                   = var.environment
       LOG_LEVEL                 = var.log_level
       TENANT_REGISTRY_TABLE_NAME = var.tenant_registry_table_name
+      TENANT_PUBLIC_DYNAMO_DB    = var.tenant_public_table_name
       TENANT_ACCOUNT_ROLE_NAME  = var.tenant_account_role_name
     }
   }

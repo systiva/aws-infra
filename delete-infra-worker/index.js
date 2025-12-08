@@ -36,6 +36,13 @@ exports.handler = async (event, context) => {
     functionVersion: context.functionVersion
   }, 'Delete Infrastructure Worker - Lambda invoked');
 
+  // Validate required environment variables
+  if (!config.DYNAMODB.TENANT_PUBLIC_TABLE) {
+    const error = new Error('Missing required environment variable: TENANT_PUBLIC_DYNAMO_DB');
+    logger.error({ error: error.message }, 'Configuration validation failed');
+    throw error;
+  }
+
   // Log the raw event structure for debugging
   logger.debug({
     rawEvent: event,

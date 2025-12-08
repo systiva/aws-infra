@@ -45,6 +45,11 @@ variable "tenant_registry_table_name" {
   type        = string
 }
 
+variable "tenant_public_table_name" {
+  description = "Name of the tenant public DynamoDB table in tenant account"
+  type        = string
+}
+
 variable "tenant_account_role_name" {
   description = "Name of the role to assume in tenant accounts"
   type        = string

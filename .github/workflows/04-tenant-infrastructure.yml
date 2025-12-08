@@ -189,8 +189,7 @@ jobs:
           echo "Verifying infrastructure outputs in SSM..."
           
           PARAMS=(
-            "dynamodb/tenant-data-table"
-            "dynamodb/tenant-config-table"
+            "tenant_public_table_name"
             "status"
           )
           
@@ -215,17 +214,11 @@ jobs:
           echo ""
           
           TENANT_TABLE=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/dynamodb/tenant-data-table" \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/tenant_public_table_name" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' --output text)
           
-          CONFIG_TABLE=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/dynamodb/tenant-config-table" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' --output text)
-          
-          echo "Tenant Data Table: $TENANT_TABLE"
-          echo "Tenant Config Table: $CONFIG_TABLE"
+          echo "Tenant Public Table: $TENANT_TABLE"
           echo ""
           echo "Configuration available in SSM at:"
           echo "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/*"
