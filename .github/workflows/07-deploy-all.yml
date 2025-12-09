@@ -73,9 +73,9 @@ jobs:
           echo "account_id=$TENANT_ACCOUNT_ID" >> $GITHUB_OUTPUT
           echo "Tenant Account ID: $TENANT_ACCOUNT_ID"
 
-  # Phase 1: Admin Bootstrap
-  admin-bootstrap:
-    name: 1. Admin Bootstrap
+  # Phase 1: Tenant Bootstrap
+  tenant-bootstrap:
+    name: 1. Tenant Bootstrap
     runs-on: ubuntu-latest
     needs: [detect-accounts]
     if: ${{ !inputs.skip_bootstrap }}
@@ -83,72 +83,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-      
-      - name: Trigger Admin Bootstrap
-        uses: actions/github-script@v7
         with:
-          script: |
-            const result = await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: '01-admin-bootstrap.yml',
-              ref: context.ref,
-              inputs: {
-                workspace: '${{ inputs.workspace }}',
-                aws_region: '${{ inputs.aws_region }}'
-              }
-            });
-            
-            console.log('Admin Bootstrap workflow triggered');
-      
-      - name: Wait for Bootstrap
-        run: |
-          echo "Waiting for bootstrap to complete..."
-          sleep 60
-
-  # Phase 2: Admin Infrastructure
-  admin-infrastructure:
-    name: 2. Admin Infrastructure
-    runs-on: ubuntu-latest
-    needs: [detect-accounts, admin-bootstrap]
-    if: ${{ always() && (needs.admin-bootstrap.result == 'success' || inputs.skip_bootstrap) }}
-    
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      
-      - name: Trigger Admin Infrastructure
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const result = await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: '02-admin-infrastructure.yml',
-              ref: context.ref,
-              inputs: {
-                workspace: '${{ inputs.workspace }}',
-                aws_region: '${{ inputs.aws_region }}'
-              }
-            });
-            
-            console.log('Admin Infrastructure workflow triggered');
-      
-      - name: Wait for Infrastructure
-        run: |
-          echo "Waiting for infrastructure deployment..."
-          sleep 120
-
-  # Phase 3: Tenant Bootstrap
-  tenant-bootstrap:
-    name: 3. Tenant Bootstrap
-    runs-on: ubuntu-latest
-    needs: [admin-infrastructure]
-    if: ${{ always() && needs.admin-infrastructure.result == 'success' && !inputs.skip_bootstrap }}
-    
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+          path: c20_prj
       
       - name: Trigger Tenant Bootstrap
         uses: actions/github-script@v7
@@ -172,16 +108,18 @@ jobs:
           echo "Waiting for tenant bootstrap..."
           sleep 60
 
-  # Phase 4: Tenant Infrastructure
+  # Phase 2: Tenant Infrastructure
   tenant-infrastructure:
-    name: 4. Tenant Infrastructure
+    name: 2. Tenant Infrastructure
     runs-on: ubuntu-latest
-    needs: [admin-infrastructure, tenant-bootstrap]
-    if: ${{ always() && needs.admin-infrastructure.result == 'success' && (needs.tenant-bootstrap.result == 'success' || inputs.skip_bootstrap) }}
+    needs: [detect-accounts, tenant-bootstrap]
+    if: ${{ always() && (needs.tenant-bootstrap.result == 'success' || inputs.skip_bootstrap) }}
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          path: c20_prj
       
       - name: Trigger Tenant Infrastructure
         uses: actions/github-script@v7
@@ -205,16 +143,88 @@ jobs:
           echo "Waiting for tenant infrastructure deployment..."
           sleep 120
 
-  # Phase 5: Lambda Deployment
-  lambda-deployment:
-    name: 5. Lambda Deployment
+  # Phase 3: Admin Bootstrap
+  admin-bootstrap:
+    name: 3. Admin Bootstrap
     runs-on: ubuntu-latest
-    needs: [tenant-infrastructure]
-    if: ${{ always() && needs.tenant-infrastructure.result == 'success' && !inputs.skip_lambda }}
+    needs: [detect-accounts, tenant-infrastructure]
+    if: ${{ always() && needs.tenant-infrastructure.result == 'success' && !inputs.skip_bootstrap }}
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Trigger Admin Bootstrap
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const result = await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '01-admin-bootstrap.yml',
+              ref: context.ref,
+              inputs: {
+                workspace: '${{ inputs.workspace }}',
+                aws_region: '${{ inputs.aws_region }}'
+              }
+            });
+            
+            console.log('Admin Bootstrap workflow triggered');
+      
+      - name: Wait for Bootstrap
+        run: |
+          echo "Waiting for bootstrap to complete..."
+          sleep 60
+
+  # Phase 4: Admin Infrastructure
+  admin-infrastructure:
+    name: 4. Admin Infrastructure
+    runs-on: ubuntu-latest
+    needs: [detect-accounts, admin-bootstrap]
+    if: ${{ always() && (needs.admin-bootstrap.result == 'success' || inputs.skip_bootstrap) }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Trigger Admin Infrastructure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const result = await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '02-admin-infrastructure.yml',
+              ref: context.ref,
+              inputs: {
+                workspace: '${{ inputs.workspace }}',
+                aws_region: '${{ inputs.aws_region }}'
+              }
+            });
+            
+            console.log('Admin Infrastructure workflow triggered');
+      
+      - name: Wait for Infrastructure
+        run: |
+          echo "Waiting for infrastructure deployment..."
+          sleep 120
+
+  # Phase 5: Lambda Deployment
+  lambda-deployment:
+    name: 5. Lambda Deployment
+    runs-on: ubuntu-latest
+    needs: [admin-infrastructure]
+    if: ${{ always() && needs.admin-infrastructure.result == 'success' && !inputs.skip_lambda }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
       
       - name: Trigger Lambda Deployment
         uses: actions/github-script@v7
@@ -249,6 +259,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          path: c20_prj
       
       - name: Trigger Frontend Deployment
         uses: actions/github-script@v7
@@ -276,7 +288,7 @@ jobs:
   deployment-summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [admin-infrastructure, tenant-infrastructure, lambda-deployment, frontend-deployment]
+    needs: [tenant-infrastructure, admin-infrastructure, lambda-deployment, frontend-deployment]
     if: always()
     
     steps:
@@ -338,10 +350,10 @@ jobs:
           echo "------------------------------------------------------------"
           echo "Component Status:"
           echo "------------------------------------------------------------"
-          echo "✓ Admin Bootstrap:        ${{ needs.admin-bootstrap.result || 'skipped' }}"
-          echo "✓ Admin Infrastructure:   ${{ needs.admin-infrastructure.result }}"
           echo "✓ Tenant Bootstrap:       ${{ needs.tenant-bootstrap.result || 'skipped' }}"
           echo "✓ Tenant Infrastructure:  ${{ needs.tenant-infrastructure.result }}"
+          echo "✓ Admin Bootstrap:        ${{ needs.admin-bootstrap.result || 'skipped' }}"
+          echo "✓ Admin Infrastructure:   ${{ needs.admin-infrastructure.result }}"
           echo "✓ Lambda Deployment:      ${{ needs.lambda-deployment.result || 'skipped' }}"
           echo "✓ Frontend Deployment:    ${{ needs.frontend-deployment.result || 'skipped' }}"
           echo ""
