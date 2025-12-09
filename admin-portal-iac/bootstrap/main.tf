@@ -456,6 +456,7 @@ module "bootstrap_ssm_outputs" {
     step-functions-arn       = aws_sfn_state_machine.tenant_operations.arn
     step-functions-name      = aws_sfn_state_machine.tenant_operations.name
     region                   = var.aws_region
+    status                   = "completed"
   }
   
   depends_on = [
