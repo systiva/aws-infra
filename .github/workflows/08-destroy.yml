@@ -254,12 +254,21 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
         run: |
-          terraform init \
-            -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
-            -backend-config="key=terraform-${{ inputs.workspace }}.tfstate" \
-            -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
-            -backend-config="region=${{ inputs.aws_region }}" \
-            -backend-config="encrypt=true"
+          if [[ "${{ needs.validate.outputs.account_type }}" == "admin" ]]; then
+            terraform init \
+              -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+              -backend-config="key=admin-portal-iac/terraform.tfstate" \
+              -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+              -backend-config="region=${{ inputs.aws_region }}" \
+              -backend-config="encrypt=true"
+          else
+            terraform init \
+              -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+              -backend-config="key=tenant-iac/terraform.tfstate" \
+              -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+              -backend-config="region=${{ inputs.aws_region }}" \
+              -backend-config="encrypt=true"
+          fi
       
       - name: Terraform Workspace
         working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
@@ -455,27 +464,34 @@ jobs:
       - name: Check if Admin Infrastructure Exists
         id: check
         run: |
-          if aws ssm get-parameter \
-              --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status" \
-              --region "${{ inputs.aws_region }}" \
-              --query 'Parameter.Value' \
-              --output text 2>/dev/null; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Admin infrastructure exists"
-          else
+          # First try to get bootstrap bucket from SSM
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -z "$BACKEND_BUCKET" ]]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⏭️  Admin infrastructure not found, skipping"
+            echo "⏭️  Admin bootstrap not found, skipping admin infrastructure destroy"
+          else
+            # Check if Terraform state file exists in S3 (workspace adds env:/{workspace}/ prefix)
+            if aws s3 ls "s3://${BACKEND_BUCKET}/env:/${{ inputs.workspace }}/admin-portal-iac/terraform.tfstate" 2>/dev/null; then
+              echo "exists=true" >> $GITHUB_OUTPUT
+              echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+              echo "✅ Admin infrastructure state found"
+            else
+              echo "exists=false" >> $GITHUB_OUTPUT
+              echo "⏭️  Admin infrastructure state not found, skipping"
+            fi
           fi
       
       - name: Get Bootstrap Configuration
         if: steps.check.outputs.exists == 'true'
         id: bootstrap
         run: |
-          BACKEND_BUCKET=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/backend-bucket" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' \
-            --output text)
+          # Backend bucket already retrieved in check step
+          BACKEND_BUCKET="${{ steps.check.outputs.backend_bucket }}"
           
           DYNAMODB_TABLE=$(aws ssm get-parameter \
             --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/dynamodb-table" \
@@ -512,7 +528,7 @@ jobs:
         run: |
           terraform init \
             -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
-            -backend-config="key=terraform-${{ inputs.workspace }}.tfstate" \
+            -backend-config="key=admin-portal-iac/terraform.tfstate" \
             -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
             -backend-config="region=${{ inputs.aws_region }}" \
             -backend-config="encrypt=true"
@@ -663,27 +679,34 @@ jobs:
       - name: Check if Tenant Infrastructure Exists
         id: check
         run: |
-          if aws ssm get-parameter \
-              --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/status" \
-              --region "${{ inputs.aws_region }}" \
-              --query 'Parameter.Value' \
-              --output text 2>/dev/null; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Tenant infrastructure exists"
-          else
+          # First try to get bootstrap bucket from SSM
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -z "$BACKEND_BUCKET" ]]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⏭️  Tenant infrastructure not found, skipping"
+            echo "⏭️  Tenant bootstrap not found, skipping tenant infrastructure destroy"
+          else
+            # Check if Terraform state file exists in S3 (workspace adds env:/{workspace}/ prefix)
+            if aws s3 ls "s3://${BACKEND_BUCKET}/env:/${{ inputs.workspace }}/tenant-iac/terraform.tfstate" 2>/dev/null; then
+              echo "exists=true" >> $GITHUB_OUTPUT
+              echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+              echo "✅ Tenant infrastructure state found"
+            else
+              echo "exists=false" >> $GITHUB_OUTPUT
+              echo "⏭️  Tenant infrastructure state not found, skipping"
+            fi
           fi
       
       - name: Get Bootstrap Configuration
         if: steps.check.outputs.exists == 'true'
         id: bootstrap
         run: |
-          BACKEND_BUCKET=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' \
-            --output text)
+          # Backend bucket already retrieved in check step
+          BACKEND_BUCKET="${{ steps.check.outputs.backend_bucket }}"
           
           DYNAMODB_TABLE=$(aws ssm get-parameter \
             --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/dynamodb-table" \
@@ -723,7 +746,7 @@ jobs:
         run: |
           terraform init \
             -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
-            -backend-config="key=terraform-${{ inputs.workspace }}.tfstate" \
+            -backend-config="key=tenant-iac/terraform.tfstate" \
             -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
             -backend-config="region=${{ inputs.aws_region }}" \
             -backend-config="encrypt=true"
