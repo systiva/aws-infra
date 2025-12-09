@@ -160,6 +160,10 @@ module "admin_backend" {
   create_tenant_step_function_arn = var.create_tenant_step_function_arn
   delete_tenant_step_function_arn = var.delete_tenant_step_function_arn
   
+  # Cross-account access
+  tenant_account_role_name = var.tenant_account_role_name
+  tenant_public_table_name = local.tenant_public_table_name
+  
   # Tags
   common_tags = local.common_tags
   
@@ -183,6 +187,9 @@ module "create_infra_worker" {
   tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
   tenant_public_table_name   = local.tenant_public_table_name
   
+  # Cross-account access
+  tenant_account_role_name = var.tenant_account_role_name
+  
   # Tags
   common_tags = local.common_tags
   
@@ -205,6 +212,9 @@ module "delete_infra_worker" {
   tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
   tenant_public_table_name   = local.tenant_public_table_name
   
+  # Cross-account access
+  tenant_account_role_name = var.tenant_account_role_name
+  
   # Tags
   common_tags = local.common_tags
   
@@ -226,6 +236,9 @@ module "poll_infra_worker" {
   # DynamoDB table for tenant registry
   tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
   tenant_public_table_name   = local.tenant_public_table_name
+  
+  # Cross-account access
+  tenant_account_role_name = var.tenant_account_role_name
   
   # Tags
   common_tags = local.common_tags
