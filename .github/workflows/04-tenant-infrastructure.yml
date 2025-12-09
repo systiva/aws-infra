@@ -189,7 +189,7 @@ jobs:
           echo "Verifying infrastructure outputs in SSM..."
           
           PARAMS=(
-            "tenant_public_table_name"
+            "tenant-public-table-name"
             "status"
           )
           
