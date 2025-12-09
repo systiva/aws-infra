@@ -315,6 +315,7 @@ jobs:
         id: check
         run: |
           source ./cicd.sh
+          
           if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status"; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Admin infrastructure exists"
@@ -388,6 +389,7 @@ jobs:
         working-directory: c20_prj
         run: |
           source ./cicd.sh
+          
           if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/status"; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Admin bootstrap exists"
@@ -438,6 +440,7 @@ jobs:
         id: check
         run: |
           source ./cicd.sh
+          
           if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/status"; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Tenant infrastructure exists"
@@ -511,6 +514,7 @@ jobs:
         working-directory: c20_prj
         run: |
           source ./cicd.sh
+          
           if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status"; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Tenant bootstrap exists"
