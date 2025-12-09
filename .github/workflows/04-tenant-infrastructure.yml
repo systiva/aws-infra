@@ -33,9 +33,9 @@ jobs:
       - name: Configure AWS Credentials (Tenant Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Check Tenant Bootstrap
@@ -138,9 +138,9 @@ jobs:
       - name: Configure AWS Credentials (Tenant Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Get Tenant Account ID
