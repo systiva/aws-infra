@@ -713,7 +713,11 @@ jobs:
             --name "/admin-portal/${{ inputs.workspace }}/shared/admin-account-id" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' \
-            --output text 2>/dev/null || echo "${{ steps.account.outputs.account_id }}")\n          \n          echo \"admin_account_id=${ADMIN_ACCOUNT_ID}\" >> $GITHUB_OUTPUT\n          echo \"Admin Account ID: ${ADMIN_ACCOUNT_ID}\"\n      \n      - name: Terraform Init
+            --output text 2>/dev/null || echo "${{ steps.account.outputs.account_id }}")
+          echo "admin_account_id=${ADMIN_ACCOUNT_ID}" >> $GITHUB_OUTPUT
+          echo "Admin Account ID: ${ADMIN_ACCOUNT_ID}"
+      
+      - name: Terraform Init
         if: steps.check.outputs.exists == 'true'
         working-directory: c20_prj/tenant-iac
         run: |
