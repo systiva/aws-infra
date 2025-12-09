@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - all
           - admin-bootstrap
           - admin-infrastructure
           - tenant-bootstrap
@@ -45,6 +46,7 @@ jobs:
       is_infrastructure: ${{ steps.check.outputs.is_infrastructure }}
       is_admin: ${{ steps.check.outputs.is_admin }}
       is_tenant: ${{ steps.check.outputs.is_tenant }}
+      is_all: ${{ steps.check.outputs.is_all }}
       account_type: ${{ steps.check.outputs.account_type }}
       resource_type: ${{ steps.check.outputs.resource_type }}
     
@@ -68,29 +70,42 @@ jobs:
         run: |
           TARGET="${{ inputs.destroy_target }}"
           
-          # Determine account type and resource type
-          if [[ "$TARGET" == admin-* ]]; then
-            echo "is_admin=true" >> $GITHUB_OUTPUT
-            echo "account_type=admin" >> $GITHUB_OUTPUT
-          else
+          # Check if destroying all
+          if [[ "$TARGET" == "all" ]]; then
+            echo "is_all=true" >> $GITHUB_OUTPUT
             echo "is_admin=false" >> $GITHUB_OUTPUT
-            echo "account_type=tenant" >> $GITHUB_OUTPUT
-          fi
-          
-          if [[ "$TARGET" == *-bootstrap ]]; then
-            echo "is_bootstrap=true" >> $GITHUB_OUTPUT
-            echo "is_infrastructure=false" >> $GITHUB_OUTPUT
-            echo "resource_type=bootstrap" >> $GITHUB_OUTPUT
-          else
-            echo "is_bootstrap=false" >> $GITHUB_OUTPUT
-            echo "is_infrastructure=true" >> $GITHUB_OUTPUT
-            echo "resource_type=infrastructure" >> $GITHUB_OUTPUT
-          fi
-          
-          if [[ "$TARGET" == tenant-* ]]; then
-            echo "is_tenant=true" >> $GITHUB_OUTPUT
-          else
             echo "is_tenant=false" >> $GITHUB_OUTPUT
+            echo "is_bootstrap=false" >> $GITHUB_OUTPUT
+            echo "is_infrastructure=false" >> $GITHUB_OUTPUT
+            echo "account_type=all" >> $GITHUB_OUTPUT
+            echo "resource_type=all" >> $GITHUB_OUTPUT
+          else
+            echo "is_all=false" >> $GITHUB_OUTPUT
+            
+            # Determine account type and resource type
+            if [[ "$TARGET" == admin-* ]]; then
+              echo "is_admin=true" >> $GITHUB_OUTPUT
+              echo "account_type=admin" >> $GITHUB_OUTPUT
+            else
+              echo "is_admin=false" >> $GITHUB_OUTPUT
+              echo "account_type=tenant" >> $GITHUB_OUTPUT
+            fi
+            
+            if [[ "$TARGET" == *-bootstrap ]]; then
+              echo "is_bootstrap=true" >> $GITHUB_OUTPUT
+              echo "is_infrastructure=false" >> $GITHUB_OUTPUT
+              echo "resource_type=bootstrap" >> $GITHUB_OUTPUT
+            else
+              echo "is_bootstrap=false" >> $GITHUB_OUTPUT
+              echo "is_infrastructure=true" >> $GITHUB_OUTPUT
+              echo "resource_type=infrastructure" >> $GITHUB_OUTPUT
+            fi
+            
+            if [[ "$TARGET" == tenant-* ]]; then
+              echo "is_tenant=true" >> $GITHUB_OUTPUT
+            else
+              echo "is_tenant=false" >> $GITHUB_OUTPUT
+            fi
           fi
           
           echo "📋 Destroy Configuration:"
@@ -99,6 +114,7 @@ jobs:
           echo "  Region: ${{ inputs.aws_region }}"
       
       - name: Configure AWS Credentials
+        if: steps.check.outputs.is_all != 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
@@ -107,6 +123,7 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
       
       - name: Get Account ID
+        if: steps.check.outputs.is_all != 'true'
         id: account
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -115,7 +132,7 @@ jobs:
           echo "Account Type: ${{ steps.check.outputs.account_type }}"
       
       - name: Check Dependencies
-        if: steps.check.outputs.is_bootstrap == 'true'
+        if: steps.check.outputs.is_bootstrap == 'true' && steps.check.outputs.is_all != 'true'
         working-directory: c20_prj
         run: |
           source ./cicd.sh
@@ -135,6 +152,7 @@ jobs:
           echo "✅ No infrastructure found. Safe to destroy bootstrap."
       
       - name: Check Resources Exist
+        if: steps.check.outputs.is_all != 'true'
         working-directory: c20_prj
         run: |
           source ./cicd.sh
@@ -159,7 +177,7 @@ jobs:
     name: Destroy Infrastructure
     runs-on: ubuntu-latest
     needs: [validate]
-    if: needs.validate.outputs.is_infrastructure == 'true'
+    if: needs.validate.outputs.is_infrastructure == 'true' && needs.validate.outputs.is_all != 'true'
     
     steps:
       - name: Checkout Code
@@ -235,7 +253,7 @@ jobs:
     name: Destroy Bootstrap
     runs-on: ubuntu-latest
     needs: [validate]
-    if: needs.validate.outputs.is_bootstrap == 'true'
+    if: needs.validate.outputs.is_bootstrap == 'true' && needs.validate.outputs.is_all != 'true'
     
     steps:
       - name: Checkout Code
@@ -263,10 +281,257 @@ jobs:
             "${{ needs.validate.outputs.account_type }}" \
             "${{ inputs.aws_region }}"
 
+  # Jobs for 'all' option - destroys in correct order
+  destroy-all-admin-infrastructure:
+    name: Destroy All - Admin Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: needs.validate.outputs.is_all == 'true'
+    
+    defaults:
+      run:
+        working-directory: c20_prj
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials (Admin)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Check if Admin Infrastructure Exists
+        id: check
+        run: |
+          source ./cicd.sh
+          if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Admin infrastructure exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Admin infrastructure not found, skipping"
+          fi
+      
+      - name: Get Bootstrap Configuration
+        if: steps.check.outputs.exists == 'true'
+        id: bootstrap
+        run: |
+          source ./cicd.sh
+          BACKEND_BUCKET=$(get_ssm_parameter "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/backend-bucket" "false")
+          DYNAMODB_TABLE=$(get_ssm_parameter "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/dynamodb-table" "false")
+          echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
+      
+      - name: Terraform Init
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/admin-portal-iac
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+            -backend-config="key=terraform-${{ inputs.workspace }}.tfstate" \
+            -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="encrypt=true"
+      
+      - name: Terraform Workspace
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/admin-portal-iac
+        run: |
+          terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
+      
+      - name: Terraform Destroy
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/admin-portal-iac
+        run: |
+          terraform destroy -var-file="environments/${{ inputs.workspace }}.tfvars" -auto-approve
+      
+      - name: Cleanup SSM Parameters
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          source ./cicd.sh
+          cleanup_ssm_parameters "${{ inputs.workspace }}" "admin/infrastructure"
+          echo "✅ Admin infrastructure destroyed"
+
+  destroy-all-admin-bootstrap:
+    name: Destroy All - Admin Bootstrap
+    runs-on: ubuntu-latest
+    needs: [validate, destroy-all-admin-infrastructure]
+    if: needs.validate.outputs.is_all == 'true' && always()
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials (Admin)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Check if Admin Bootstrap Exists
+        id: check
+        working-directory: c20_prj
+        run: |
+          source ./cicd.sh
+          if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/status"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Admin bootstrap exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Admin bootstrap not found, skipping"
+          fi
+      
+      - name: Destroy Bootstrap Resources
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj
+        run: |
+          source ./cicd.sh
+          export AWS_REGION="${{ inputs.aws_region }}"
+          destroy_bootstrap_resources "${{ inputs.workspace }}" "admin" "${{ inputs.aws_region }}"
+          echo "✅ Admin bootstrap destroyed"
+
+  destroy-all-tenant-infrastructure:
+    name: Destroy All - Tenant Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate, destroy-all-admin-bootstrap]
+    if: needs.validate.outputs.is_all == 'true' && always()
+    
+    defaults:
+      run:
+        working-directory: c20_prj
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials (Tenant)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Check if Tenant Infrastructure Exists
+        id: check
+        run: |
+          source ./cicd.sh
+          if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/status"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Tenant infrastructure exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Tenant infrastructure not found, skipping"
+          fi
+      
+      - name: Get Bootstrap Configuration
+        if: steps.check.outputs.exists == 'true'
+        id: bootstrap
+        run: |
+          source ./cicd.sh
+          BACKEND_BUCKET=$(get_ssm_parameter "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" "false")
+          DYNAMODB_TABLE=$(get_ssm_parameter "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/dynamodb-table" "false")
+          echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
+      
+      - name: Terraform Init
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/tenant-iac
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+            -backend-config="key=terraform-${{ inputs.workspace }}.tfstate" \
+            -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="encrypt=true"
+      
+      - name: Terraform Workspace
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/tenant-iac
+        run: |
+          terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
+      
+      - name: Terraform Destroy
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/tenant-iac
+        run: |
+          terraform destroy -var-file="environments/${{ inputs.workspace }}.tfvars" -auto-approve
+      
+      - name: Cleanup SSM Parameters
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          source ./cicd.sh
+          cleanup_ssm_parameters "${{ inputs.workspace }}" "tenant/infrastructure"
+          echo "✅ Tenant infrastructure destroyed"
+
+  destroy-all-tenant-bootstrap:
+    name: Destroy All - Tenant Bootstrap
+    runs-on: ubuntu-latest
+    needs: [validate, destroy-all-tenant-infrastructure]
+    if: needs.validate.outputs.is_all == 'true' && always()
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials (Tenant)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Check if Tenant Bootstrap Exists
+        id: check
+        working-directory: c20_prj
+        run: |
+          source ./cicd.sh
+          if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Tenant bootstrap exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Tenant bootstrap not found, skipping"
+          fi
+      
+      - name: Destroy Bootstrap Resources
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj
+        run: |
+          source ./cicd.sh
+          export AWS_REGION="${{ inputs.aws_region }}"
+          destroy_bootstrap_resources "${{ inputs.workspace }}" "tenant" "${{ inputs.aws_region }}"
+          echo "✅ Tenant bootstrap destroyed"
+
   summary:
     name: Destruction Summary
     runs-on: ubuntu-latest
-    needs: [validate, destroy-infrastructure, destroy-bootstrap]
+    needs: [validate, destroy-infrastructure, destroy-bootstrap, destroy-all-admin-infrastructure, destroy-all-admin-bootstrap, destroy-all-tenant-infrastructure, destroy-all-tenant-bootstrap]
     if: always()
     
     steps:
@@ -288,29 +553,79 @@ jobs:
           echo "Region:      ${{ inputs.aws_region }}"
           echo ""
           
-          if [[ "${{ needs.destroy-infrastructure.result }}" == "success" ]]; then
-            echo "✅ Infrastructure Destroyed"
-          elif [[ "${{ needs.destroy-infrastructure.result }}" == "skipped" ]]; then
-            echo "⏭️  Infrastructure Destroy Skipped"
+          if [[ "${{ inputs.destroy_target }}" == "all" ]]; then
+            # Summary for 'all' option
+            echo "Destruction Order: Admin Infra → Admin Bootstrap → Tenant Infra → Tenant Bootstrap"
+            echo ""
+            
+            if [[ "${{ needs.destroy-all-admin-infrastructure.result }}" == "success" ]]; then
+              echo "✅ Admin Infrastructure Destroyed"
+            elif [[ "${{ needs.destroy-all-admin-infrastructure.result }}" == "skipped" ]]; then
+              echo "⏭️  Admin Infrastructure Skipped"
+            else
+              echo "❌ Admin Infrastructure Failed"
+            fi
+            
+            if [[ "${{ needs.destroy-all-admin-bootstrap.result }}" == "success" ]]; then
+              echo "✅ Admin Bootstrap Destroyed"
+            elif [[ "${{ needs.destroy-all-admin-bootstrap.result }}" == "skipped" ]]; then
+              echo "⏭️  Admin Bootstrap Skipped"
+            else
+              echo "❌ Admin Bootstrap Failed"
+            fi
+            
+            if [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "success" ]]; then
+              echo "✅ Tenant Infrastructure Destroyed"
+            elif [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "skipped" ]]; then
+              echo "⏭️  Tenant Infrastructure Skipped"
+            else
+              echo "❌ Tenant Infrastructure Failed"
+            fi
+            
+            if [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "success" ]]; then
+              echo "✅ Tenant Bootstrap Destroyed"
+            elif [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "skipped" ]]; then
+              echo "⏭️  Tenant Bootstrap Skipped"
+            else
+              echo "❌ Tenant Bootstrap Failed"
+            fi
           else
-            echo "❌ Infrastructure Destroy Failed"
-          fi
-          
-          if [[ "${{ needs.destroy-bootstrap.result }}" == "success" ]]; then
-            echo "✅ Bootstrap Destroyed"
-          elif [[ "${{ needs.destroy-bootstrap.result }}" == "skipped" ]]; then
-            echo "⏭️  Bootstrap Destroy Skipped"
-          else
-            echo "❌ Bootstrap Destroy Failed"
+            # Summary for individual targets
+            if [[ "${{ needs.destroy-infrastructure.result }}" == "success" ]]; then
+              echo "✅ Infrastructure Destroyed"
+            elif [[ "${{ needs.destroy-infrastructure.result }}" == "skipped" ]]; then
+              echo "⏭️  Infrastructure Destroy Skipped"
+            else
+              echo "❌ Infrastructure Destroy Failed"
+            fi
+            
+            if [[ "${{ needs.destroy-bootstrap.result }}" == "success" ]]; then
+              echo "✅ Bootstrap Destroyed"
+            elif [[ "${{ needs.destroy-bootstrap.result }}" == "skipped" ]]; then
+              echo "⏭️  Bootstrap Destroy Skipped"
+            else
+              echo "❌ Bootstrap Destroy Failed"
+            fi
           fi
           
           echo ""
           echo "═══════════════════════════════════════════════════"
           
-          if [[ "${{ needs.destroy-infrastructure.result }}" == "failure" ]] || \
-             [[ "${{ needs.destroy-bootstrap.result }}" == "failure" ]]; then
-            echo "❌ Destruction completed with errors"
-            exit 1
+          # Check for failures
+          if [[ "${{ inputs.destroy_target }}" == "all" ]]; then
+            if [[ "${{ needs.destroy-all-admin-infrastructure.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-all-admin-bootstrap.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "failure" ]]; then
+              echo "❌ Destruction completed with errors"
+              exit 1
+            fi
+          else
+            if [[ "${{ needs.destroy-infrastructure.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-bootstrap.result }}" == "failure" ]]; then
+              echo "❌ Destruction completed with errors"
+              exit 1
+            fi
           fi
           
           echo "✅ Destruction completed successfully"
