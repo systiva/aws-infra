@@ -157,6 +157,7 @@ module "infrastructure_ssm_outputs" {
     
     # Metadata
     "tenant_id" = var.tenant_id
+    "status"    = "completed"
   }
   
   depends_on = [
