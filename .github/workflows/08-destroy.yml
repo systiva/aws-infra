@@ -135,14 +135,16 @@ jobs:
         if: steps.check.outputs.is_bootstrap == 'true' && steps.check.outputs.is_all != 'true'
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
-          
           ACCOUNT_TYPE="${{ steps.check.outputs.account_type }}"
           INFRA_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/infrastructure/status"
           
           echo "🔍 Checking if infrastructure exists..."
           
-          if ssm_parameter_exists "$INFRA_PATH"; then
+          if aws ssm get-parameter \
+              --name "$INFRA_PATH" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
             echo "❌ Cannot destroy bootstrap: Infrastructure still exists"
             echo "📋 You must destroy ${ACCOUNT_TYPE}-infrastructure first"
             echo "💡 Run workflow: 08-destroy with target=${ACCOUNT_TYPE}-infrastructure"
@@ -155,8 +157,6 @@ jobs:
         if: steps.check.outputs.is_all != 'true'
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
-          
           ACCOUNT_TYPE="${{ steps.check.outputs.account_type }}"
           RESOURCE_TYPE="${{ steps.check.outputs.resource_type }}"
           STATUS_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/${RESOURCE_TYPE}/status"
@@ -164,7 +164,11 @@ jobs:
           echo "🔍 Checking if resources exist..."
           echo "📍 SSM Path: ${STATUS_PATH}"
           
-          if ! ssm_parameter_exists "$STATUS_PATH"; then
+          if ! aws ssm get-parameter \
+              --name "$STATUS_PATH" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
             echo "⚠️ Resources not found in SSM"
             echo "💡 Path: ${STATUS_PATH}"
             echo "💡 Resources may already be destroyed or never created"
@@ -202,13 +206,20 @@ jobs:
         id: bootstrap
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
-          
           ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
           BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap"
           
-          BACKEND_BUCKET=$(get_ssm_parameter "${BOOTSTRAP_PATH}/backend-bucket" "false")
-          DYNAMODB_TABLE=$(get_ssm_parameter "${BOOTSTRAP_PATH}/dynamodb-table" "false")
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
           
           echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
           echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
@@ -242,10 +253,32 @@ jobs:
       - name: Cleanup SSM Parameters
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
-          
           ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
-          cleanup_ssm_parameters "${{ inputs.workspace }}" "${ACCOUNT_TYPE}/infrastructure"
+          BASE_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/infrastructure"
+          
+          echo "🗑️  Cleaning up SSM Parameters"
+          echo "Path: ${BASE_PATH}"
+          
+          # Get all parameters under the path
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "$BASE_PATH" \
+            --recursive \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameters[*].Name' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -z "$PARAMS" ]]; then
+            echo "No parameters found to delete"
+          else
+            # Delete each parameter
+            for param_name in $PARAMS; do
+              echo "Deleting: $param_name"
+              aws ssm delete-parameter \
+                --name "$param_name" \
+                --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+            echo "✅ Cleanup complete"
+          fi
           
           echo "✅ Infrastructure destroyed and SSM parameters cleaned up"
 
@@ -272,14 +305,82 @@ jobs:
       - name: Destroy Bootstrap Resources
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
+          ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap"
           
-          export AWS_REGION="${{ inputs.aws_region }}"
+          echo "🔥 Destroying Bootstrap Resources"
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Account Type: ${ACCOUNT_TYPE}"
+          echo "Region: ${{ inputs.aws_region }}"
           
-          destroy_bootstrap_resources \
-            "${{ inputs.workspace }}" \
-            "${{ needs.validate.outputs.account_type }}" \
-            "${{ inputs.aws_region }}"
+          # Step 1: Read bootstrap configuration from SSM
+          echo "📖 Reading bootstrap configuration from SSM..."
+          
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -z "$BACKEND_BUCKET" ]]; then
+            echo "❌ Bootstrap configuration not found in SSM"
+            echo "Expected path: ${BOOTSTRAP_PATH}"
+            exit 1
+          fi
+          
+          echo "Backend Bucket: ${BACKEND_BUCKET}"
+          echo "DynamoDB Table: ${DYNAMODB_TABLE}"
+          
+          # Step 2: Empty and delete S3 bucket
+          echo "🗑️  Deleting S3 Bucket"
+          
+          if aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            echo "Emptying bucket: ${BACKEND_BUCKET}"
+            aws s3 rm "s3://${BACKEND_BUCKET}" --recursive --region "${{ inputs.aws_region }}"
+            echo "Deleting bucket: ${BACKEND_BUCKET}"
+            aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
+            echo "✅ S3 bucket deleted: ${BACKEND_BUCKET}"
+          else
+            echo "⚠️  Bucket not found or already deleted: ${BACKEND_BUCKET}"
+          fi
+          
+          # Step 3: Delete DynamoDB table
+          echo "🗑️  Deleting DynamoDB Table"
+          
+          if aws dynamodb describe-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            echo "Deleting table: ${DYNAMODB_TABLE}"
+            aws dynamodb delete-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            echo "Waiting for table deletion to complete..."
+            aws dynamodb wait table-not-exists --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            echo "✅ DynamoDB table deleted successfully"
+          else
+            echo "⚠️  Table not found or already deleted: ${DYNAMODB_TABLE}"
+          fi
+          
+          # Step 4: Cleanup SSM parameters
+          echo "🗑️  Cleaning up SSM Parameters"
+          
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "${BOOTSTRAP_PATH}" \
+            --recursive \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameters[*].Name' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              echo "Deleting: $param_name"
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
+          echo "✅ Bootstrap resources destroyed successfully"
 
   # Jobs for 'all' option - destroys in correct order
   destroy-all-admin-infrastructure:
@@ -314,9 +415,11 @@ jobs:
       - name: Check if Admin Infrastructure Exists
         id: check
         run: |
-          source ./cicd.sh
-          
-          if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status"; then
+          if aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Admin infrastructure exists"
           else
@@ -328,9 +431,18 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         id: bootstrap
         run: |
-          source ./cicd.sh
-          BACKEND_BUCKET=$(get_ssm_parameter "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/backend-bucket" "false")
-          DYNAMODB_TABLE=$(get_ssm_parameter "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/dynamodb-table" "false")
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
           echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
           echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
       
@@ -360,8 +472,22 @@ jobs:
       - name: Cleanup SSM Parameters
         if: steps.check.outputs.exists == 'true'
         run: |
-          source ./cicd.sh
-          cleanup_ssm_parameters "${{ inputs.workspace }}" "admin/infrastructure"
+          echo "🗑️  Cleaning up SSM Parameters"
+          
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "/admin-portal/${{ inputs.workspace }}/admin/infrastructure" \
+            --recursive \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameters[*].Name' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              echo "Deleting: $param_name"
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
           echo "✅ Admin infrastructure destroyed"
 
   destroy-all-admin-bootstrap:
@@ -388,9 +514,11 @@ jobs:
         id: check
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
-          
-          if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/status"; then
+          if aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Admin bootstrap exists"
           else
@@ -402,9 +530,36 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
-          export AWS_REGION="${{ inputs.aws_region }}"
-          destroy_bootstrap_resources "${{ inputs.workspace }}" "admin" "${{ inputs.aws_region }}"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/admin/bootstrap"
+          
+          echo "🔥 Destroying Admin Bootstrap Resources"
+          
+          # Read bootstrap configuration
+          BACKEND_BUCKET=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/backend-bucket" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+          DYNAMODB_TABLE=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/dynamodb-table" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+          
+          # Delete S3 bucket
+          if [[ -n "$BACKEND_BUCKET" ]] && aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            aws s3 rm "s3://${BACKEND_BUCKET}" --recursive --region "${{ inputs.aws_region }}"
+            aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
+            echo "✅ S3 bucket deleted"
+          fi
+          
+          # Delete DynamoDB table
+          if [[ -n "$DYNAMODB_TABLE" ]] && aws dynamodb describe-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            aws dynamodb delete-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            aws dynamodb wait table-not-exists --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            echo "✅ DynamoDB table deleted"
+          fi
+          
+          # Cleanup SSM parameters
+          PARAMS=$(aws ssm get-parameters-by-path --path "${BOOTSTRAP_PATH}" --recursive --region "${{ inputs.aws_region }}" --query 'Parameters[*].Name' --output text 2>/dev/null || echo "")
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
           echo "✅ Admin bootstrap destroyed"
 
   destroy-all-tenant-infrastructure:
@@ -439,9 +594,11 @@ jobs:
       - name: Check if Tenant Infrastructure Exists
         id: check
         run: |
-          source ./cicd.sh
-          
-          if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/status"; then
+          if aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Tenant infrastructure exists"
           else
@@ -453,9 +610,18 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         id: bootstrap
         run: |
-          source ./cicd.sh
-          BACKEND_BUCKET=$(get_ssm_parameter "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" "false")
-          DYNAMODB_TABLE=$(get_ssm_parameter "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/dynamodb-table" "false")
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
           echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
           echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
       
@@ -485,8 +651,22 @@ jobs:
       - name: Cleanup SSM Parameters
         if: steps.check.outputs.exists == 'true'
         run: |
-          source ./cicd.sh
-          cleanup_ssm_parameters "${{ inputs.workspace }}" "tenant/infrastructure"
+          echo "🗑️  Cleaning up SSM Parameters"
+          
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure" \
+            --recursive \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameters[*].Name' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              echo "Deleting: $param_name"
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
           echo "✅ Tenant infrastructure destroyed"
 
   destroy-all-tenant-bootstrap:
@@ -513,9 +693,11 @@ jobs:
         id: check
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
-          
-          if ssm_parameter_exists "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status"; then
+          if aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Tenant bootstrap exists"
           else
@@ -527,9 +709,36 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         working-directory: c20_prj
         run: |
-          source ./cicd.sh
-          export AWS_REGION="${{ inputs.aws_region }}"
-          destroy_bootstrap_resources "${{ inputs.workspace }}" "tenant" "${{ inputs.aws_region }}"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/tenant/bootstrap"
+          
+          echo "🔥 Destroying Tenant Bootstrap Resources"
+          
+          # Read bootstrap configuration
+          BACKEND_BUCKET=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/backend-bucket" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+          DYNAMODB_TABLE=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/dynamodb-table" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+          
+          # Delete S3 bucket
+          if [[ -n "$BACKEND_BUCKET" ]] && aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            aws s3 rm "s3://${BACKEND_BUCKET}" --recursive --region "${{ inputs.aws_region }}"
+            aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
+            echo "✅ S3 bucket deleted"
+          fi
+          
+          # Delete DynamoDB table
+          if [[ -n "$DYNAMODB_TABLE" ]] && aws dynamodb describe-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            aws dynamodb delete-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            aws dynamodb wait table-not-exists --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            echo "✅ DynamoDB table deleted"
+          fi
+          
+          # Cleanup SSM parameters
+          PARAMS=$(aws ssm get-parameters-by-path --path "${BOOTSTRAP_PATH}" --recursive --region "${{ inputs.aws_region }}" --query 'Parameters[*].Name' --output text 2>/dev/null || echo "")
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
           echo "✅ Tenant bootstrap destroyed"
 
   summary:
