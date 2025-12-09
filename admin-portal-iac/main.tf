@@ -162,7 +162,6 @@ module "admin_backend" {
   
   # Cross-account access
   tenant_account_role_name = var.tenant_account_role_name
-  tenant_public_table_name = local.tenant_public_table_name
   
   # Tags
   common_tags = local.common_tags
