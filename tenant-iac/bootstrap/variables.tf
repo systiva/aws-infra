@@ -18,16 +18,6 @@ variable "admin_account_id" {
   }
 }
 
-variable "tenant_account_id" {
-  description = "AWS account ID for tenant account"
-  type        = string
-  
-  validation {
-    condition     = can(regex("^[0-9]{12}$", var.tenant_account_id))
-    error_message = "Tenant account ID must be a 12-digit number."
-  }
-}
-
 variable "tenant_aws_profile" {
   description = "AWS profile for tenant account authentication (only for local development, CI/CD uses environment variables)"
   type        = string

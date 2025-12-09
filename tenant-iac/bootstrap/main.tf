@@ -30,8 +30,7 @@ resource "random_id" "suffix" {
   keepers = {
     # Ensures the same suffix is generated for the same workspace and accounts
     workspace        = var.workspace_prefix
-    tenant_account_id = var.tenant_account_id
-    admin_account_id  = var.admin_account_id
+    admin_account_id = var.admin_account_id
   }
 }
 
@@ -42,14 +41,11 @@ data "aws_region" "current" {}
 locals {
   current_account_id = data.aws_caller_identity.current.account_id
   admin_account_id   = var.admin_account_id
-  tenant_account_id  = var.tenant_account_id
+  tenant_account_id  = data.aws_caller_identity.current.account_id  # Auto-detect from credentials
   is_same_account    = local.admin_account_id == local.tenant_account_id
   
   workspace_prefix = var.workspace_prefix
   name_prefix      = "${local.workspace_prefix}-tenant-infra"
-  
-  # Validation - ensure we're deploying to the intended tenant account
-  account_validation_passed = local.current_account_id == local.tenant_account_id
   
   common_tags = {
     Workspace         = local.workspace_prefix
@@ -59,16 +55,6 @@ locals {
     AccountType       = local.is_same_account ? "admin-tenant-shared" : "tenant-only"
     ManagedBy         = "terraform"
     Component         = "tenant-bootstrap"
-  }
-}
-
-# Account validation check
-resource "null_resource" "validate_tenant_account" {
-  lifecycle {
-    precondition {
-      condition     = local.account_validation_passed
-      error_message = "ERROR: Currently authenticated to account ${local.current_account_id}, but target tenant account is ${local.tenant_account_id}. Please check your AWS profile '${var.tenant_aws_profile}' configuration."
-    }
   }
 }
 
