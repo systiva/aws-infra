@@ -214,7 +214,7 @@ jobs:
           echo ""
           
           TENANT_TABLE=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/tenant_public_table_name" \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/tenant-public-table-name" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' --output text)
           
