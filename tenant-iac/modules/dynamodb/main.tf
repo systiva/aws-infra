@@ -36,8 +36,8 @@ resource "aws_dynamodb_table" "tenant_public" {
   dynamic "server_side_encryption" {
     for_each = var.server_side_encryption ? [1] : []
     content {
-      enabled     = true
-      kms_key_id  = aws_kms_key.dynamodb[0].arn
+      enabled        = true
+      kms_master_key_id = aws_kms_key.dynamodb[0].arn
     }
   }
 
