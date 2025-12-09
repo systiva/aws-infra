@@ -115,6 +115,17 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
       
+      - name: Get Bootstrap Outputs from SSM
+        id: bootstrap
+        run: |
+          STEP_FUNCTIONS_ARN=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/step-functions-arn" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' --output text)
+          
+          echo "step_functions_arn=$STEP_FUNCTIONS_ARN" >> $GITHUB_OUTPUT
+          echo "Step Functions ARN: $STEP_FUNCTIONS_ARN"
+      
       - name: Terraform Init
         run: |
           terraform init \
@@ -141,6 +152,8 @@ jobs:
             -var="aws_region=${{ inputs.aws_region }}" \
             -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
             -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="create_tenant_step_function_arn=${{ steps.bootstrap.outputs.step_functions_arn }}" \
+            -var="delete_tenant_step_function_arn=${{ steps.bootstrap.outputs.step_functions_arn }}" \
             -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \
             -var-file="environments/${{ inputs.workspace }}.tfvars" \
             -out=tfplan

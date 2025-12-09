@@ -26,10 +26,6 @@ on:
         required: true
         type: string
         default: 'us-east-1'
-      tenant_account_id:
-        description: 'Tenant AWS Account ID (required for tenant targets)'
-        required: false
-        type: string
       confirm_destroy:
         description: 'Type "DESTROY" to confirm'
         required: true
@@ -55,6 +51,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          path: c20_prj
       
       - name: Validate Confirmation
         run: |
@@ -66,6 +64,7 @@ jobs:
       
       - name: Parse Destroy Target
         id: check
+        working-directory: c20_prj
         run: |
           TARGET="${{ inputs.destroy_target }}"
           
@@ -99,15 +98,6 @@ jobs:
           echo "  Workspace: ${{ inputs.workspace }}"
           echo "  Region: ${{ inputs.aws_region }}"
       
-      - name: Validate Tenant Account ID
-        if: steps.check.outputs.is_tenant == 'true'
-        run: |
-          if [[ -z "${{ inputs.tenant_account_id }}" ]]; then
-            echo "❌ Tenant Account ID is required for tenant resources"
-            exit 1
-          fi
-          echo "✅ Tenant Account ID: ${{ inputs.tenant_account_id }}"
-      
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -116,8 +106,17 @@ jobs:
           aws-session-token: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
+      - name: Get Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+          echo "Account Type: ${{ steps.check.outputs.account_type }}"
+      
       - name: Check Dependencies
         if: steps.check.outputs.is_bootstrap == 'true'
+        working-directory: c20_prj
         run: |
           source ./cicd.sh
           
@@ -136,6 +135,7 @@ jobs:
           echo "✅ No infrastructure found. Safe to destroy bootstrap."
       
       - name: Check Resources Exist
+        working-directory: c20_prj
         run: |
           source ./cicd.sh
           
@@ -164,6 +164,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          path: c20_prj
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -180,6 +182,7 @@ jobs:
       
       - name: Get Bootstrap Configuration
         id: bootstrap
+        working-directory: c20_prj
         run: |
           source ./cicd.sh
           
@@ -197,7 +200,7 @@ jobs:
           echo "  Table: ${DYNAMODB_TABLE}"
       
       - name: Terraform Init
-        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && './admin-portal-iac' || './tenant-iac' }}
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
         run: |
           terraform init \
             -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
@@ -207,18 +210,19 @@ jobs:
             -backend-config="encrypt=true"
       
       - name: Terraform Workspace
-        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && './admin-portal-iac' || './tenant-iac' }}
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
         run: |
           terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
       
       - name: Terraform Destroy
-        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && './admin-portal-iac' || './tenant-iac' }}
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
         run: |
           terraform destroy \
             -var-file="environments/${{ inputs.workspace }}.tfvars" \
             -auto-approve
       
       - name: Cleanup SSM Parameters
+        working-directory: c20_prj
         run: |
           source ./cicd.sh
           
@@ -236,6 +240,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          path: c20_prj
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -246,6 +252,7 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
       
       - name: Destroy Bootstrap Resources
+        working-directory: c20_prj
         run: |
           source ./cicd.sh
           
@@ -265,6 +272,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          path: c20_prj
       
       - name: Display Summary
         run: |

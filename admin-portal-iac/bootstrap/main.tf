@@ -447,15 +447,21 @@ module "bootstrap_ssm_outputs" {
   aws_region   = var.aws_region
   
   outputs = {
-    backend-bucket       = aws_s3_bucket.terraform_state.id
-    backend-bucket-arn   = aws_s3_bucket.terraform_state.arn
-    dynamodb-table       = aws_dynamodb_table.terraform_lock.id
-    dynamodb-table-arn   = aws_dynamodb_table.terraform_lock.arn
-    region               = var.aws_region
+    backend-bucket           = aws_s3_bucket.terraform_state.id
+    backend-bucket-arn       = aws_s3_bucket.terraform_state.arn
+    dynamodb-table           = aws_dynamodb_table.terraform_lock.id
+    dynamodb-table-arn       = aws_dynamodb_table.terraform_lock.arn
+    tenant-registry-table    = aws_dynamodb_table.tenant_registry.id
+    tenant-registry-table-arn = aws_dynamodb_table.tenant_registry.arn
+    step-functions-arn       = aws_sfn_state_machine.tenant_operations.arn
+    step-functions-name      = aws_sfn_state_machine.tenant_operations.name
+    region                   = var.aws_region
   }
   
   depends_on = [
     aws_s3_bucket.terraform_state,
-    aws_dynamodb_table.terraform_lock
+    aws_dynamodb_table.terraform_lock,
+    aws_dynamodb_table.tenant_registry,
+    aws_sfn_state_machine.tenant_operations
   ]
 }
