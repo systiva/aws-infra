@@ -228,6 +228,29 @@ jobs:
           echo "  Bucket: ${BACKEND_BUCKET}"
           echo "  Table: ${DYNAMODB_TABLE}"
       
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+      
+      - name: Get Bootstrap Outputs
+        id: bootstrap_outputs
+        working-directory: c20_prj
+        run: |
+          ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap"
+          
+          STEP_FUNCTIONS_ARN=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/step-functions-arn" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          echo "step_functions_arn=${STEP_FUNCTIONS_ARN}" >> $GITHUB_OUTPUT
+          echo "Step Functions ARN: ${STEP_FUNCTIONS_ARN}"
+      
       - name: Terraform Init
         working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
         run: |
@@ -246,9 +269,26 @@ jobs:
       - name: Terraform Destroy
         working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
         run: |
-          terraform destroy \
-            -var-file="environments/${{ inputs.workspace }}.tfvars" \
-            -auto-approve
+          if [[ "${{ needs.validate.outputs.account_type }}" == "admin" ]]; then
+            terraform destroy \
+              -var="workspace_prefix=${{ inputs.workspace }}" \
+              -var="aws_region=${{ inputs.aws_region }}" \
+              -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
+              -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+              -var="create_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+              -var="delete_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+              -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \
+              -var-file="environments/${{ inputs.workspace }}.tfvars" \
+              -auto-approve
+          else
+            terraform destroy \
+              -var="workspace_prefix=${{ inputs.workspace }}" \
+              -var="aws_region=${{ inputs.aws_region }}" \
+              -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+              -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
+              -var-file="environments/${{ inputs.workspace }}.tfvars" \
+              -auto-approve
+          fi
       
       - name: Cleanup SSM Parameters
         working-directory: c20_prj
@@ -446,6 +486,26 @@ jobs:
           echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
           echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
       
+      - name: Get AWS Account ID
+        if: steps.check.outputs.exists == 'true'
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+      
+      - name: Get Bootstrap Outputs
+        if: steps.check.outputs.exists == 'true'
+        id: bootstrap_outputs
+        run: |
+          STEP_FUNCTIONS_ARN=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/step-functions-arn" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          echo "step_functions_arn=${STEP_FUNCTIONS_ARN}" >> $GITHUB_OUTPUT
+      
       - name: Terraform Init
         if: steps.check.outputs.exists == 'true'
         working-directory: c20_prj/admin-portal-iac
@@ -467,7 +527,16 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         working-directory: c20_prj/admin-portal-iac
         run: |
-          terraform destroy -var-file="environments/${{ inputs.workspace }}.tfvars" -auto-approve
+          terraform destroy \
+            -var="workspace_prefix=${{ inputs.workspace }}" \
+            -var="aws_region=${{ inputs.aws_region }}" \
+            -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="create_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+            -var="delete_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+            -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \
+            -var-file="environments/${{ inputs.workspace }}.tfvars" \
+            -auto-approve
       
       - name: Cleanup SSM Parameters
         if: steps.check.outputs.exists == 'true'
@@ -625,7 +694,26 @@ jobs:
           echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
           echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
       
-      - name: Terraform Init
+      - name: Get AWS Account ID
+        if: steps.check.outputs.exists == 'true'
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+      
+      - name: Get Admin Account ID
+        if: steps.check.outputs.exists == 'true'
+        id: admin_account
+        run: |
+          # We need to temporarily switch to admin credentials to get admin account ID
+          # But since we're in tenant context, we'll try to get it from SSM if available
+          # Otherwise use the tenant account ID as fallback
+          ADMIN_ACCOUNT_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/admin-account-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "${{ steps.account.outputs.account_id }}")\n          \n          echo \"admin_account_id=${ADMIN_ACCOUNT_ID}\" >> $GITHUB_OUTPUT\n          echo \"Admin Account ID: ${ADMIN_ACCOUNT_ID}\"\n      \n      - name: Terraform Init
         if: steps.check.outputs.exists == 'true'
         working-directory: c20_prj/tenant-iac
         run: |
@@ -646,7 +734,13 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         working-directory: c20_prj/tenant-iac
         run: |
-          terraform destroy -var-file="environments/${{ inputs.workspace }}.tfvars" -auto-approve
+          terraform destroy \
+            -var="workspace_prefix=${{ inputs.workspace }}" \
+            -var="aws_region=${{ inputs.aws_region }}" \
+            -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="admin_account_id=${{ steps.admin_account.outputs.admin_account_id }}" \
+            -var-file="environments/${{ inputs.workspace }}.tfvars" \
+            -auto-approve
       
       - name: Cleanup SSM Parameters
         if: steps.check.outputs.exists == 'true'
