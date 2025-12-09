@@ -26,7 +26,7 @@ output "workspace_prefix" {
 
 output "tenant_id" {
   description = "Tenant identifier"
-  value       = var.tenant_id
+  value       = local.tenant_id
 }
 
 output "is_same_account" {
@@ -38,7 +38,7 @@ output "deployment_summary" {
   description = "Summary of what was deployed"
   value = {
     workspace_prefix           = var.workspace_prefix
-    tenant_id                 = var.tenant_id
+    tenant_id                 = local.tenant_id
     admin_account_id          = var.admin_account_id
     tenant_account_id         = var.tenant_account_id
     is_same_account           = local.is_same_account

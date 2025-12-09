@@ -52,6 +52,9 @@ locals {
   workspace_prefix = var.workspace_prefix
   name_prefix = "${local.workspace_prefix}-tenant-infra"
   
+  # Tenant ID defaults to workspace prefix if not explicitly provided
+  tenant_id = var.tenant_id != "" ? var.tenant_id : local.workspace_prefix
+  
   # Conditional resource creation
   should_create_cross_account_role = !local.is_same_account
   should_create_separate_state = !local.is_same_account
@@ -66,7 +69,7 @@ locals {
     Project           = var.project_name
     AdminAccount      = local.admin_account_id
     TenantAccount     = local.tenant_account_id
-    TenantId          = var.tenant_id
+    TenantId          = local.tenant_id
     SameAccount       = local.is_same_account
     ComponentType     = "tenant-infrastructure"
     ManagedBy         = "terraform"
@@ -156,7 +159,7 @@ module "infrastructure_ssm_outputs" {
     "cross_account_role_arn" = length(aws_iam_role.cross_account_tenant_role) > 0 ? aws_iam_role.cross_account_tenant_role[0].arn : "not-created"
     
     # Metadata
-    "tenant_id" = var.tenant_id
+    "tenant_id" = local.tenant_id
     "status"    = "completed"
   }
   

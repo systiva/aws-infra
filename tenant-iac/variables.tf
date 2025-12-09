@@ -30,11 +30,12 @@ variable "tenant_account_id" {
 }
 
 variable "tenant_id" {
-  description = "Unique tenant identifier"
+  description = "Unique tenant identifier (defaults to workspace prefix if not provided)"
   type        = string
+  default     = ""
   
   validation {
-    condition     = can(regex("^[a-zA-Z0-9-_]+$", var.tenant_id))
+    condition     = var.tenant_id == "" || can(regex("^[a-zA-Z0-9-_]+$", var.tenant_id))
     error_message = "Tenant ID can only contain alphanumeric characters, hyphens, and underscores."
   }
 }
