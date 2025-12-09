@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_proceed: ${{ steps.check.outputs.should_proceed }}
-      tenant_account_id: ${{ steps.account.outputs.tenant_account_id }}
     
     steps:
       - name: Checkout Code
@@ -33,17 +32,10 @@ jobs:
       - name: Configure AWS Credentials (Tenant Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
-      
-      - name: Get Tenant Account ID
-        id: account
-        run: |
-          TENANT_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "tenant_account_id=$TENANT_ACCOUNT_ID" >> $GITHUB_OUTPUT
-          echo "Tenant Account ID: $TENANT_ACCOUNT_ID"
       
       - name: Check if Bootstrap Already Exists
         id: check
@@ -88,9 +80,38 @@ jobs:
       - name: Configure AWS Credentials (Tenant Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Admin Account ID
+        id: admin_account
+        run: |
+          # Switch to admin credentials to get admin account ID
+          echo "Getting admin account ID..."
+      
+      - name: Configure AWS Credentials (Admin Account - for account ID)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Admin Account ID Value
+        id: admin_account_value
+        run: |
+          ADMIN_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "admin_account_id=$ADMIN_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "Admin Account ID: $ADMIN_ACCOUNT_ID"
+      
+      - name: Switch Back to Tenant Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TENANT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TENANT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.TENANT_AWS_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Terraform Init
@@ -102,7 +123,7 @@ jobs:
           terraform plan \
             -var="workspace_prefix=${{ inputs.workspace }}" \
             -var="aws_region=${{ inputs.aws_region }}" \
-            -var="tenant_account_id=${{ needs.validate.outputs.tenant_account_id }}" \
+            -var="admin_account_id=${{ steps.admin_account_value.outputs.admin_account_id }}" \
             -out=tfplan
       
       - name: Terraform Apply
@@ -137,11 +158,13 @@ jobs:
       
       - name: Display Bootstrap Summary
         run: |
+          TENANT_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          
           echo "=========================================="
           echo "Tenant Bootstrap Complete"
           echo "========================================="
           echo "Workspace: ${{ inputs.workspace }}"
-          echo "Tenant Account: ${{ needs.validate.outputs.tenant_account_id }}"
+          echo "Tenant Account: $TENANT_ACCOUNT_ID"
           echo "Region: ${{ inputs.aws_region }}"
           echo ""
           echo "SSM Parameters stored at:"
