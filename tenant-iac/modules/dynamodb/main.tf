@@ -33,12 +33,9 @@ resource "aws_dynamodb_table" "tenant_public" {
   }
 
   # Server-side encryption
-  dynamic "server_side_encryption" {
-    for_each = var.server_side_encryption ? [1] : []
-    content {
-      enabled        = true
-      kms_master_key_id = aws_kms_key.dynamodb[0].arn
-    }
+  server_side_encryption {
+    enabled     = var.server_side_encryption
+    kms_key_arn = var.server_side_encryption ? aws_kms_key.dynamodb[0].arn : null
   }
 
   tags = merge(var.common_tags, {
