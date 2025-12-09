@@ -15,18 +15,6 @@ terraform {
 }
 
 # Generate random password for platform admin
-resource "random_password" "platform_admin_password" {
-  length      = 16
-  special     = true
-  upper       = true
-  lower       = true
-  numeric     = true
-  min_numeric = 1
-  min_upper   = 1
-  min_lower   = 1
-  min_special = 1
-}
-
 # Generate unique 8-character platform ID
 resource "random_integer" "platform_id" {
   min = 10000000  # 8-digit minimum
@@ -115,8 +103,8 @@ resource "aws_cognito_user" "platform_admin" {
   # Don't set attributes here to avoid provider inconsistency bug
   # Attributes will be set via null_resource provisioner below
   
-  # Set temporary password initially
-  temporary_password = random_password.platform_admin_password.result
+  # Set temporary password from variable (passed from GitHub secret)
+  temporary_password = var.temporary_password
   message_action     = "SUPPRESS"  # Don't send welcome email
   
   # Ensure the platform ID is generated first
