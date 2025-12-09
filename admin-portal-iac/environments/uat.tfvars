@@ -56,7 +56,7 @@ vpc_endpoint_services = [
 ]
 
 # Cross-Account Access
-tenant_account_role_name = "CrossAccountTenantRole"
+tenant_account_role_name = "uat-CrossAccountTenantRole"
 tenant_public_table_name = "TENANT_PUBLIC"  # Table name in tenant account for public tenant data
 trusted_tenant_account_ids = [
   # Add tenant account IDs here when available
