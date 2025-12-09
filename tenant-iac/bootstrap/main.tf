@@ -137,6 +137,7 @@ module "bootstrap_ssm_outputs" {
     dynamodb-table-arn = local.is_same_account ? "shared-with-admin" : aws_dynamodb_table.tenant_terraform_lock[0].arn
     account-id         = local.tenant_account_id
     region             = var.aws_region
+    status             = "completed"
   }
   
   depends_on = [

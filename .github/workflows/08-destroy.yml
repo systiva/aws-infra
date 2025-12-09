@@ -464,22 +464,37 @@ jobs:
       - name: Check if Admin Infrastructure Exists
         id: check
         run: |
-          # First try to get bootstrap bucket from SSM
+          # Get bootstrap bucket from SSM (same as deploy workflow)
           BACKEND_BUCKET=$(aws ssm get-parameter \
             --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/backend-bucket" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' \
             --output text 2>/dev/null || echo "")
           
+          # Fallback: If SSM missing, search for bucket by naming pattern
+          if [[ -z "$BACKEND_BUCKET" ]]; then
+            echo "⚠️  SSM parameter not found, searching for bucket..."
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            BACKEND_BUCKET=$(aws s3api list-buckets \
+              --query "Buckets[?starts_with(Name, 'admin-portal-${{ inputs.workspace }}-terraform-state-${ACCOUNT_ID}-')].Name | [0]" \
+              --output text)
+            
+            if [[ "$BACKEND_BUCKET" == "None" || -z "$BACKEND_BUCKET" ]]; then
+              BACKEND_BUCKET=""
+            else
+              echo "Found bucket: ${BACKEND_BUCKET}"
+            fi
+          fi
+          
           if [[ -z "$BACKEND_BUCKET" ]]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⏭️  Admin bootstrap not found, skipping admin infrastructure destroy"
+            echo "⏭️  Admin bootstrap bucket not found, skipping admin infrastructure destroy"
           else
-            # Check if Terraform state file exists in S3 (workspace adds env:/{workspace}/ prefix)
+            # Check if Terraform state file exists in S3
             if aws s3 ls "s3://${BACKEND_BUCKET}/env:/${{ inputs.workspace }}/admin-portal-iac/terraform.tfstate" 2>/dev/null; then
               echo "exists=true" >> $GITHUB_OUTPUT
               echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
-              echo "✅ Admin infrastructure state found"
+              echo "✅ Admin infrastructure state found in bucket: ${BACKEND_BUCKET}"
             else
               echo "exists=false" >> $GITHUB_OUTPUT
               echo "⏭️  Admin infrastructure state not found, skipping"
@@ -679,22 +694,37 @@ jobs:
       - name: Check if Tenant Infrastructure Exists
         id: check
         run: |
-          # First try to get bootstrap bucket from SSM
+          # Get bootstrap bucket from SSM (same as deploy workflow)
           BACKEND_BUCKET=$(aws ssm get-parameter \
             --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' \
             --output text 2>/dev/null || echo "")
           
+          # Fallback: If SSM missing, search for bucket by naming pattern
+          if [[ -z "$BACKEND_BUCKET" ]]; then
+            echo "⚠️  SSM parameter not found, searching for bucket..."
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            BACKEND_BUCKET=$(aws s3api list-buckets \
+              --query "Buckets[?starts_with(Name, 'admin-portal-${{ inputs.workspace }}-terraform-state-${ACCOUNT_ID}-')].Name | [0]" \
+              --output text)
+            
+            if [[ "$BACKEND_BUCKET" == "None" || -z "$BACKEND_BUCKET" ]]; then
+              BACKEND_BUCKET=""
+            else
+              echo "Found bucket: ${BACKEND_BUCKET}"
+            fi
+          fi
+          
           if [[ -z "$BACKEND_BUCKET" ]]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⏭️  Tenant bootstrap not found, skipping tenant infrastructure destroy"
+            echo "⏭️  Tenant bootstrap bucket not found, skipping tenant infrastructure destroy"
           else
-            # Check if Terraform state file exists in S3 (workspace adds env:/{workspace}/ prefix)
+            # Check if Terraform state file exists in S3
             if aws s3 ls "s3://${BACKEND_BUCKET}/env:/${{ inputs.workspace }}/tenant-iac/terraform.tfstate" 2>/dev/null; then
               echo "exists=true" >> $GITHUB_OUTPUT
               echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
-              echo "✅ Tenant infrastructure state found"
+              echo "✅ Tenant infrastructure state found in bucket: ${BACKEND_BUCKET}"
             else
               echo "exists=false" >> $GITHUB_OUTPUT
               echo "⏭️  Tenant infrastructure state not found, skipping"
