@@ -48,6 +48,21 @@ resource "random_password" "jwt_signing_key" {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
+# Retrieve tenant public table name from SSM (created by tenant infrastructure)
+data "aws_ssm_parameter" "tenant_public_table_name" {
+  name = "/admin-portal/${var.workspace_prefix}/tenant/infrastructure/tenant-public-table-name"
+}
+
+# Retrieve Step Functions ARN from SSM (created by admin bootstrap)
+data "aws_ssm_parameter" "step_functions_arn" {
+  name = "/admin-portal/${var.workspace_prefix}/admin/bootstrap/step-functions-arn"
+}
+
+# Retrieve Tenant Registry Table Name from SSM (created by admin bootstrap)
+data "aws_ssm_parameter" "tenant_registry_table_name" {
+  name = "/admin-portal/${var.workspace_prefix}/admin/bootstrap/tenant-registry-table"
+}
+
 # Local values for resource naming and configuration
 locals {
   # Account comparison logic
@@ -62,8 +77,14 @@ locals {
   workspace_prefix = var.workspace_prefix
   name_prefix = "${var.project_name}-${local.workspace_prefix}"
   
-  # DynamoDB table naming
-  tenant_public_table_name = "${local.workspace_prefix}-tenant-public"
+  # DynamoDB table naming - retrieved from tenant infrastructure SSM
+  tenant_public_table_name = data.aws_ssm_parameter.tenant_public_table_name.value
+  
+  # Step Functions ARN - retrieved from admin bootstrap SSM
+  step_functions_arn = data.aws_ssm_parameter.step_functions_arn.value
+  
+  # Tenant Registry Table - retrieved from admin bootstrap SSM
+  tenant_registry_table_name = data.aws_ssm_parameter.tenant_registry_table_name.value
   
   # S3 bucket names (must be globally unique)
   admin_portal_bucket_name = var.s3_admin_portal_bucket_name != "" ? var.s3_admin_portal_bucket_name : "${local.name_prefix}-portal-${random_id.suffix.hex}"
@@ -152,13 +173,13 @@ module "admin_backend" {
   # Function URL configuration  
   enable_function_url = var.enable_lambda_function_urls
   
-  # Local DynamoDB table names (independent of admin-account-iac)
-  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
-  step_functions_arn         = var.step_functions_arn
+  # DynamoDB table names from bootstrap
+  tenant_registry_table_name = local.tenant_registry_table_name
+  step_functions_arn         = local.step_functions_arn
   
-  # Step Functions ARNs for tenant lifecycle management
-  create_tenant_step_function_arn = var.create_tenant_step_function_arn
-  delete_tenant_step_function_arn = var.delete_tenant_step_function_arn
+  # Step Functions ARNs for tenant lifecycle management (both use the same state machine)
+  create_tenant_step_function_arn = local.step_functions_arn
+  delete_tenant_step_function_arn = local.step_functions_arn
   
   # Cross-account access
   tenant_account_role_name = var.tenant_account_role_name
@@ -182,8 +203,8 @@ module "create_infra_worker" {
   timeout     = 300  # 5 minutes for infrastructure operations
   memory_size = 512
   
-  # DynamoDB table for tenant registry
-  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  # DynamoDB tables
+  tenant_registry_table_name = local.tenant_registry_table_name
   tenant_public_table_name   = local.tenant_public_table_name
   
   # Cross-account access
@@ -207,8 +228,8 @@ module "delete_infra_worker" {
   timeout     = 300  # 5 minutes for infrastructure operations
   memory_size = 512
   
-  # DynamoDB table for tenant registry
-  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  # DynamoDB tables
+  tenant_registry_table_name = local.tenant_registry_table_name
   tenant_public_table_name   = local.tenant_public_table_name
   
   # Cross-account access
@@ -232,8 +253,8 @@ module "poll_infra_worker" {
   timeout     = 60   # 1 minute for polling operations
   memory_size = 256
   
-  # DynamoDB table for tenant registry
-  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  # DynamoDB tables
+  tenant_registry_table_name = local.tenant_registry_table_name
   tenant_public_table_name   = local.tenant_public_table_name
   
   # Cross-account access
@@ -303,7 +324,7 @@ module "oms_service" {
   aws_region   = var.aws_region
   
   # Lambda configuration
-  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  tenant_registry_table_name = local.tenant_registry_table_name
   cross_account_role_name    = var.oms_cross_account_role_name
   log_level                  = var.oms_log_level
   log_retention_days         = var.log_retention_days
@@ -557,8 +578,8 @@ module "ims_service" {
   jwt_signing_key     = random_password.jwt_signing_key[0].result
   
   # DynamoDB configuration
-  tenant_registry_table_name = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
-  tenant_registry_table_arn  = "arn:aws:dynamodb:${local.region}:${local.account_id}:table/${var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"}"
+  tenant_registry_table_name = local.tenant_registry_table_name
+  tenant_registry_table_arn  = "arn:aws:dynamodb:${local.region}:${local.account_id}:table/${local.tenant_registry_table_name}"
   
   # VPC configuration (optional)
   vpc_config = null  # Can be configured later if VPC access is needed
@@ -582,7 +603,7 @@ module "platform_bootstrap" {
   user_pool_id = module.cognito[0].user_pool_id
   
   # DynamoDB configuration (using tenant registry table)
-  rbac_table_name      = var.tenant_registry_table_name != "" ? var.tenant_registry_table_name : "${local.name_prefix}-tenant-registry"
+  rbac_table_name      = local.tenant_registry_table_name
   rbac_table_hash_key  = "PK"
   rbac_table_range_key = "SK"
   

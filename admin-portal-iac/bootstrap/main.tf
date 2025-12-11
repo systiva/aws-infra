@@ -136,24 +136,6 @@ resource "aws_dynamodb_table" "tenant_registry" {
     type = "S"
   }
 
-  attribute {
-    name = "GSI1PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "GSI1SK"
-    type = "S"
-  }
-
-  # Global Secondary Index for query patterns
-  global_secondary_index {
-    name               = "GSI1"
-    hash_key           = "GSI1PK"
-    range_key          = "GSI1SK"
-    projection_type    = "ALL"
-  }
-
   point_in_time_recovery {
     enabled = true
   }
