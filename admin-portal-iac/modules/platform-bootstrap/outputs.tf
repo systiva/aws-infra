@@ -12,7 +12,7 @@ output "platform_admin_username" {
 
 output "platform_admin_password" {
   description = "Password of the platform administrator"
-  value       = random_password.platform_admin_password.result
+  value       = var.temporary_password
   sensitive   = true
 }
 
@@ -30,7 +30,7 @@ output "platform_admin_credentials" {
   description = "Platform administrator login credentials"
   value = {
     username = local.platform_admin_username
-    password = random_password.platform_admin_password.result
+    password = var.temporary_password
     email    = local.platform_admin_email
     user_id  = aws_cognito_user.platform_admin.sub
   }
