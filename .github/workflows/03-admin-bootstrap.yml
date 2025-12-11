@@ -1,4 +1,4 @@
-name: 03 - Tenant Bootstrap
+name: 01 - Admin Bootstrap
 
 on:
   workflow_dispatch:
@@ -29,12 +29,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
       
-      - name: Configure AWS Credentials (Tenant Account)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Check if Bootstrap Already Exists
@@ -42,14 +42,14 @@ jobs:
         run: |
           # Check if SSM parameters already exist
           if aws ssm get-parameter \
-              --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status" \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/status" \
               --region "${{ inputs.aws_region }}" \
               --query 'Parameter.Value' \
               --output text 2>/dev/null; then
             
             echo "❌ Bootstrap already exists for workspace: ${{ inputs.workspace }}"
-            echo "💡 SSM Parameter: /admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status"
-            echo "💡 To recreate, first run workflow: 08-destroy with target=tenant-bootstrap"
+            echo "💡 SSM Parameter: /admin-portal/${{ inputs.workspace }}/admin/bootstrap/status"
+            echo "💡 To recreate, first run workflow: 08-destroy with target=admin-bootstrap"
             exit 1
           else
             echo "✅ Bootstrap does not exist. Proceeding with creation."
@@ -57,14 +57,14 @@ jobs:
           fi
 
   bootstrap:
-    name: Bootstrap Tenant Infrastructure
+    name: Bootstrap Admin Infrastructure
     runs-on: ubuntu-latest
     needs: [validate]
     if: needs.validate.outputs.should_proceed == 'true'
     
     defaults:
       run:
-        working-directory: c20_prj/tenant-iac/bootstrap
+        working-directory: c20_prj/admin-portal-iac/bootstrap
     
     steps:
       - name: Checkout Code
@@ -77,21 +77,7 @@ jobs:
         with:
           terraform_version: "1.5.0"
       
-      - name: Configure AWS Credentials (Tenant Account)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
-          aws-region: ${{ inputs.aws_region }}
-      
-      - name: Get Admin Account ID
-        id: admin_account
-        run: |
-          # Switch to admin credentials to get admin account ID
-          echo "Getting admin account ID..."
-      
-      - name: Configure AWS Credentials (Admin Account - for account ID)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
@@ -99,20 +85,12 @@ jobs:
           aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
       
-      - name: Get Admin Account ID Value
-        id: admin_account_value
+      - name: Get AWS Account ID
+        id: account
         run: |
-          ADMIN_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "admin_account_id=$ADMIN_ACCOUNT_ID" >> $GITHUB_OUTPUT
-          echo "Admin Account ID: $ADMIN_ACCOUNT_ID"
-      
-      - name: Switch Back to Tenant Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN }}
-          aws-region: ${{ inputs.aws_region }}
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account: $ACCOUNT_ID"
       
       - name: Terraform Init
         run: |
@@ -123,7 +101,7 @@ jobs:
           terraform plan \
             -var="workspace_prefix=${{ inputs.workspace }}" \
             -var="aws_region=${{ inputs.aws_region }}" \
-            -var="admin_account_id=${{ steps.admin_account_value.outputs.admin_account_id }}" \
+            -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
             -out=tfplan
       
       - name: Terraform Apply
@@ -139,13 +117,12 @@ jobs:
             "backend-bucket-arn"
             "dynamodb-table"
             "dynamodb-table-arn"
-            "account-id"
             "region"
             "status"
           )
           
           for param in "${PARAMS[@]}"; do
-            FULL_PATH="/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/${param}"
+            FULL_PATH="/admin-portal/${{ inputs.workspace }}/admin/bootstrap/${param}"
             if aws ssm get-parameter --name "$FULL_PATH" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
               echo "✓ Parameter exists: $FULL_PATH"
             else
@@ -158,18 +135,16 @@ jobs:
       
       - name: Display Bootstrap Summary
         run: |
-          TENANT_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          
           echo "=========================================="
-          echo "Tenant Bootstrap Complete"
-          echo "========================================="
+          echo "Admin Bootstrap Complete"
+          echo "=========================================="
           echo "Workspace: ${{ inputs.workspace }}"
-          echo "Tenant Account: $TENANT_ACCOUNT_ID"
           echo "Region: ${{ inputs.aws_region }}"
           echo ""
           echo "SSM Parameters stored at:"
-          echo "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/*"
+          echo "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/*"
           echo ""
           echo "Next Steps:"
-          echo "1. Run '04 - Tenant Infrastructure' workflow"
+          echo "1. Run '02 - Admin Infrastructure' workflow"
+          echo "2. Then run '03 - Tenant Bootstrap' workflow"
           echo "=========================================="
