@@ -48,7 +48,7 @@ jobs:
               --region "${{ inputs.aws_region }}" \
               --query 'Parameter.Value' \
               --output text 2>/dev/null); then
-            echo "Admin infrastructure not found. Please run '02 - Admin Infrastructure' first."
+            echo "Admin infrastructure not found. Please run '04 - Admin Infrastructure' first."
             exit 1
           fi
           
