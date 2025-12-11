@@ -397,7 +397,7 @@ module "vpc_endpoints" {
 # S3 bucket for React build files
 resource "aws_s3_bucket" "admin_portal" {
   bucket        = local.admin_portal_bucket_name
-  force_destroy = var.workspace_prefix == "dev" ? true : false
+  force_destroy = true  # Allow Terraform to delete bucket even if not empty
 
   tags = merge(local.common_tags, {
     Name        = "${local.name_prefix}-admin-portal"
@@ -430,6 +430,24 @@ resource "aws_s3_bucket_public_access_block" "admin_portal" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+# Lifecycle policy to expire old versions and delete markers
+resource "aws_s3_bucket_lifecycle_configuration" "admin_portal" {
+  bucket = aws_s3_bucket.admin_portal.id
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
 }
 
 # ==============================================
