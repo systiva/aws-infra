@@ -8,7 +8,7 @@ resource "aws_dynamodb_table" "tenant_public" {
   hash_key         = "PK"
   range_key        = "SK"
   
-  deletion_protection_enabled = var.deletion_protection
+  deletion_protection_enabled = false  # Allow deletion for all environments
 
   # Primary key attributes
   attribute {
