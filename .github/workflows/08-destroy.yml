@@ -864,15 +864,26 @@ jobs:
           
           echo "🔥 Destroying Tenant Bootstrap Resources"
           
-          # Read bootstrap configuration
-          BACKEND_BUCKET=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/backend-bucket" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
-          DYNAMODB_TABLE=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/dynamodb-table" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+          # Read bootstrap configuration and strip any quotes
+          BACKEND_BUCKET=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/backend-bucket" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null | tr -d '"' || echo "")
+          DYNAMODB_TABLE=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/dynamodb-table" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null | tr -d '"' || echo "")
+          
+          echo "Backend Bucket: ${BACKEND_BUCKET}"
+          echo "DynamoDB Table: ${DYNAMODB_TABLE}"
+          
+          # Track deletion status
+          BUCKET_DELETED=false
+          TABLE_DELETED=false
           
           # Delete S3 bucket
           if [[ -n "$BACKEND_BUCKET" ]] && aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
             aws s3 rm "s3://${BACKEND_BUCKET}" --recursive --region "${{ inputs.aws_region }}"
             aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
             echo "✅ S3 bucket deleted"
+            BUCKET_DELETED=true
+          else
+            echo "⚠️  Bucket not found or already deleted: ${BACKEND_BUCKET}"
+            BUCKET_DELETED=true
           fi
           
           # Delete DynamoDB table
@@ -880,6 +891,25 @@ jobs:
             aws dynamodb delete-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
             aws dynamodb wait table-not-exists --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
             echo "✅ DynamoDB table deleted"
+            TABLE_DELETED=true
+          else
+            echo "⚠️  Table not found or already deleted: ${DYNAMODB_TABLE}"
+            TABLE_DELETED=true
+          fi
+          
+          # Cleanup SSM parameters only if all resources are deleted
+          if [[ "$BUCKET_DELETED" == "true" && "$TABLE_DELETED" == "true" ]]; then
+            echo "🗑️  Cleaning up SSM Parameters"
+            PARAMS=$(aws ssm get-parameters-by-path --path "${BOOTSTRAP_PATH}" --recursive --region "${{ inputs.aws_region }}" --query 'Parameters[*].Name' --output text 2>/dev/null || echo "")
+            if [[ -n "$PARAMS" ]]; then
+              for param_name in $PARAMS; do
+                echo "Deleting: $param_name"
+                aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+              done
+              echo "✅ SSM parameters cleaned up"
+            fi
+          else
+            echo "⚠️  Skipping SSM cleanup - not all resources were deleted successfully"
           fi
           
           # Cleanup SSM parameters

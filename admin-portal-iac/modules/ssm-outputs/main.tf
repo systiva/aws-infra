@@ -8,7 +8,8 @@ locals {
   flattened_outputs = {
     for key, value in var.outputs :
     replace(key, "_", "-") => (
-      try(jsonencode(value), tostring(value))
+      # Store as plain string to avoid double-quoting
+      can(tostring(value)) ? tostring(value) : jsonencode(value)
     )
   }
 }
