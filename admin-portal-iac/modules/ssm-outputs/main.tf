@@ -14,13 +14,14 @@ locals {
   ssm_prefix = "/admin-portal/${var.workspace}/${var.account_type}/${var.category}"
   
   # Flatten nested maps for parameter creation
-  # Filter out null and empty string values to avoid SSM parameter errors
+  # Convert all values to strings, replacing null/empty with placeholder
   flattened_outputs = {
     for key, value in var.outputs :
     replace(key, "_", "-") => (
-      can(tostring(value)) ? tostring(value) : jsonencode(value)
+      value != null && value != "" 
+        ? (can(tostring(value)) ? tostring(value) : jsonencode(value))
+        : "N/A"
     )
-    if value != null && value != ""
   }
 }
 
