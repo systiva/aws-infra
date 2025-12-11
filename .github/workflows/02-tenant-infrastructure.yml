@@ -25,8 +25,6 @@ jobs:
     outputs:
       tenant_backend_bucket: ${{ steps.tenant.outputs.backend_bucket }}
       tenant_dynamodb_table: ${{ steps.tenant.outputs.dynamodb_table }}
-      admin_vpc_id: ${{ steps.admin.outputs.vpc_id }}
-      admin_api_gateway_id: ${{ steps.admin.outputs.api_gateway_id }}
       admin_account_id: ${{ steps.admin_account.outputs.account_id }}
     
     steps:
@@ -84,36 +82,6 @@ jobs:
           ADMIN_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "account_id=$ADMIN_ACCOUNT_ID" >> $GITHUB_OUTPUT
           echo "Admin Account ID: $ADMIN_ACCOUNT_ID"
-      
-      - name: Read Admin Infrastructure Config
-        id: admin
-        run: |
-          if ! STATUS=$(aws ssm get-parameter \
-              --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status" \
-              --region "${{ inputs.aws_region }}" \
-              --query 'Parameter.Value' \
-              --output text 2>/dev/null); then
-            echo "Admin infrastructure not found. Please run '04 - Admin Infrastructure' first."
-            exit 1
-          fi
-          
-          VPC_ID=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/vpc-id" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' \
-            --output text)
-          
-          API_GATEWAY_ID=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-id" \
-            --region "${{ inputs.aws_region }}" \
-            --query 'Parameter.Value' \
-            --output text)
-          
-          echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
-          echo "api_gateway_id=$API_GATEWAY_ID" >> $GITHUB_OUTPUT
-          
-          echo "Admin VPC ID: $VPC_ID"
-          echo "Admin API Gateway ID: $API_GATEWAY_ID"
 
   deploy:
     name: Deploy Tenant Infrastructure
@@ -224,6 +192,6 @@ jobs:
           echo "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure/*"
           echo ""
           echo "Next Steps:"
-          echo "1. Run '05 - Lambda Deployment' to update Lambda functions"
-          echo "2. Run '06 - Frontend Deployment' to deploy the UI"
+          echo "1. Run '03 - Admin Bootstrap' to bootstrap admin account"
+          echo "2. Then run '04 - Admin Infrastructure' to deploy admin infrastructure"
           echo "=========================================="

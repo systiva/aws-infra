@@ -37,12 +37,6 @@ variable "point_in_time_recovery" {
   default     = true
 }
 
-variable "server_side_encryption" {
-  description = "Enable server-side encryption"
-  type        = bool
-  default     = true
-}
-
 variable "deletion_protection" {
   description = "Enable deletion protection"
   type        = bool

@@ -32,10 +32,11 @@ resource "aws_dynamodb_table" "tenant_public" {
     enabled = var.point_in_time_recovery
   }
 
-  # Server-side encryption
+  # Server-side encryption - using AWS-owned default encryption
+  # This provides encryption at rest with no additional cost
+  # and no KMS key management overhead
   server_side_encryption {
-    enabled     = var.server_side_encryption
-    kms_key_arn = var.server_side_encryption ? aws_kms_key.dynamodb[0].arn : null
+    enabled = true
   }
 
   tags = merge(var.common_tags, {
@@ -47,25 +48,4 @@ resource "aws_dynamodb_table" "tenant_public" {
   lifecycle {
     prevent_destroy = true
   }
-}
-
-# KMS key for DynamoDB encryption
-resource "aws_kms_key" "dynamodb" {
-  count = var.server_side_encryption ? 1 : 0
-  
-  description             = "KMS key for DynamoDB encryption in ${var.project_name}-${var.environment}"
-  deletion_window_in_days = 7
-  enable_key_rotation     = true
-
-  tags = merge(var.common_tags, {
-    Name = "${var.project_name}-${var.environment}-dynamodb-key"
-  })
-}
-
-# KMS key alias
-resource "aws_kms_alias" "dynamodb" {
-  count = var.server_side_encryption ? 1 : 0
-  
-  name          = "alias/${var.project_name}-${var.environment}-dynamodb"
-  target_key_id = aws_kms_key.dynamodb[0].key_id
 }
