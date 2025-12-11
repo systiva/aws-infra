@@ -35,14 +35,9 @@ resource "aws_ssm_parameter" "outputs" {
   for_each = var.enabled ? local.flattened_outputs : {}
   
   name = "${local.ssm_prefix}/${each.key}"
-  
-  # Determine parameter type based on key name
   type = can(regex("(password|secret|key-id|client-id|kms-key)", each.key)) ? "SecureString" : "String"
   
-  # Store value as string
-  value = each.value
-  
-  # Enable overwrite for updates
+  value     = tostring(each.value)
   overwrite = true
   
   # Add tags for organization
