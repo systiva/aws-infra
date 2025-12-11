@@ -440,6 +440,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "admin_portal" {
     id     = "expire-old-versions"
     status = "Enabled"
 
+    filter {}  # Empty filter applies to all objects
+
     noncurrent_version_expiration {
       noncurrent_days = 30
     }

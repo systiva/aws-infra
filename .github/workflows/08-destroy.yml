@@ -386,12 +386,30 @@ jobs:
           echo "Backend Bucket: ${BACKEND_BUCKET}"
           echo "DynamoDB Table: ${DYNAMODB_TABLE}"
           
-          # Step 2: Empty and delete S3 bucket
+          # Step 2: Empty and delete S3 bucket (including all versions)
           echo "🗑️  Deleting S3 Bucket"
           
           if aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
-            echo "Emptying bucket: ${BACKEND_BUCKET}"
-            aws s3 rm "s3://${BACKEND_BUCKET}" --recursive --region "${{ inputs.aws_region }}"
+            echo "Emptying bucket (including all versions): ${BACKEND_BUCKET}"
+            
+            # Delete all object versions
+            aws s3api list-object-versions \
+              --bucket "${BACKEND_BUCKET}" \
+              --region "${{ inputs.aws_region }}" \
+              --output json \
+              --query 'Versions[].{Key:Key,VersionId:VersionId}' | \
+            jq -r '.[] | "--key \"\(.Key)\" --version-id \"\(.VersionId)\""' | \
+            xargs -I {} aws s3api delete-object --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" {} || true
+            
+            # Delete all delete markers
+            aws s3api list-object-versions \
+              --bucket "${BACKEND_BUCKET}" \
+              --region "${{ inputs.aws_region }}" \
+              --output json \
+              --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' | \
+            jq -r '.[] | "--key \"\(.Key)\" --version-id \"\(.VersionId)\""' | \
+            xargs -I {} aws s3api delete-object --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" {} || true
+            
             echo "Deleting bucket: ${BACKEND_BUCKET}"
             aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
             echo "✅ S3 bucket deleted: ${BACKEND_BUCKET}"
@@ -638,9 +656,12 @@ jobs:
           BACKEND_BUCKET=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/backend-bucket" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
           DYNAMODB_TABLE=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/dynamodb-table" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
           
-          # Delete S3 bucket
+          # Delete S3 bucket (including all versions)
           if [[ -n "$BACKEND_BUCKET" ]] && aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
-            aws s3 rm "s3://${BACKEND_BUCKET}" --recursive --region "${{ inputs.aws_region }}"
+            echo "Deleting all object versions..."
+            aws s3api list-object-versions --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" --output json --query 'Versions[].{Key:Key,VersionId:VersionId}' | jq -r '.[] | "--key \"\(.Key)\" --version-id \"\(.VersionId)\""' | xargs -I {} aws s3api delete-object --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" {} || true
+            echo "Deleting all delete markers..."
+            aws s3api list-object-versions --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" --output json --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' | jq -r '.[] | "--key \"\(.Key)\" --version-id \"\(.VersionId)\""' | xargs -I {} aws s3api delete-object --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" {} || true
             aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
             echo "✅ S3 bucket deleted"
           fi
@@ -875,9 +896,12 @@ jobs:
           BUCKET_DELETED=false
           TABLE_DELETED=false
           
-          # Delete S3 bucket
+          # Delete S3 bucket (including all versions)
           if [[ -n "$BACKEND_BUCKET" ]] && aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
-            aws s3 rm "s3://${BACKEND_BUCKET}" --recursive --region "${{ inputs.aws_region }}"
+            echo "Deleting all object versions..."
+            aws s3api list-object-versions --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" --output json --query 'Versions[].{Key:Key,VersionId:VersionId}' | jq -r '.[] | "--key \"\(.Key)\" --version-id \"\(.VersionId)\""' | xargs -I {} aws s3api delete-object --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" {} || true
+            echo "Deleting all delete markers..."
+            aws s3api list-object-versions --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" --output json --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' | jq -r '.[] | "--key \"\(.Key)\" --version-id \"\(.VersionId)\""' | xargs -I {} aws s3api delete-object --bucket "${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" {} || true
             aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
             echo "✅ S3 bucket deleted"
             BUCKET_DELETED=true
