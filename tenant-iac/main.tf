@@ -135,7 +135,6 @@ module "tenant_dynamodb" {
   # DynamoDB configuration
   billing_mode           = var.dynamodb_billing_mode
   point_in_time_recovery = var.point_in_time_recovery
-  server_side_encryption = var.server_side_encryption
   deletion_protection    = var.deletion_protection
   
   common_tags = local.common_tags
