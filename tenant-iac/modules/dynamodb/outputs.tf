@@ -13,21 +13,6 @@ output "tenant_public_table_arn" {
   value       = aws_dynamodb_table.tenant_public.arn
 }
 
-output "kms_key_id" {
-  description = "The globally unique identifier for the KMS key (if encryption is enabled)"
-  value       = var.server_side_encryption ? aws_kms_key.dynamodb[0].key_id : null
-}
-
-output "kms_key_arn" {
-  description = "The Amazon Resource Name (ARN) of the KMS key (if encryption is enabled)"
-  value       = var.server_side_encryption ? aws_kms_key.dynamodb[0].arn : null
-}
-
-output "kms_alias_name" {
-  description = "The display name of the KMS key alias (if encryption is enabled)"
-  value       = var.server_side_encryption ? aws_kms_alias.dynamodb[0].name : null
-}
-
 # Table schema information for applications
 output "table_schema" {
   description = "Table schema information for application reference"
