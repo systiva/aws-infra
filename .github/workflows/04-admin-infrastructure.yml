@@ -209,6 +209,6 @@ jobs:
           echo "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/*"
           echo ""
           echo "Next Steps:"
-          echo "1. Run '01 - Tenant Bootstrap' workflow"
-          echo "2. Then run '02 - Tenant Infrastructure' workflow"
+          echo "1. Run '05 - Lambda Deployment' workflow to deploy backend Lambda functions"
+          echo "2. Run '06 - Frontend Deployment' workflow to deploy the admin portal UI"
           echo "=========================================="
