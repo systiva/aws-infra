@@ -48,11 +48,6 @@ resource "random_password" "jwt_signing_key" {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# Retrieve tenant public table name from SSM (created by tenant infrastructure)
-data "aws_ssm_parameter" "tenant_public_table_name" {
-  name = "/admin-portal/${var.workspace_prefix}/tenant/infrastructure/tenant-public-table-name"
-}
-
 # Retrieve Step Functions ARN from SSM (created by admin bootstrap)
 data "aws_ssm_parameter" "step_functions_arn" {
   name = "/admin-portal/${var.workspace_prefix}/admin/bootstrap/step-functions-arn"
@@ -77,8 +72,10 @@ locals {
   workspace_prefix = var.workspace_prefix
   name_prefix = "${var.project_name}-${local.workspace_prefix}"
   
-  # DynamoDB table naming - retrieved from tenant infrastructure SSM
-  tenant_public_table_name = data.aws_ssm_parameter.tenant_public_table_name.value
+  # DynamoDB table naming - uses naming convention instead of SSM parameter
+  # SSM parameter is stored in tenant account (cross-account access not supported)
+  # Convention: {project_name}-{workspace_prefix}-tenant-public
+  tenant_public_table_name = "${var.project_name}-${local.workspace_prefix}-tenant-public"
   
   # Step Functions ARN - retrieved from admin bootstrap SSM
   step_functions_arn = data.aws_ssm_parameter.step_functions_arn.value
