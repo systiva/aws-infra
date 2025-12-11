@@ -1,4 +1,4 @@
-name: 02 - Admin Infrastructure
+name: 04 - Admin Infrastructure
 
 on:
   workflow_dispatch:
@@ -54,7 +54,7 @@ jobs:
               exit 1
             fi
           else
-            echo "Bootstrap not found. Please run '01 - Admin Bootstrap' first."
+            echo "Bootstrap not found. Please run '03 - Admin Bootstrap' first."
             echo "exists=false" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -209,6 +209,6 @@ jobs:
           echo "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/*"
           echo ""
           echo "Next Steps:"
-          echo "1. Run '03 - Tenant Bootstrap' workflow"
-          echo "2. Then run '04 - Tenant Infrastructure' workflow"
+          echo "1. Run '01 - Tenant Bootstrap' workflow"
+          echo "2. Then run '02 - Tenant Infrastructure' workflow"
           echo "=========================================="

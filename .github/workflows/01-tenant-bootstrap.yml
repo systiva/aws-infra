@@ -1,4 +1,4 @@
-name: 03 - Tenant Bootstrap
+name: 01 - Tenant Bootstrap
 
 on:
   workflow_dispatch:
@@ -171,5 +171,5 @@ jobs:
           echo "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/*"
           echo ""
           echo "Next Steps:"
-          echo "1. Run '04 - Tenant Infrastructure' workflow"
+          echo "1. Run '02 - Tenant Infrastructure' workflow"
           echo "=========================================="

@@ -1,4 +1,4 @@
-name: 04 - Tenant Infrastructure
+name: 02 - Tenant Infrastructure
 
 on:
   workflow_dispatch:
@@ -46,7 +46,7 @@ jobs:
               --region "${{ inputs.aws_region }}" \
               --query 'Parameter.Value' \
               --output text 2>/dev/null); then
-            echo "Tenant bootstrap not found. Please run '03 - Tenant Bootstrap' first."
+            echo "Tenant bootstrap not found. Please run '01 - Tenant Bootstrap' first."
             exit 1
           fi
           
@@ -93,7 +93,7 @@ jobs:
               --region "${{ inputs.aws_region }}" \
               --query 'Parameter.Value' \
               --output text 2>/dev/null); then
-            echo "Admin infrastructure not found. Please run '02 - Admin Infrastructure' first."
+            echo "Admin infrastructure not found. Please run '04 - Admin Infrastructure' first."
             exit 1
           fi
           
