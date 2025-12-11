@@ -61,7 +61,7 @@ locals {
 # S3 bucket for Terraform state
 resource "aws_s3_bucket" "terraform_state" {
   bucket        = "${local.name_prefix}-terraform-state-${local.account_id}-${random_id.suffix.hex}"
-  force_destroy = var.workspace_prefix == "dev" ? true : false
+  force_destroy = true  # Allow Terraform to delete bucket even if not empty
 
   tags = merge(local.common_tags, {
     Name    = "${local.name_prefix}-terraform-state"

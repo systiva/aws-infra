@@ -60,9 +60,10 @@ locals {
 
 # Conditional S3 Bucket - Only if different account
 resource "aws_s3_bucket" "tenant_terraform_state" {
-  count  = local.is_same_account ? 0 : 1
-  bucket = "${var.project_name}-${local.workspace_prefix}-tenant-terraform-state-${local.tenant_account_id}-${random_id.suffix.hex}"
-  
+  count         = local.is_same_account ? 0 : 1
+  bucket        = "${var.project_name}-${local.workspace_prefix}-tenant-terraform-state-${local.tenant_account_id}-${random_id.suffix.hex}"
+  force_destroy = true  # Allow Terraform to delete bucket even if not empty
+
   tags = merge(local.common_tags, {
     Name    = "${local.name_prefix}-terraform-state"
     Purpose = "Tenant Terraform State Storage"
