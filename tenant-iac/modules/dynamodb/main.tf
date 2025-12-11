@@ -44,8 +44,4 @@ resource "aws_dynamodb_table" "tenant_public" {
     Purpose     = "Multi-Tenant Public Data"
     DataPattern = "Single Table Design with PK/SK"
   })
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
