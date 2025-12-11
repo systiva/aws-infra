@@ -61,7 +61,7 @@ locals {
 # Conditional S3 Bucket - Only if different account
 resource "aws_s3_bucket" "tenant_terraform_state" {
   count  = local.is_same_account ? 0 : 1
-  bucket = "${local.workspace_prefix}-tenant-infra-terraform-state-${local.tenant_account_id}-${random_id.suffix.hex}"
+  bucket = "${var.project_name}-${local.workspace_prefix}-tenant-terraform-state-${local.tenant_account_id}-${random_id.suffix.hex}"
   
   tags = merge(local.common_tags, {
     Name    = "${local.name_prefix}-terraform-state"
@@ -92,7 +92,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tenant_terraform_
 # Conditional DynamoDB Lock Table - Only if different account  
 resource "aws_dynamodb_table" "tenant_terraform_lock" {
   count        = local.is_same_account ? 0 : 1
-  name         = "${local.name_prefix}-terraform-lock"
+  name         = "${var.project_name}-${local.workspace_prefix}-tenant-terraform-lock"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
 

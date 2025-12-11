@@ -24,6 +24,12 @@ variable "tenant_aws_profile" {
   default     = "default"
 }
 
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+  default     = "admin-portal"
+}
+
 variable "aws_region" {
   description = "AWS region for tenant resources"
   type        = string
