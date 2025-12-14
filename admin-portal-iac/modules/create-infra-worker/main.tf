@@ -52,7 +52,6 @@ resource "aws_lambda_function" "create_infra_worker" {
       TENANT_ACCOUNT_ID         = var.tenant_account_id
       CROSS_ACCOUNT_ROLE_NAME   = var.cross_account_role_name
       WORKSPACE                 = var.workspace_prefix
-      AWS_REGION                = var.aws_region
     }
   }
 
