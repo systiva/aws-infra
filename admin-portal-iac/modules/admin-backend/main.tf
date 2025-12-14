@@ -43,7 +43,6 @@ resource "aws_lambda_function" "admin_backend" {
       ADMIN_ACCOUNT_ID                 = var.admin_account_id
       TENANT_ACCOUNT_ID                = var.tenant_account_id
       CROSS_ACCOUNT_ROLE_NAME          = var.cross_account_role_name
-      AWS_REGION                       = var.aws_region
       WORKSPACE                        = var.workspace_prefix
     }
   }
