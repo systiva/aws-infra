@@ -72,6 +72,9 @@ locals {
   workspace_prefix = var.workspace_prefix
   name_prefix = "${var.project_name}-${local.workspace_prefix}"
   
+  # Calculate cross-account role name dynamically from workspace
+  cross_account_role_name = "${local.workspace_prefix}-CrossAccountTenantRole"
+  
   # DynamoDB table naming - uses naming convention instead of SSM parameter
   # SSM parameter is stored in tenant account (cross-account access not supported)
   # Convention: {project_name}-{workspace_prefix}-tenant-public
@@ -179,7 +182,11 @@ module "admin_backend" {
   delete_tenant_step_function_arn = local.step_functions_arn
   
   # Cross-account access
-  tenant_account_role_name = var.tenant_account_role_name
+  admin_account_id        = local.admin_account_id
+  tenant_account_id       = local.tenant_account_id
+  cross_account_role_name = local.cross_account_role_name
+  workspace_prefix        = var.workspace_prefix
+  aws_region              = var.aws_region
   
   # Tags
   common_tags = local.common_tags
@@ -205,7 +212,11 @@ module "create_infra_worker" {
   tenant_public_table_name   = local.tenant_public_table_name
   
   # Cross-account access
-  tenant_account_role_name = var.tenant_account_role_name
+  admin_account_id        = local.admin_account_id
+  tenant_account_id       = local.tenant_account_id
+  cross_account_role_name = local.cross_account_role_name
+  workspace_prefix        = var.workspace_prefix
+  aws_region              = var.aws_region
   
   # Tags
   common_tags = local.common_tags
@@ -230,7 +241,11 @@ module "delete_infra_worker" {
   tenant_public_table_name   = local.tenant_public_table_name
   
   # Cross-account access
-  tenant_account_role_name = var.tenant_account_role_name
+  admin_account_id        = local.admin_account_id
+  tenant_account_id       = local.tenant_account_id
+  cross_account_role_name = local.cross_account_role_name
+  workspace_prefix        = var.workspace_prefix
+  aws_region              = var.aws_region
   
   # Tags
   common_tags = local.common_tags
@@ -255,7 +270,11 @@ module "poll_infra_worker" {
   tenant_public_table_name   = local.tenant_public_table_name
   
   # Cross-account access
-  tenant_account_role_name = var.tenant_account_role_name
+  admin_account_id        = local.admin_account_id
+  tenant_account_id       = local.tenant_account_id
+  cross_account_role_name = local.cross_account_role_name
+  workspace_prefix        = var.workspace_prefix
+  aws_region              = var.aws_region
   
   # Tags
   common_tags = local.common_tags

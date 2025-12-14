@@ -48,7 +48,11 @@ resource "aws_lambda_function" "poll_infra_worker" {
       LOG_LEVEL                 = var.log_level
       TENANT_REGISTRY_TABLE_NAME = var.tenant_registry_table_name
       TENANT_PUBLIC_DYNAMO_DB    = var.tenant_public_table_name
-      TENANT_ACCOUNT_ROLE_NAME  = var.tenant_account_role_name
+      ADMIN_ACCOUNT_ID          = var.admin_account_id
+      TENANT_ACCOUNT_ID         = var.tenant_account_id
+      CROSS_ACCOUNT_ROLE_NAME   = var.cross_account_role_name
+      WORKSPACE                 = var.workspace_prefix
+      AWS_REGION                = var.aws_region
     }
   }
 
@@ -125,7 +129,7 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
         Action = [
           "sts:AssumeRole"
         ]
-        Resource = "arn:aws:iam::*:role/${var.tenant_account_role_name}"
+        Resource = "arn:aws:iam::${var.tenant_account_id}:role/${var.cross_account_role_name}"
       }
     ], var.additional_permissions)
   })

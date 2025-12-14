@@ -50,10 +50,29 @@ variable "tenant_public_table_name" {
   type        = string
 }
 
-variable "tenant_account_role_name" {
-  description = "Name of the role to assume in tenant accounts"
+variable "admin_account_id" {
+  description = "Admin account ID (detected from workflow)"
   type        = string
-  default     = "CrossAccountTenantRole"
+}
+
+variable "tenant_account_id" {
+  description = "Tenant account ID (detected from workflow)"
+  type        = string
+}
+
+variable "cross_account_role_name" {
+  description = "Cross-account role name (e.g., qa-CrossAccountTenantRole)"
+  type        = string
+}
+
+variable "workspace_prefix" {
+  description = "Workspace prefix (e.g., qa, dev, prod)"
+  type        = string
+}
+
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
 }
 
 variable "additional_permissions" {
