@@ -245,17 +245,6 @@ variable "tenant_admin_group_id" {
   default     = ""
 }
 
-# Cross-Account Access Configuration
-variable "admin_account_id" {
-  description = "AWS Account ID for admin account (detected from admin credentials in workflow)"
-  type        = string
-}
-
-variable "tenant_account_id" {
-  description = "AWS Account ID for tenant account (detected from tenant credentials in workflow)"
-  type        = string
-}
-
 variable "trusted_tenant_account_ids" {
   description = "List of trusted tenant account IDs for cross-account access"
   type        = list(string)
