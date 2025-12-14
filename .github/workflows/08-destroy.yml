@@ -119,6 +119,7 @@ jobs:
         with:
           aws-access-key-id: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ (steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Get Account ID
