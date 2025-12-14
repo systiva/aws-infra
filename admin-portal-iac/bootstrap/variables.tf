@@ -22,8 +22,8 @@ variable "workspace_prefix" {
   type        = string
   
   validation {
-    condition     = contains(["dev", "qa", "prd", "uat"], var.workspace_prefix)
-    error_message = "Workspace prefix must be dev, qa, prd, or uat."
+    condition     = contains(["dev", "qa", "prod", "uat"], var.workspace_prefix)
+    error_message = "Workspace prefix must be dev, qa, prod, or uat."
   }
 }
 

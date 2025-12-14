@@ -1,11 +1,11 @@
 # Variables for tenant infrastructure
 variable "workspace_prefix" {
-  description = "Workspace prefix for resource naming (dev|qa|prd|uat)"
+  description = "Workspace prefix for resource naming (dev|qa|prod|uat)"
   type        = string
   
   validation {
-    condition     = contains(["dev", "qa", "prd", "uat"], var.workspace_prefix)
-    error_message = "Workspace prefix must be one of: dev, qa, prd, uat."
+    condition     = contains(["dev", "qa", "prod", "uat"], var.workspace_prefix)
+    error_message = "Workspace prefix must be one of: dev, qa, prod, uat."
   }
 }
 
