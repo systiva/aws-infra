@@ -93,7 +93,7 @@ jobs:
             const result = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: '03-tenant-bootstrap.yml',
+              workflow_id: '01-tenant-bootstrap.yml',
               ref: context.ref,
               inputs: {
                 workspace: '${{ inputs.workspace }}',
@@ -128,7 +128,7 @@ jobs:
             const result = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: '04-tenant-infrastructure.yml',
+              workflow_id: '02-tenant-infrastructure.yml',
               ref: context.ref,
               inputs: {
                 workspace: '${{ inputs.workspace }}',
@@ -147,8 +147,8 @@ jobs:
   admin-bootstrap:
     name: 3. Admin Bootstrap
     runs-on: ubuntu-latest
-    needs: [detect-accounts, tenant-infrastructure]
-    if: ${{ always() && needs.tenant-infrastructure.result == 'success' && !inputs.skip_bootstrap }}
+    needs: [detect-accounts]
+    if: ${{ !inputs.skip_bootstrap }}
     
     steps:
       - name: Checkout Code
@@ -163,7 +163,7 @@ jobs:
             const result = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: '01-admin-bootstrap.yml',
+              workflow_id: '03-admin-bootstrap.yml',
               ref: context.ref,
               inputs: {
                 workspace: '${{ inputs.workspace }}',
@@ -198,7 +198,7 @@ jobs:
             const result = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: '02-admin-infrastructure.yml',
+              workflow_id: '04-admin-infrastructure.yml',
               ref: context.ref,
               inputs: {
                 workspace: '${{ inputs.workspace }}',
