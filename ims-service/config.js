@@ -27,7 +27,7 @@ const config = {
   USER_POOL_CLIENT_SECRET: process.env.USER_POOL_CLIENT_SECRET,
   
   // DynamoDB Configuration
-  TENANT_REGISTRY_TABLE_NAME: process.env.TENANT_REGISTRY_TABLE_NAME || 'admin-portal-dev-tenant-registry',
+  TENANT_REGISTRY_TABLE_NAME: process.env.TENANT_REGISTRY_TABLE_NAME,
   
   // Platform Configuration
   PLATFORM_TENANT_ID: process.env.PLATFORM_TENANT_ID || 'platform',

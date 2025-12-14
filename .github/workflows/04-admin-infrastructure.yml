@@ -33,7 +33,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Check Bootstrap Status
@@ -106,14 +106,38 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
           aws-region: ${{ inputs.aws_region }}
       
-      - name: Get AWS Account ID
+      - name: Get Admin Account ID
         id: account
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          ADMIN_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ADMIN_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "Admin Account ID: $ADMIN_ACCOUNT_ID"
+      
+      - name: Configure AWS Credentials (Tenant Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Tenant Account ID
+        id: tenant_account
+        run: |
+          TENANT_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "tenant_account_id=$TENANT_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "Tenant Account ID: $TENANT_ACCOUNT_ID"
+      
+      - name: Configure AWS Credentials (Admin - for Terraform)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
       
       - name: Get Bootstrap Outputs from SSM
         id: bootstrap
@@ -151,7 +175,7 @@ jobs:
             -var="workspace_prefix=${{ inputs.workspace }}" \
             -var="aws_region=${{ inputs.aws_region }}" \
             -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
-            -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="tenant_account_id=${{ steps.tenant_account.outputs.tenant_account_id }}" \
             -var="create_tenant_step_function_arn=${{ steps.bootstrap.outputs.step_functions_arn }}" \
             -var="delete_tenant_step_function_arn=${{ steps.bootstrap.outputs.step_functions_arn }}" \
             -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \

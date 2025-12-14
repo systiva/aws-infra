@@ -31,23 +31,20 @@ resource "aws_lambda_function" "admin_backend" {
 
   environment {
     variables = {
-      NODE_ENV                    = var.environment
-      LOG_LEVEL                  = "info"  # Updated to lowercase as required
-      TENANT_REGISTRY_TABLE_NAME = var.tenant_registry_table_name
-      STEP_FUNCTIONS_ARN         = var.step_functions_arn
-      CORS_ORIGIN                = "*"
+      NODE_ENV                         = var.environment
+      LOG_LEVEL                        = "info"
+      TENANT_REGISTRY_TABLE_NAME       = var.tenant_registry_table_name
       
       # Step Functions Configuration
-      CREATE_TENANT_STATE_MACHINE_ARN = var.create_tenant_step_function_arn
-      DELETE_TENANT_STATE_MACHINE_ARN = var.delete_tenant_step_function_arn
+      CREATE_TENANT_STATE_MACHINE_ARN  = var.create_tenant_step_function_arn
+      DELETE_TENANT_STATE_MACHINE_ARN  = var.delete_tenant_step_function_arn
       
       # Cross-account access configuration
-      TENANT_ACCOUNT_ROLE_NAME   = var.tenant_account_role_name
-      TRUSTED_TENANT_ACCOUNTS    = join(",", var.trusted_tenant_account_ids)
-      
-      # API Configuration
-      DEFAULT_PAGE_SIZE          = "10"
-      MAX_PAGE_SIZE             = "100"
+      ADMIN_ACCOUNT_ID                 = var.admin_account_id
+      TENANT_ACCOUNT_ID                = var.tenant_account_id
+      CROSS_ACCOUNT_ROLE_NAME          = var.cross_account_role_name
+      AWS_REGION                       = var.aws_region
+      WORKSPACE                        = var.workspace_prefix
     }
   }
 
@@ -188,21 +185,13 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
         ]
         Resource = var.step_functions_arn
       }] : [],
-      length(var.trusted_tenant_account_ids) > 0 ? [{
+      [{
         Effect = "Allow"
         Action = [
           "sts:AssumeRole"
         ]
-        Resource = [
-          for account_id in var.trusted_tenant_account_ids :
-          "arn:aws:iam::${account_id}:role/${var.tenant_account_role_name}"
-        ]
-        Condition = {
-          StringEquals = {
-            "aws:RequestedRegion" = data.aws_region.current.name
-          }
-        }
-      }] : [],
+        Resource = "arn:aws:iam::${var.tenant_account_id}:role/${var.cross_account_role_name}"
+      }],
       [{
         Effect = "Allow"
         Action = [
