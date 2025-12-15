@@ -221,7 +221,7 @@ class PermissionManagement {
             const permissionQueries = flatRoles.map(async (roleAssignment) => {
                 // SK format is ROLE#<roleID>
                 const roleId = roleAssignment.SK.replace('ROLE#', '');
-                const rolePermissionsPK = `ROLE#${tenantId}#${roleId}#PERMISSION`;
+                const rolePermissionsPK = `ROLE#${tenantId}#${roleId}#PERMISSIONS`;
                 
                 try {
                     const rolePermissions = await RBACModel.query("PK").eq(rolePermissionsPK).exec();
@@ -283,7 +283,7 @@ class PermissionManagement {
      */
     static async getRolePermissions(tenantId, roleId) {
         try {
-            const rolePermissionsPK = `ROLE#${tenantId}#${roleId}#PERMISSION`;
+            const rolePermissionsPK = `ROLE#${tenantId}#${roleId}#PERMISSIONS`;
             const permissionAssignments = await RBACModel.query("PK").eq(rolePermissionsPK).exec();
             
             if (!permissionAssignments || permissionAssignments.length === 0) {
