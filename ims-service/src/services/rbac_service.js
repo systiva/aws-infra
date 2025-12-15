@@ -71,7 +71,29 @@ class RBACService {
     try {
       logger.info(`Deleting user: ${userId} from tenant: ${tenantId}`);
       
-      // Delete user record and all related group memberships
+      // Step 1: Delete all user-group mappings
+      try {
+        const userGroupsPK = `USER#${tenantId}#${userId}#GROUPS`;
+        const { RBACModel } = require('../db/db');
+        const groupMappings = await RBACModel.query("PK").eq(userGroupsPK).exec();
+        
+        if (groupMappings && groupMappings.length > 0) {
+          logger.info(`Removing ${groupMappings.length} user-group mappings for user ${userId}`);
+          for (const mapping of groupMappings) {
+            const groupId = mapping.SK.replace('GROUP#', '');
+            try {
+              await UserManagement.removeUserFromGroup(tenantId, userId, groupId);
+              logger.debug(`Removed user ${userId} from group ${groupId}`);
+            } catch (err) {
+              logger.error(`Error removing user ${userId} from group ${groupId}: ${err.message}`);
+            }
+          }
+        }
+      } catch (err) {
+        logger.error(`Error cleaning up user-group mappings for user ${userId}: ${err.message}`);
+      }
+      
+      // Step 2: Delete the user entity itself
       await UserManagement.deleteUser(tenantId, userId);
 
       await this.createAuditLog(tenantId, 'DELETE_USER', 'USER', userId, deletedBy);
@@ -254,7 +276,51 @@ class RBACService {
     try {
       logger.info(`Deleting group: ${groupId} from tenant: ${tenantId}`);
       
-      // Delete group record and all related memberships
+      // Step 1: Delete all group-role mappings
+      try {
+        const groupRolesPK = `GROUP#${tenantId}#${groupId}#ROLES`;
+        const { RBACModel } = require('../db/db');
+        const roleMappings = await RBACModel.query("PK").eq(groupRolesPK).exec();
+        
+        if (roleMappings && roleMappings.length > 0) {
+          logger.info(`Removing ${roleMappings.length} group-role mappings for group ${groupId}`);
+          for (const mapping of roleMappings) {
+            const roleId = mapping.SK.replace('ROLE#', '');
+            try {
+              await GroupManagement.removeRoleFromGroup(tenantId, groupId, roleId);
+              logger.debug(`Removed role ${roleId} from group ${groupId}`);
+            } catch (err) {
+              logger.error(`Error removing role ${roleId} from group ${groupId}: ${err.message}`);
+            }
+          }
+        }
+      } catch (err) {
+        logger.error(`Error cleaning up group-role mappings for group ${groupId}: ${err.message}`);
+      }
+      
+      // Step 2: Delete all group-user mappings
+      try {
+        const groupUsersPK = `GROUP#${tenantId}#${groupId}#USERS`;
+        const { RBACModel } = require('../db/db');
+        const userMappings = await RBACModel.query("PK").eq(groupUsersPK).exec();
+        
+        if (userMappings && userMappings.length > 0) {
+          logger.info(`Removing ${userMappings.length} group-user mappings for group ${groupId}`);
+          for (const mapping of userMappings) {
+            const userId = mapping.SK.replace('USER#', '');
+            try {
+              await UserManagement.removeUserFromGroup(tenantId, userId, groupId);
+              logger.debug(`Removed user ${userId} from group ${groupId}`);
+            } catch (err) {
+              logger.error(`Error removing user ${userId} from group ${groupId}: ${err.message}`);
+            }
+          }
+        }
+      } catch (err) {
+        logger.error(`Error cleaning up group-user mappings for group ${groupId}: ${err.message}`);
+      }
+      
+      // Step 3: Delete the group entity itself
       await GroupManagement.deleteGroup(tenantId, groupId);
 
       await this.createAuditLog(tenantId, 'DELETE_GROUP', 'GROUP', groupId, deletedBy);
@@ -301,7 +367,25 @@ class RBACService {
         created_by: roleData.created_by || 'system'
       };
 
+      // Step 1: Create the role entity
       const result = await RoleManagement.createRole(tenantId, roleToCreate);
+      
+      // Step 2: Create bidirectional permission-role mappings for each permission
+      const permissions = roleData.permissions || [];
+      if (permissions.length > 0) {
+        logger.info(`Creating permission-role mappings for role ${roleId} with ${permissions.length} permissions`);
+        
+        for (const permissionId of permissions) {
+          try {
+            await RoleManagement.addPermissionToRole(tenantId, roleId, permissionId);
+            logger.debug(`Permission ${permissionId} mapped to role ${roleId} in tenant ${tenantId}`);
+          } catch (mappingError) {
+            logger.error(`Error mapping permission ${permissionId} to role ${roleId}: ${mappingError.message}`);
+            // Continue with other permissions even if one fails
+          }
+        }
+      }
+      
       await this.createAuditLog(tenantId, 'CREATE_ROLE', 'ROLE', roleId, roleData.created_by);
       
       return result;
@@ -314,6 +398,40 @@ class RBACService {
   async updateRole(tenantId, roleId, updateData) {
     try {
       logger.info(`Updating role: ${roleId} in tenant: ${tenantId}`);
+      
+      // If permissions are being updated, sync the permission-role mappings
+      if (updateData.permissions) {
+        logger.info(`Syncing permission-role mappings for role ${roleId}`);
+        
+        // Get current role to find existing permissions
+        const currentRole = await RoleManagement.getRole(tenantId, roleId);
+        const currentPermissions = currentRole?.permissions || [];
+        const newPermissions = updateData.permissions || [];
+        
+        // Find permissions to add and remove
+        const permissionsToAdd = newPermissions.filter(p => !currentPermissions.includes(p));
+        const permissionsToRemove = currentPermissions.filter(p => !newPermissions.includes(p));
+        
+        // Remove old mappings
+        for (const permissionId of permissionsToRemove) {
+          try {
+            await RoleManagement.removePermissionFromRole(tenantId, roleId, permissionId);
+            logger.debug(`Removed permission ${permissionId} from role ${roleId}`);
+          } catch (err) {
+            logger.error(`Error removing permission ${permissionId} from role ${roleId}: ${err.message}`);
+          }
+        }
+        
+        // Add new mappings
+        for (const permissionId of permissionsToAdd) {
+          try {
+            await RoleManagement.addPermissionToRole(tenantId, roleId, permissionId);
+            logger.debug(`Added permission ${permissionId} to role ${roleId}`);
+          } catch (err) {
+            logger.error(`Error adding permission ${permissionId} to role ${roleId}: ${err.message}`);
+          }
+        }
+      }
       
       const result = await RoleManagement.updateRole(tenantId, roleId, updateData);
       await this.createAuditLog(tenantId, 'UPDATE_ROLE', 'ROLE', roleId, updateData.updated_by);
@@ -329,7 +447,49 @@ class RBACService {
     try {
       logger.info(`Deleting role: ${roleId} from tenant: ${tenantId}`);
       
-      // Delete role record and all related assignments
+      // Step 1: Get the role to find its permissions
+      const role = await RoleManagement.getRole(tenantId, roleId);
+      const permissions = role?.permissions || [];
+      
+      // Step 2: Delete all permission-role mappings
+      if (permissions.length > 0) {
+        logger.info(`Removing ${permissions.length} permission-role mappings for role ${roleId}`);
+        for (const permissionId of permissions) {
+          try {
+            await RoleManagement.removePermissionFromRole(tenantId, roleId, permissionId);
+            logger.debug(`Removed permission ${permissionId} mapping from role ${roleId}`);
+          } catch (err) {
+            logger.error(`Error removing permission ${permissionId} from role ${roleId}: ${err.message}`);
+            // Continue with other permissions
+          }
+        }
+      }
+      
+      // Step 3: Delete all role-group mappings (roles assigned to groups)
+      // Query for all groups that have this role
+      try {
+        const roleGroupsPK = `ROLE#${tenantId}#${roleId}#GROUPS`;
+        const { RBACModel } = require('../db/db');
+        const groupMappings = await RBACModel.query("PK").eq(roleGroupsPK).exec();
+        
+        if (groupMappings && groupMappings.length > 0) {
+          logger.info(`Removing ${groupMappings.length} role-group mappings for role ${roleId}`);
+          for (const mapping of groupMappings) {
+            const groupId = mapping.SK.replace('GROUP#', '');
+            try {
+              await GroupManagement.removeRoleFromGroup(tenantId, groupId, roleId);
+              logger.debug(`Removed role ${roleId} from group ${groupId}`);
+            } catch (err) {
+              logger.error(`Error removing role ${roleId} from group ${groupId}: ${err.message}`);
+              // Continue with other groups
+            }
+          }
+        }
+      } catch (err) {
+        logger.error(`Error cleaning up role-group mappings for role ${roleId}: ${err.message}`);
+      }
+      
+      // Step 4: Delete the role entity itself
       await RoleManagement.deleteRole(tenantId, roleId);
 
       await this.createAuditLog(tenantId, 'DELETE_ROLE', 'ROLE', roleId, deletedBy);
