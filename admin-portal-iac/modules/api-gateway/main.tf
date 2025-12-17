@@ -369,14 +369,24 @@ resource "aws_lambda_permission" "oms_inventory_endpoints" {
 # Sys App Frontend Lambda Permissions
 # ==============================================
 
-# Permission for /ui and /ui/*
-resource "aws_lambda_permission" "app_frontend" {
+# Permission for /ui root path
+resource "aws_lambda_permission" "app_frontend_root" {
   count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-AppFrontend"
+  statement_id  = "AllowAPIGateway-AppFrontend-Root"
   action        = "lambda:InvokeFunction"
   function_name = var.app_frontend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/GET/ui"
+}
+
+# Permission for /ui/* proxy paths (all methods, all subpaths)
+resource "aws_lambda_permission" "app_frontend_proxy" {
+  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppFrontend-Proxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_frontend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/ui/*"
 }
 
 # ==============================================
