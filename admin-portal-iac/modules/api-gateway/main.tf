@@ -34,6 +34,16 @@ resource "aws_api_gateway_rest_api" "admin_api" {
 
   body = local.openapi_spec
 
+  # Binary media types for serving images, fonts, etc.
+  binary_media_types = [
+    "image/*",
+    "font/*",
+    "application/octet-stream",
+    "application/font-woff",
+    "application/font-woff2",
+    "*/*"
+  ]
+
   endpoint_configuration {
     types            = [var.api_gateway_type]
     vpc_endpoint_ids = var.api_gateway_type == "PRIVATE" ? [var.vpc_endpoint_id] : null
