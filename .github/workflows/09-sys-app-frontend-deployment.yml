@@ -1,0 +1,301 @@
+name: 09 - Sys App Frontend Code Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+
+jobs:
+  get-config:
+    name: Get Configuration from SSM
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.config.outputs.api_url }}
+      cognito_user_pool_id: ${{ steps.config.outputs.cognito_user_pool_id }}
+      cognito_client_id: ${{ steps.config.outputs.cognito_client_id }}
+      cognito_domain: ${{ steps.config.outputs.cognito_domain }}
+      s3_bucket: ${{ steps.config.outputs.s3_bucket }}
+      web_server_url: ${{ steps.config.outputs.web_server_url }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Get Configuration from SSM
+        id: config
+        run: |
+          # Validate admin infrastructure exists
+          if ! STATUS=$(aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null); then
+            echo "Admin infrastructure not found. Please run '04 - Admin Infrastructure' first."
+            exit 1
+          fi
+
+          # Get API Gateway URL
+          API_URL=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-url" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+
+          # Extract base URL (remove /api/v1 suffix)
+          API_BASE_URL=$(echo "$API_URL" | sed 's|/api/v1$||')
+
+          # Get Cognito configuration
+          COGNITO_USER_POOL_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+
+          COGNITO_CLIENT_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-client-id" \
+            --region "${{ inputs.aws_region }}" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)
+
+          COGNITO_DOMAIN=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-domain" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+
+          # Get S3 bucket for Sys App Frontend (separate from admin portal)
+          S3_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/app-frontend-s3-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+
+          # If SSM param not found, try to find bucket by prefix
+          if [ -z "$S3_BUCKET" ] || [ "$S3_BUCKET" == "None" ]; then
+            S3_BUCKET=$(aws s3api list-buckets \
+              --query "Buckets[?starts_with(Name, 'app-fe-${{ inputs.workspace }}')].Name | [0]" \
+              --output text 2>/dev/null || echo "")
+          fi
+
+          if [ -z "$S3_BUCKET" ] || [ "$S3_BUCKET" == "None" ]; then
+            echo "Error: S3 bucket for Sys App Frontend not found."
+            echo "Please run '04 - Admin Infrastructure' with enable_app_frontend=true first."
+            exit 1
+          fi
+
+          # Web Server URL for Sys App Frontend (via API Gateway /ui path)
+          WEB_SERVER_URL="${API_BASE_URL}/ui"
+
+          # Export outputs
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "api_base_url=$API_BASE_URL" >> $GITHUB_OUTPUT
+          echo "cognito_user_pool_id=$COGNITO_USER_POOL_ID" >> $GITHUB_OUTPUT
+          echo "cognito_client_id=$COGNITO_CLIENT_ID" >> $GITHUB_OUTPUT
+          echo "cognito_domain=$COGNITO_DOMAIN" >> $GITHUB_OUTPUT
+          echo "s3_bucket=$S3_BUCKET" >> $GITHUB_OUTPUT
+          echo "web_server_url=$WEB_SERVER_URL" >> $GITHUB_OUTPUT
+
+          echo "Configuration retrieved successfully"
+          echo "API URL: $API_URL"
+          echo "API Base URL: $API_BASE_URL"
+          echo "Cognito User Pool: $COGNITO_USER_POOL_ID"
+          echo "S3 Bucket (Sys App): $S3_BUCKET"
+          echo "Web Server URL: $WEB_SERVER_URL"
+
+  build-and-deploy:
+    name: Build and Deploy Sys App Frontend
+    runs-on: ubuntu-latest
+    needs: [get-config]
+
+    steps:
+      - name: Checkout Code from Remote Repository
+        uses: actions/checkout@v4
+        with:
+          repository: tripleh1701-dev/ppp-fe
+          ref: main
+          token: ${{ secrets.GH_PAT_TOKEN }}
+
+      - name: Verify Checkout
+        run: |
+          echo "=== Verifying repository checkout ==="
+          echo "Current directory: $(pwd)"
+          echo "Files in root:"
+          ls -la
+          echo ""
+          if [ -f "package.json" ]; then
+            echo "package.json found"
+          else
+            echo "ERROR: package.json not found!"
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: |
+          npm ci
+
+      - name: Create Environment Configuration
+        run: |
+          cat > .env.production << EOF
+          NEXT_PUBLIC_ENV=${{ inputs.workspace }}
+          NEXT_PUBLIC_API_BASE_URL=${{ needs.get-config.outputs.api_url }}
+          NEXT_PUBLIC_API_URL=${{ needs.get-config.outputs.api_url }}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID=${{ needs.get-config.outputs.cognito_user_pool_id }}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID=${{ needs.get-config.outputs.cognito_client_id }}
+          NEXT_PUBLIC_COGNITO_DOMAIN=${{ needs.get-config.outputs.cognito_domain }}
+          NEXT_PUBLIC_AWS_REGION=${{ inputs.aws_region }}
+          NEXT_PUBLIC_VERSION=${{ github.sha }}
+          EOF
+
+          cp .env.production .env.local
+          echo "Environment configuration created"
+
+      - name: Configure Next.js for Static Export
+        run: |
+          echo "Configuring Next.js for static export..."
+          cat > next.config.js << 'EOF'
+          /** @type {import('next').NextConfig} */
+          const nextConfig = {
+            output: 'export',
+            trailingSlash: true,
+            images: {
+              unoptimized: true,
+            },
+          }
+          module.exports = nextConfig
+          EOF
+          echo "next.config.js updated for static export"
+
+      - name: Build Frontend
+        env:
+          CI: false
+        run: |
+          npm run build
+
+          echo "Build completed successfully"
+          echo "Build output:"
+          ls -la out/ 2>/dev/null || ls -la build/ 2>/dev/null || echo "Build directory not found"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Upload to S3
+        run: |
+          echo "Uploading build to S3 bucket: ${{ needs.get-config.outputs.s3_bucket }}"
+
+          # Determine build directory (Next.js uses 'out' for static export)
+          BUILD_DIR="out"
+          if [ ! -d "$BUILD_DIR" ]; then
+            BUILD_DIR="build"
+          fi
+
+          if [ ! -d "$BUILD_DIR" ]; then
+            echo "ERROR: No build directory found!"
+            exit 1
+          fi
+
+          echo "Using build directory: $BUILD_DIR"
+
+          # Clear existing content
+          aws s3 rm s3://${{ needs.get-config.outputs.s3_bucket }}/ --recursive --region "${{ inputs.aws_region }}" || true
+
+          # Sync build directory to S3
+          aws s3 sync $BUILD_DIR/ s3://${{ needs.get-config.outputs.s3_bucket }}/ \
+            --delete \
+            --cache-control "public, max-age=31536000" \
+            --exclude "index.html" \
+            --exclude "*.html" \
+            --region "${{ inputs.aws_region }}"
+
+          # Upload HTML files with no-cache
+          find $BUILD_DIR -name "*.html" -type f | while read file; do
+            key="${file#$BUILD_DIR/}"
+            aws s3 cp "$file" "s3://${{ needs.get-config.outputs.s3_bucket }}/$key" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --region "${{ inputs.aws_region }}"
+          done
+
+          echo "Upload to S3 completed"
+
+      - name: Update SSM with Deployment Metadata
+        run: |
+          # Store Sys App Frontend deployment metadata (separate from admin portal)
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/last-deployment-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/build-number" \
+            --value "${{ github.run_number }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/deployment-url" \
+            --value "${{ needs.get-config.outputs.web_server_url }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/s3-bucket" \
+            --value "${{ needs.get-config.outputs.s3_bucket }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/commit-sha" \
+            --value "${{ github.sha }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+      - name: Display Deployment Summary
+        run: |
+          echo "=========================================="
+          echo "Sys App Frontend Deployment Complete"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Build Number: ${{ github.run_number }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "Source: tripleh1701-dev/ppp-fe (main branch)"
+          echo ""
+          echo "Application URL: ${{ needs.get-config.outputs.web_server_url }}"
+          echo "S3 Bucket: ${{ needs.get-config.outputs.s3_bucket }}"
+          echo ""
+          echo "Configuration:"
+          echo "  - API URL: ${{ needs.get-config.outputs.api_url }}"
+          echo "  - Cognito Pool: ${{ needs.get-config.outputs.cognito_user_pool_id }}"
+          echo "  - Region: ${{ inputs.aws_region }}"
+          echo "=========================================="
