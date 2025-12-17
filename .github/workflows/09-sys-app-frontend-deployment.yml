@@ -268,11 +268,12 @@ jobs:
           echo "Upload to S3 completed"
 
       - name: Update Lambda with S3 Serving Code
+        env:
+          LAMBDA_CODE_B64: "Y29uc3QgeyBTM0NsaWVudCwgR2V0T2JqZWN0Q29tbWFuZCB9ID0gcmVxdWlyZSgiQGF3cy1zZGsvY2xpZW50LXMzIik7Cgpjb25zdCBzMyA9IG5ldyBTM0NsaWVudCh7IHJlZ2lvbjogcHJvY2Vzcy5lbnYuQVdTX1JFR0lPTiB9KTsKY29uc3QgQlVDS0VUID0gcHJvY2Vzcy5lbnYuUzNfQlVDS0VUX05BTUU7Cgpjb25zdCBNSU1FX1RZUEVTID0gewogICIuaHRtbCI6ICJ0ZXh0L2h0bWwiLAogICIuY3NzIjogInRleHQvY3NzIiwKICAiLmpzIjogImFwcGxpY2F0aW9uL2phdmFzY3JpcHQiLAogICIuanNvbiI6ICJhcHBsaWNhdGlvbi9qc29uIiwKICAiLnBuZyI6ICJpbWFnZS9wbmciLAogICIuanBnIjogImltYWdlL2pwZWciLAogICIuanBlZyI6ICJpbWFnZS9qcGVnIiwKICAiLmdpZiI6ICJpbWFnZS9naWYiLAogICIuc3ZnIjogImltYWdlL3N2Zyt4bWwiLAogICIuaWNvIjogImltYWdlL3gtaWNvbiIsCiAgIi53b2ZmIjogImZvbnQvd29mZiIsCiAgIi53b2ZmMiI6ICJmb250L3dvZmYyIiwKICAiLnR0ZiI6ICJmb250L3R0ZiIsCiAgIi53ZWJwIjogImltYWdlL3dlYnAiLAp9OwoKY29uc3QgQklOQVJZX0VYVFMgPSBbIi5wbmciLCAiLmpwZyIsICIuanBlZyIsICIuZ2lmIiwgIi5pY28iLCAiLndvZmYiLCAiLndvZmYyIiwgIi50dGYiLCAiLndlYnAiXTsKCmZ1bmN0aW9uIGdldE1pbWUoZmlsZVBhdGgpIHsKICBjb25zdCBleHQgPSBmaWxlUGF0aC5zdWJzdHJpbmcoZmlsZVBhdGgubGFzdEluZGV4T2YoIi4iKSkudG9Mb3dlckNhc2UoKTsKICByZXR1cm4gTUlNRV9UWVBFU1tleHRdIHx8ICJhcHBsaWNhdGlvbi9vY3RldC1zdHJlYW0iOwp9CgpmdW5jdGlvbiBpc0JpbmFyeShmaWxlUGF0aCkgewogIGNvbnN0IGV4dCA9IGZpbGVQYXRoLnN1YnN0cmluZyhmaWxlUGF0aC5sYXN0SW5kZXhPZigiLiIpKS50b0xvd2VyQ2FzZSgpOwogIHJldHVybiBCSU5BUllfRVhUUy5pbmNsdWRlcyhleHQpOwp9Cgphc3luYyBmdW5jdGlvbiBnZXRTM0ZpbGUoa2V5KSB7CiAgdHJ5IHsKICAgIGNvbnN0IHJlc3AgPSBhd2FpdCBzMy5zZW5kKG5ldyBHZXRPYmplY3RDb21tYW5kKHsgQnVja2V0OiBCVUNLRVQsIEtleToga2V5IH0pKTsKICAgIGNvbnN0IGNodW5rcyA9IFtdOwogICAgZm9yIGF3YWl0IChjb25zdCBjaHVuayBvZiByZXNwLkJvZHkpIHsKICAgICAgY2h1bmtzLnB1c2goY2h1bmspOwogICAgfQogICAgY29uc3QgYnVmZmVyID0gQnVmZmVyLmNvbmNhdChjaHVua3MpOwogICAgcmV0dXJuIHsKICAgICAgYm9keTogaXNCaW5hcnkoa2V5KSA/IGJ1ZmZlci50b1N0cmluZygiYmFzZTY0IikgOiBidWZmZXIudG9TdHJpbmcoInV0Zi04IiksCiAgICAgIGlzQmFzZTY0OiBpc0JpbmFyeShrZXkpLAogICAgICBjb250ZW50VHlwZTogcmVzcC5Db250ZW50VHlwZSB8fCBnZXRNaW1lKGtleSksCiAgICB9OwogIH0gY2F0Y2ggKGUpIHsKICAgIGlmIChlLm5hbWUgPT09ICJOb1N1Y2hLZXkiKSByZXR1cm4gbnVsbDsKICAgIHRocm93IGU7CiAgfQp9CgpleHBvcnRzLmhhbmRsZXIgPSBhc3luYyAoZXZlbnQpID0+IHsKICBjb25zb2xlLmxvZygiRXZlbnQ6IiwgSlNPTi5zdHJpbmdpZnkoZXZlbnQpKTsKICAKICBsZXQgcmVxUGF0aCA9IGV2ZW50LnBhdGggfHwgZXZlbnQucmF3UGF0aCB8fCAiLyI7CiAgCiAgaWYgKHJlcVBhdGguc3RhcnRzV2l0aCgiL3VpIikpIHsKICAgIHJlcVBhdGggPSByZXFQYXRoLnN1YnN0cmluZygzKSB8fCAiLyI7CiAgfQogIAogIGxldCBrZXkgPSByZXFQYXRoLnN0YXJ0c1dpdGgoIi8iKSA/IHJlcVBhdGguc3Vic3RyaW5nKDEpIDogcmVxUGF0aDsKICBpZiAoa2V5ID09PSAiIiB8fCBrZXkuZW5kc1dpdGgoIi8iKSkgewogICAga2V5ID0ga2V5ICsgImluZGV4Lmh0bWwiOwogIH0KICAKICBjb25zb2xlLmxvZygiRmV0Y2hpbmcgZnJvbSBTMzoiLCBCVUNLRVQgKyAiLyIgKyBrZXkpOwogIAogIGxldCByZXN1bHQgPSBhd2FpdCBnZXRTM0ZpbGUoa2V5KTsKICAKICBpZiAoIXJlc3VsdCAmJiAha2V5LmluY2x1ZGVzKCIuIikpIHsKICAgIHJlc3VsdCA9IGF3YWl0IGdldFMzRmlsZShrZXkgKyAiLmh0bWwiKTsKICAgIGlmICghcmVzdWx0KSB7CiAgICAgIHJlc3VsdCA9IGF3YWl0IGdldFMzRmlsZShrZXkgKyAiL2luZGV4Lmh0bWwiKTsKICAgIH0KICB9CiAgCiAgaWYgKCFyZXN1bHQpIHsKICAgIGNvbnNvbGUubG9nKCJGaWxlIG5vdCBmb3VuZCwgZmFsbGluZyBiYWNrIHRvIGluZGV4Lmh0bWwiKTsKICAgIHJlc3VsdCA9IGF3YWl0IGdldFMzRmlsZSgiaW5kZXguaHRtbCIpOwogIH0KICAKICBpZiAoIXJlc3VsdCkgewogICAgcmV0dXJuIHsKICAgICAgc3RhdHVzQ29kZTogNDA0LAogICAgICBoZWFkZXJzOiB7ICJDb250ZW50LVR5cGUiOiAidGV4dC9odG1sIiB9LAogICAgICBib2R5OiAiPGgxPjQwNCAtIE5vdCBGb3VuZDwvaDE+IiwKICAgIH07CiAgfQogIAogIHJldHVybiB7CiAgICBzdGF0dXNDb2RlOiAyMDAsCiAgICBoZWFkZXJzOiB7CiAgICAgICJDb250ZW50LVR5cGUiOiByZXN1bHQuY29udGVudFR5cGUsCiAgICAgICJDYWNoZS1Db250cm9sIjoga2V5LmluY2x1ZGVzKCJfbmV4dC9zdGF0aWMiKSA/ICJwdWJsaWMsIG1heC1hZ2U9MzE1MzYwMDAiIDogIm5vLWNhY2hlIiwKICAgICAgIkFjY2Vzcy1Db250cm9sLUFsbG93LU9yaWdpbiI6ICIqIiwKICAgIH0sCiAgICBib2R5OiByZXN1bHQuYm9keSwKICAgIGlzQmFzZTY0RW5jb2RlZDogcmVzdWx0LmlzQmFzZTY0LAogIH07Cn07Cg=="
         run: |
           echo "Updating app-frontend-web-server Lambda to serve from S3..."
 
           LAMBDA_NAME="app-fe-${{ inputs.workspace }}-web-server"
-          S3_BUCKET="${{ needs.get-config.outputs.s3_bucket }}"
 
           # Check if Lambda exists
           if ! aws lambda get-function --function-name "$LAMBDA_NAME" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
@@ -284,127 +285,38 @@ jobs:
           mkdir -p lambda-pkg
           cd lambda-pkg
 
-          # Create the Lambda handler code
-          cat > index.js << 'LAMBDAEOF'
-          const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+          # Decode base64 Lambda code
+          echo "$LAMBDA_CODE_B64" | base64 -d > index.js
 
-          const s3 = new S3Client({ region: process.env.AWS_REGION });
-          const BUCKET = process.env.S3_BUCKET_NAME;
-
-          const MIME_TYPES = {
-            '.html': 'text/html',
-            '.css': 'text/css',
-            '.js': 'application/javascript',
-            '.json': 'application/json',
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.gif': 'image/gif',
-            '.svg': 'image/svg+xml',
-            '.ico': 'image/x-icon',
-            '.woff': 'font/woff',
-            '.woff2': 'font/woff2',
-            '.ttf': 'font/ttf',
-            '.webp': 'image/webp',
-          };
-
-          const BINARY_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.webp'];
-
-          function getMime(path) {
-            const ext = path.substring(path.lastIndexOf('.')).toLowerCase();
-            return MIME_TYPES[ext] || 'application/octet-stream';
-          }
-
-          function isBinary(path) {
-            const ext = path.substring(path.lastIndexOf('.')).toLowerCase();
-            return BINARY_EXTS.includes(ext);
-          }
-
-          async function getS3File(key) {
-            try {
-              const resp = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
-              const chunks = [];
-              for await (const chunk of resp.Body) chunks.push(chunk);
-              const buffer = Buffer.concat(chunks);
-              return {
-                body: isBinary(key) ? buffer.toString('base64') : buffer.toString('utf-8'),
-                isBase64: isBinary(key),
-                contentType: resp.ContentType || getMime(key)
-              };
-            } catch (e) {
-              if (e.name === 'NoSuchKey') return null;
-              throw e;
-            }
-          }
-
-          exports.handler = async (event) => {
-            let path = event.path || event.rawPath || '/';
-
-            // Remove /ui prefix
-            if (path.startsWith('/ui')) path = path.substring(3) || '/';
-
-            // Get S3 key
-            let key = path.startsWith('/') ? path.substring(1) : path;
-            if (key === '' || key.endsWith('/')) key += 'index.html';
-
-            console.log(`Fetching: ${BUCKET}/${key}`);
-
-            let result = await getS3File(key);
-
-            // Try .html extension
-            if (!result && !key.includes('.')) {
-              result = await getS3File(key + '.html');
-              if (!result) result = await getS3File(key + '/index.html');
-            }
-
-            // SPA fallback
-            if (!result) result = await getS3File('index.html');
-
-            if (!result) {
-              return {
-                statusCode: 404,
-                headers: { 'Content-Type': 'text/html' },
-                body: '<h1>404 - Not Found</h1>'
-              };
-            }
-
-            return {
-              statusCode: 200,
-              headers: {
-                'Content-Type': result.contentType,
-                'Cache-Control': key.includes('_next/static') ? 'public, max-age=31536000' : 'no-cache',
-                'Access-Control-Allow-Origin': '*'
-              },
-              body: result.body,
-              isBase64Encoded: result.isBase64
-            };
-          };
-          LAMBDAEOF
+          # Verify the file was created correctly
+          echo "=== Lambda index.js content (first 20 lines) ==="
+          head -20 index.js
+          echo "=== end ==="
 
           # Create package.json
-          cat > package.json << 'PKGEOF'
-          {
-            "name": "app-frontend-web-server",
-            "version": "1.0.0",
-            "main": "index.js",
-            "dependencies": {
-              "@aws-sdk/client-s3": "^3.400.0"
-            }
-          }
-          PKGEOF
+          echo '{"name":"app-frontend-web-server","version":"1.0.0","main":"index.js","dependencies":{"@aws-sdk/client-s3":"^3.400.0"}}' > package.json
 
           # Install dependencies and create zip
-          npm install --production
-          zip -r ../lambda.zip .
+          echo "Installing dependencies..."
+          npm install --production --silent
+
+          echo "Creating zip file..."
+          zip -r ../lambda.zip . -q
+
           cd ..
 
+          echo "Zip file size:"
+          ls -la lambda.zip
+
           # Update Lambda code
+          echo "Updating Lambda function..."
           aws lambda update-function-code \
             --function-name "$LAMBDA_NAME" \
             --zip-file fileb://lambda.zip \
             --region "${{ inputs.aws_region }}"
 
           # Wait for update
+          echo "Waiting for Lambda update to complete..."
           aws lambda wait function-updated \
             --function-name "$LAMBDA_NAME" \
             --region "${{ inputs.aws_region }}"
