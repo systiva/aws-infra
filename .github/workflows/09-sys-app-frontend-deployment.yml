@@ -131,7 +131,6 @@ jobs:
         with:
           repository: tripleh1701-dev/ppp-fe
           ref: main
-          token: ${{ secrets.GH_PAT_TOKEN }}
 
       - name: Verify Checkout
         run: |
