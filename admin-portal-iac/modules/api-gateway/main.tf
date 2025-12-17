@@ -8,12 +8,12 @@ data "aws_region" "current" {}
 # Local values
 locals {
   api_name = "${var.project_name}-${var.environment}-api"
-  
+
   common_tags = merge(var.common_tags, {
     Name = local.api_name
     Type = "APIGateway"
   })
-  
+
   # Generate OpenAPI spec from template
   openapi_spec = templatefile("${path.module}/swagger.yml.tpl", {
     api_name                  = local.api_name
@@ -21,6 +21,7 @@ locals {
     admin_backend_lambda_uri  = var.admin_backend_lambda_invoke_arn
     ims_service_lambda_uri    = var.ims_service_lambda_invoke_arn
     oms_service_lambda_uri    = var.oms_service_lambda_invoke_arn
+    app_frontend_lambda_uri   = var.app_frontend_lambda_invoke_arn
     jwt_authorizer_uri        = var.enable_jwt_authorizer ? var.jwt_authorizer_lambda_invoke_arn : ""
     jwt_authorizer_enabled    = var.enable_jwt_authorizer
   })
@@ -30,14 +31,14 @@ locals {
 resource "aws_api_gateway_rest_api" "admin_api" {
   name        = local.api_name
   description = var.api_gateway_type == "PRIVATE" ? "Private API Gateway for Admin Portal - No internet access required" : "Regional API Gateway for Admin Portal - Internet accessible"
-  
+
   body = local.openapi_spec
-  
+
   endpoint_configuration {
     types            = [var.api_gateway_type]
     vpc_endpoint_ids = var.api_gateway_type == "PRIVATE" ? [var.vpc_endpoint_id] : null
   }
-  
+
   # Policy: VPC-only for PRIVATE, no policy for REGIONAL (allows all access)
   policy = var.api_gateway_type == "PRIVATE" ? jsonencode({
     Version = "2012-10-17"
@@ -62,7 +63,7 @@ resource "aws_api_gateway_rest_api" "admin_api" {
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "admin_api" {
   rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  
+
   triggers = {
     # Redeploy when OpenAPI spec changes
     redeployment = sha1(jsonencode([
@@ -362,6 +363,20 @@ resource "aws_lambda_permission" "oms_inventory_endpoints" {
   function_name = var.oms_service_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/inventory/*"
+}
+
+# ==============================================
+# Sys App Frontend Lambda Permissions
+# ==============================================
+
+# Permission for /ui and /ui/*
+resource "aws_lambda_permission" "app_frontend" {
+  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppFrontend"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_frontend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
 }
 
 # ==============================================

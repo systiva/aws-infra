@@ -4,7 +4,7 @@
 variable "workspace_prefix" {
   description = "Workspace prefix for resource naming (dev|qa|prod|uat)"
   type        = string
-  
+
   validation {
     condition     = contains(["dev", "qa", "prod", "uat"], var.workspace_prefix)
     error_message = "Workspace prefix must be one of: dev, qa, prod, uat."
@@ -15,7 +15,7 @@ variable "workspace_prefix" {
 variable "admin_account_id" {
   description = "AWS account ID for admin account"
   type        = string
-  
+
   validation {
     condition     = can(regex("^[0-9]{12}$", var.admin_account_id))
     error_message = "Admin account ID must be a 12-digit number."
@@ -25,7 +25,7 @@ variable "admin_account_id" {
 variable "tenant_account_id" {
   description = "AWS account ID for tenant account"
   type        = string
-  
+
   validation {
     condition     = can(regex("^[0-9]{12}$", var.tenant_account_id))
     error_message = "Tenant account ID must be a 12-digit number."
@@ -430,9 +430,19 @@ variable "temporary_password" {
   description = "Temporary password for platform admin user"
   type        = string
   sensitive   = true
-  
+
   validation {
     condition     = length(var.temporary_password) >= 8
     error_message = "Temporary password must be at least 8 characters long."
   }
+}
+
+# ==============================================
+# Sys App Frontend Configuration
+# ==============================================
+
+variable "enable_app_frontend" {
+  description = "Enable Sys App Frontend (separate from admin portal)"
+  type        = bool
+  default     = false
 }

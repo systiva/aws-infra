@@ -99,7 +99,7 @@ paths:
         uri: "${admin_backend_lambda_uri}"
         httpMethod: "POST"
         passthroughBehavior: "when_no_match"
-    
+
     put:
       summary: "Update tenant onboarding"
       produces:
@@ -477,5 +477,48 @@ paths:
       x-amazon-apigateway-integration:
         type: "aws_proxy"
         uri: "${oms_service_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # ==============================================
+  # Sys App Frontend Routes
+  # Serves React/Next.js UI from S3 via Lambda
+  # ==============================================
+  /ui:
+    x-amazon-apigateway-any-method:
+      summary: "Sys App Frontend root (public)"
+      produces:
+        - "text/html"
+        - "application/javascript"
+        - "text/css"
+        - "application/json"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_frontend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /ui/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Sys App Frontend (public)"
+      produces:
+        - "text/html"
+        - "application/javascript"
+        - "text/css"
+        - "application/json"
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_frontend_lambda_uri}"
         httpMethod: "POST"
         passthroughBehavior: "when_no_match"

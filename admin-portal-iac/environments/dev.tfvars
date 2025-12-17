@@ -47,7 +47,7 @@ delete_tenant_step_function_arn = "arn:aws:states:us-east-1:583122682394:stateMa
 # VPC Endpoints Configuration
 vpc_endpoint_services = [
   "s3",
-  "dynamodb", 
+  "dynamodb",
   "lambda",
   "states",  # Step Functions
   "sts",     # Security Token Service for cross-account role assumption
@@ -109,3 +109,8 @@ enable_ims_service        = true
 ims_lambda_timeout        = 30
 ims_lambda_memory_size    = 512
 ims_log_level            = "INFO"
+
+# ==============================================
+# Sys App Frontend Configuration
+# ==============================================
+enable_app_frontend = true
