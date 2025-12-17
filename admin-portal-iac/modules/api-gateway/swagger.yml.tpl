@@ -522,3 +522,51 @@ paths:
         uri: "${app_frontend_lambda_uri}"
         httpMethod: "POST"
         passthroughBehavior: "when_no_match"
+
+  # ==============================================
+  # Sys App Frontend - Images & Fonts (for assets without /ui prefix)
+  # These routes handle hardcoded paths like /images/... and /fonts/...
+  # ==============================================
+  /images/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Sys App Frontend images (public)"
+      produces:
+        - "image/png"
+        - "image/svg+xml"
+        - "image/jpeg"
+        - "image/gif"
+        - "image/webp"
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_frontend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /fonts/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Sys App Frontend fonts (public)"
+      produces:
+        - "font/woff"
+        - "font/woff2"
+        - "font/ttf"
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_frontend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"

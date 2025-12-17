@@ -369,24 +369,34 @@ resource "aws_lambda_permission" "oms_inventory_endpoints" {
 # Sys App Frontend Lambda Permissions
 # ==============================================
 
-# Permission for /ui root path
-resource "aws_lambda_permission" "app_frontend_root" {
+# Permission for /ui, /images, /fonts and all subpaths
+resource "aws_lambda_permission" "app_frontend" {
   count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-AppFrontend-Root"
+  statement_id  = "AllowAPIGateway-AppFrontend"
   action        = "lambda:InvokeFunction"
   function_name = var.app_frontend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/GET/ui"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
 }
 
-# Permission for /ui/* proxy paths (all methods, all subpaths)
-resource "aws_lambda_permission" "app_frontend_proxy" {
+# Permission for /images path (assets without /ui prefix)
+resource "aws_lambda_permission" "app_frontend_images" {
   count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-AppFrontend-Proxy"
+  statement_id  = "AllowAPIGateway-AppFrontend-Images"
   action        = "lambda:InvokeFunction"
   function_name = var.app_frontend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/ui/*"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/images/*"
+}
+
+# Permission for /fonts path (assets without /ui prefix)
+resource "aws_lambda_permission" "app_frontend_fonts" {
+  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppFrontend-Fonts"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_frontend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/fonts/*"
 }
 
 # ==============================================
