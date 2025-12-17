@@ -242,6 +242,153 @@ jobs:
 
           echo "Upload to S3 completed"
 
+      - name: Update Lambda with S3 Serving Code
+        run: |
+          echo "Updating app-frontend-web-server Lambda to serve from S3..."
+
+          LAMBDA_NAME="app-fe-${{ inputs.workspace }}-web-server"
+          S3_BUCKET="${{ needs.get-config.outputs.s3_bucket }}"
+
+          # Check if Lambda exists
+          if ! aws lambda get-function --function-name "$LAMBDA_NAME" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
+            echo "ERROR: Lambda $LAMBDA_NAME not found. Run workflow 04 first."
+            exit 1
+          fi
+
+          # Create Lambda package directory
+          mkdir -p lambda-pkg
+          cd lambda-pkg
+
+          # Create the Lambda handler code
+          cat > index.js << 'LAMBDAEOF'
+          const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+
+          const s3 = new S3Client({ region: process.env.AWS_REGION });
+          const BUCKET = process.env.S3_BUCKET_NAME;
+
+          const MIME_TYPES = {
+            '.html': 'text/html',
+            '.css': 'text/css',
+            '.js': 'application/javascript',
+            '.json': 'application/json',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.svg': 'image/svg+xml',
+            '.ico': 'image/x-icon',
+            '.woff': 'font/woff',
+            '.woff2': 'font/woff2',
+            '.ttf': 'font/ttf',
+            '.webp': 'image/webp',
+          };
+
+          const BINARY_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.webp'];
+
+          function getMime(path) {
+            const ext = path.substring(path.lastIndexOf('.')).toLowerCase();
+            return MIME_TYPES[ext] || 'application/octet-stream';
+          }
+
+          function isBinary(path) {
+            const ext = path.substring(path.lastIndexOf('.')).toLowerCase();
+            return BINARY_EXTS.includes(ext);
+          }
+
+          async function getS3File(key) {
+            try {
+              const resp = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+              const chunks = [];
+              for await (const chunk of resp.Body) chunks.push(chunk);
+              const buffer = Buffer.concat(chunks);
+              return {
+                body: isBinary(key) ? buffer.toString('base64') : buffer.toString('utf-8'),
+                isBase64: isBinary(key),
+                contentType: resp.ContentType || getMime(key)
+              };
+            } catch (e) {
+              if (e.name === 'NoSuchKey') return null;
+              throw e;
+            }
+          }
+
+          exports.handler = async (event) => {
+            let path = event.path || event.rawPath || '/';
+
+            // Remove /ui prefix
+            if (path.startsWith('/ui')) path = path.substring(3) || '/';
+
+            // Get S3 key
+            let key = path.startsWith('/') ? path.substring(1) : path;
+            if (key === '' || key.endsWith('/')) key += 'index.html';
+
+            console.log(`Fetching: ${BUCKET}/${key}`);
+
+            let result = await getS3File(key);
+
+            // Try .html extension
+            if (!result && !key.includes('.')) {
+              result = await getS3File(key + '.html');
+              if (!result) result = await getS3File(key + '/index.html');
+            }
+
+            // SPA fallback
+            if (!result) result = await getS3File('index.html');
+
+            if (!result) {
+              return {
+                statusCode: 404,
+                headers: { 'Content-Type': 'text/html' },
+                body: '<h1>404 - Not Found</h1>'
+              };
+            }
+
+            return {
+              statusCode: 200,
+              headers: {
+                'Content-Type': result.contentType,
+                'Cache-Control': key.includes('_next/static') ? 'public, max-age=31536000' : 'no-cache',
+                'Access-Control-Allow-Origin': '*'
+              },
+              body: result.body,
+              isBase64Encoded: result.isBase64
+            };
+          };
+          LAMBDAEOF
+
+          # Create package.json
+          cat > package.json << 'PKGEOF'
+          {
+            "name": "app-frontend-web-server",
+            "version": "1.0.0",
+            "main": "index.js",
+            "dependencies": {
+              "@aws-sdk/client-s3": "^3.400.0"
+            }
+          }
+          PKGEOF
+
+          # Install dependencies and create zip
+          npm install --production
+          zip -r ../lambda.zip .
+          cd ..
+
+          # Update Lambda code
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_NAME" \
+            --zip-file fileb://lambda.zip \
+            --region "${{ inputs.aws_region }}"
+
+          # Wait for update
+          aws lambda wait function-updated \
+            --function-name "$LAMBDA_NAME" \
+            --region "${{ inputs.aws_region }}"
+
+          echo "✓ Lambda $LAMBDA_NAME updated successfully"
+
+          # Cleanup
+          rm -rf lambda-pkg lambda.zip
+
       - name: Update SSM with Deployment Metadata
         run: |
           # Store Sys App Frontend deployment metadata (separate from admin portal)
