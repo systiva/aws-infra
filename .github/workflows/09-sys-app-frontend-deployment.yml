@@ -174,20 +174,26 @@ jobs:
       - name: Configure Next.js for Static Export
         run: |
           echo "Configuring Next.js for static export with /ui basePath..."
-          cat > next.config.js << 'EOF'
-          /** @type {import('next').NextConfig} */
-          const nextConfig = {
-            output: 'export',
-            basePath: '/ui',
-            trailingSlash: true,
-            images: {
-              unoptimized: true,
-            },
-            assetPrefix: '/ui',
-          }
-          module.exports = nextConfig
-          EOF
-          echo "next.config.js updated for static export with basePath: /ui"
+
+          # Create next.config.js with proper formatting (no extra indentation)
+          echo '/** @type {import("next").NextConfig} */' > next.config.js
+          echo 'const nextConfig = {' >> next.config.js
+          echo '  output: "export",' >> next.config.js
+          echo '  basePath: "/ui",' >> next.config.js
+          echo '  assetPrefix: "/ui",' >> next.config.js
+          echo '  trailingSlash: true,' >> next.config.js
+          echo '  images: { unoptimized: true },' >> next.config.js
+          echo '};' >> next.config.js
+          echo 'module.exports = nextConfig;' >> next.config.js
+
+          echo "=== next.config.js content ==="
+          cat next.config.js
+          echo "=== end of next.config.js ==="
+
+      - name: Clean Build Cache
+        run: |
+          echo "Cleaning Next.js cache..."
+          rm -rf .next out node_modules/.cache 2>/dev/null || true
 
       - name: Build Frontend
         env:
@@ -198,6 +204,23 @@ jobs:
           echo "Build completed successfully"
           echo "Build output:"
           ls -la out/ 2>/dev/null || ls -la build/ 2>/dev/null || echo "Build directory not found"
+
+          # Verify basePath is applied in HTML
+          echo ""
+          echo "=== Verifying basePath in index.html ==="
+          if [ -f "out/index.html" ]; then
+            echo "Checking for /ui prefix in asset paths..."
+            grep -o 'src="[^"]*"' out/index.html | head -5 || true
+            grep -o 'href="[^"]*"' out/index.html | head -5 || true
+
+            if grep -q '"/ui/_next' out/index.html; then
+              echo "✓ basePath /ui is correctly applied"
+            else
+              echo "⚠ WARNING: basePath /ui might not be applied correctly"
+              echo "First 50 lines of index.html:"
+              head -50 out/index.html
+            fi
+          fi
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
