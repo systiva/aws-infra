@@ -173,19 +173,21 @@ jobs:
 
       - name: Configure Next.js for Static Export
         run: |
-          echo "Configuring Next.js for static export..."
+          echo "Configuring Next.js for static export with /ui basePath..."
           cat > next.config.js << 'EOF'
           /** @type {import('next').NextConfig} */
           const nextConfig = {
             output: 'export',
+            basePath: '/ui',
             trailingSlash: true,
             images: {
               unoptimized: true,
             },
+            assetPrefix: '/ui',
           }
           module.exports = nextConfig
           EOF
-          echo "next.config.js updated for static export"
+          echo "next.config.js updated for static export with basePath: /ui"
 
       - name: Build Frontend
         env:
