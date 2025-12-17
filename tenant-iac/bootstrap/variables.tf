@@ -1,0 +1,43 @@
+variable "workspace_prefix" {
+  description = "Workspace prefix for resource naming (dev|qa|prod|uat)"
+  type        = string
+  
+  validation {
+    condition     = contains(["dev", "qa", "prod", "uat"], var.workspace_prefix)
+    error_message = "Workspace prefix must be one of: dev, qa, prod, uat."
+  }
+}
+
+variable "admin_account_id" {
+  description = "AWS account ID for admin account"
+  type        = string
+  
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.admin_account_id))
+    error_message = "Admin account ID must be a 12-digit number."
+  }
+}
+
+variable "tenant_aws_profile" {
+  description = "AWS profile for tenant account authentication (only for local development, CI/CD uses environment variables)"
+  type        = string
+  default     = "default"
+}
+
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+  default     = "admin-portal"
+}
+
+variable "aws_region" {
+  description = "AWS region for tenant resources"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "environment" {
+  description = "Environment (dev, staging, prod)"
+  type        = string
+  default     = "dev"
+}

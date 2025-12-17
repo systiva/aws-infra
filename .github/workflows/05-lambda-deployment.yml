@@ -1,0 +1,280 @@
+name: 05 - Lambda Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+      function_name:
+        description: 'Lambda function to deploy'
+        required: true
+        type: choice
+        options:
+          - all
+          - admin-portal-be
+          - admin-portal-web-server
+          - create-admin-worker
+          - create-infra-worker
+          - delete-infra-worker
+          - poll-infra-worker
+          - setup-rbac-worker
+          - jwt-authorizer
+          - ims-service
+          - oms-service
+
+jobs:
+  get-config:
+    name: Get Configuration from SSM
+    runs-on: ubuntu-latest
+    outputs:
+      vpc_id: ${{ steps.admin.outputs.vpc_id }}
+      subnet_ids: ${{ steps.admin.outputs.subnet_ids }}
+      api_gateway_id: ${{ steps.admin.outputs.api_gateway_id }}
+      functions_to_deploy: ${{ steps.functions.outputs.list }}
+    
+    steps:
+      - name: Configure AWS Credentials (Admin Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Admin Infrastructure Config
+        id: admin
+        run: |
+          VPC_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/vpc-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          SUBNET_IDS=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/private-subnet-ids" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          API_GATEWAY_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
+          echo "subnet_ids=$SUBNET_IDS" >> $GITHUB_OUTPUT
+          echo "api_gateway_id=$API_GATEWAY_ID" >> $GITHUB_OUTPUT
+      
+      - name: Determine Functions to Deploy
+        id: functions
+        run: |
+          if [[ "${{ inputs.function_name }}" == "all" ]]; then
+            FUNCTIONS="admin-portal-be admin-portal-web-server create-admin-worker create-infra-worker delete-infra-worker poll-infra-worker setup-rbac-worker jwt-authorizer ims-service oms-service"
+          else
+            FUNCTIONS="${{ inputs.function_name }}"
+          fi
+          
+          # Convert to JSON array for matrix (trim whitespace)
+          echo "list=$(echo $FUNCTIONS | tr -s ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
+
+  deploy-lambda:
+    name: Deploy ${{ matrix.function }}
+    runs-on: ubuntu-latest
+    needs: [get-config]
+    strategy:
+      matrix:
+        function: ${{ fromJson(needs.get-config.outputs.functions_to_deploy) }}
+      fail-fast: false
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Configure AWS Credentials (Admin Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Debug - List Directories
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Function to build: ${{ matrix.function }}"
+          echo "Checking if directory exists:"
+          ls -la | grep -E "(create-|delete-|poll-|setup-|jwt-|ims-|oms-)"
+          if [ -d "${{ matrix.function }}" ]; then
+            echo "Directory ${{ matrix.function }} exists"
+            ls -la "${{ matrix.function }}"
+          else
+            echo "ERROR: Directory ${{ matrix.function }} does not exist"
+            exit 1
+          fi
+      
+      - name: Build Lambda Package
+        working-directory: ${{ matrix.function }}
+        run: |
+          echo "Building ${{ matrix.function }}..."
+          
+          # Install dependencies
+          npm install --production
+          
+          # Create deployment package
+          zip -r function.zip . -x "*.git*" "test/*" "*.md"
+      
+      - name: Deploy Lambda Function
+        working-directory: ${{ matrix.function }}
+        run: |
+          # Handle special naming patterns
+          if [[ "${{ matrix.function }}" == "oms-service" ]]; then
+            FUNCTION_NAME="oms-service-${{ inputs.workspace }}"
+          elif [[ "${{ matrix.function }}" == "admin-portal-be" ]]; then
+            FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-backend"
+          elif [[ "${{ matrix.function }}" == "admin-portal-web-server" ]]; then
+            FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-web-server"
+          else
+            FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-${{ matrix.function }}"
+          fi
+          
+          echo "Deploying to function: $FUNCTION_NAME"
+          
+          # Update function code
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://function.zip \
+            --region "${{ inputs.aws_region }}"
+          
+          # Wait for update to complete
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}"
+          
+          echo "Deployment complete for ${{ matrix.function }}"
+      
+      - name: Update SSM with Deployment Info
+        run: |
+          # Handle special naming patterns
+          if [[ "${{ matrix.function }}" == "oms-service" ]]; then
+            FUNCTION_NAME="oms-service-${{ inputs.workspace }}"
+          elif [[ "${{ matrix.function }}" == "admin-portal-be" ]]; then
+            FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-backend"
+          elif [[ "${{ matrix.function }}" == "admin-portal-web-server" ]]; then
+            FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-web-server"
+          else
+            FUNCTION_NAME="admin-portal-${{ inputs.workspace }}-${{ matrix.function }}"
+          fi
+          
+          # Get function details
+          FUNCTION_ARN=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.FunctionArn' \
+            --output text)
+          
+          VERSION=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.Version' \
+            --output text)
+          
+          CODE_SHA=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.CodeSha256' \
+            --output text)
+          
+          # Update SSM parameters in admin account
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/lambda/${{ matrix.function }}/version" \
+            --value "$VERSION" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/lambda/${{ matrix.function }}/code-sha256" \
+            --value "$CODE_SHA" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/lambda/${{ matrix.function }}/deployed-at" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+
+  update-metadata:
+    name: Update Deployment Metadata
+    runs-on: ubuntu-latest
+    needs: [deploy-lambda]
+    
+    steps:
+      - name: Configure AWS Credentials (Admin Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Store Deployment Metadata
+        run: |
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/lambda-builds/last-build-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/deployment/last-deployment-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/deployment/workflow-run-id" \
+            --value "${{ github.run_id }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+          
+          aws ssm put-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/deployment/commit-sha" \
+            --value "${{ github.sha }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}"
+      
+      - name: Display Summary
+        run: |
+          echo "=========================================="
+          echo "Lambda Deployment Complete"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Functions deployed: ${{ inputs.function_name }}"
+          echo "Workflow Run ID: ${{ github.run_id }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "=========================================="

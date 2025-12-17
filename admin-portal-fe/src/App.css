@@ -1,0 +1,62 @@
+.app {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f3f4f6;
+}
+
+.main-content {
+  margin-left: 260px;
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Access Denied and Error Page Styles */
+.access-denied,
+.not-found {
+  text-align: center;
+  padding: 4rem 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.access-denied {
+  background: #fdf2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 12px;
+  color: #dc2626;
+}
+
+.not-found {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  border-radius: 12px;
+  color: #ca8a04;
+}
+
+.access-denied h2,
+.not-found h2 {
+  margin-top: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.access-denied p,
+.not-found p {
+  margin-bottom: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}

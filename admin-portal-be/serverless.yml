@@ -1,0 +1,66 @@
+service: data-migration-orchestration
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  memorySize: 128
+  timeout: 10
+  environment:
+    ENV: ${opt:stage, 'dev'}
+    AWS_DEFAULT_REGION: ${self:provider.region}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:DescribeTable
+        - dynamodb:CreateTable
+      Resource: 
+  - "arn:aws:dynamodb:${self:provider.region}:*:table/admin-portal-dev-tenant-registry*"
+  - "arn:aws:dynamodb:${self:provider.region}:*:table/admin-portal-dev-tenant-registry*/index/*"
+    # Cross-account permissions for tenant provisioning
+    - Effect: Allow
+      Action:
+        - sts:AssumeRole
+      Resource: 
+        - "arn:aws:iam::560261045252:role/CrossAccountTenantRole"
+    # CloudFormation permissions for creating tenant resources
+    - Effect: Allow
+      Action:
+        - cloudformation:CreateStack
+        - cloudformation:UpdateStack
+        - cloudformation:DeleteStack
+        - cloudformation:DescribeStacks
+        - cloudformation:DescribeStackEvents
+        - cloudformation:DescribeStackResources
+        - cloudformation:ListStacks
+        - cloudformation:GetTemplate
+      Resource: 
+        - "arn:aws:cloudformation:${self:provider.region}:560261045252:stack/tenant-*/*"
+
+functions:
+  app:
+    handler: index.handler
+    events:
+      - http:
+          path: /
+          method: any
+      - http:
+          path: /{proxy+}
+          method: any
+      - schedule:
+          rate: rate(1 day)
+          enabled: true
+
+package:
+  exclude:
+    - node_modules/**
+    - .git/**
+    - .vscode/**
+    - README.md
+    - package-lock.json

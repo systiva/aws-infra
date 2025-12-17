@@ -1,0 +1,1021 @@
+name: 08 - Destroy Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      destroy_target:
+        description: 'What to destroy'
+        required: true
+        type: choice
+        options:
+          - all
+          - admin-bootstrap
+          - admin-infrastructure
+          - tenant-bootstrap
+          - tenant-infrastructure
+      workspace:
+        description: 'Workspace (dev/qa/uat/prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ inputs.aws_region }}
+  WORKSPACE: ${{ inputs.workspace }}
+  DESTROY_TARGET: ${{ inputs.destroy_target }}
+
+jobs:
+  validate:
+    name: Validate Destroy Request
+    runs-on: ubuntu-latest
+    outputs:
+      is_bootstrap: ${{ steps.check.outputs.is_bootstrap }}
+      is_infrastructure: ${{ steps.check.outputs.is_infrastructure }}
+      is_admin: ${{ steps.check.outputs.is_admin }}
+      is_tenant: ${{ steps.check.outputs.is_tenant }}
+      is_all: ${{ steps.check.outputs.is_all }}
+      account_type: ${{ steps.check.outputs.account_type }}
+      resource_type: ${{ steps.check.outputs.resource_type }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Validate Confirmation
+        run: |
+          if [[ "${{ inputs.confirm_destroy }}" != "DESTROY" ]]; then
+            echo "❌ Destruction not confirmed. You must type 'DESTROY' to proceed."
+            exit 1
+          fi
+          echo "✅ Destruction confirmed"
+      
+      - name: Parse Destroy Target
+        id: check
+        working-directory: c20_prj
+        run: |
+          TARGET="${{ inputs.destroy_target }}"
+          
+          # Check if destroying all
+          if [[ "$TARGET" == "all" ]]; then
+            echo "is_all=true" >> $GITHUB_OUTPUT
+            echo "is_admin=false" >> $GITHUB_OUTPUT
+            echo "is_tenant=false" >> $GITHUB_OUTPUT
+            echo "is_bootstrap=false" >> $GITHUB_OUTPUT
+            echo "is_infrastructure=false" >> $GITHUB_OUTPUT
+            echo "account_type=all" >> $GITHUB_OUTPUT
+            echo "resource_type=all" >> $GITHUB_OUTPUT
+          else
+            echo "is_all=false" >> $GITHUB_OUTPUT
+            
+            # Determine account type and resource type
+            if [[ "$TARGET" == admin-* ]]; then
+              echo "is_admin=true" >> $GITHUB_OUTPUT
+              echo "account_type=admin" >> $GITHUB_OUTPUT
+            else
+              echo "is_admin=false" >> $GITHUB_OUTPUT
+              echo "account_type=tenant" >> $GITHUB_OUTPUT
+            fi
+            
+            if [[ "$TARGET" == *-bootstrap ]]; then
+              echo "is_bootstrap=true" >> $GITHUB_OUTPUT
+              echo "is_infrastructure=false" >> $GITHUB_OUTPUT
+              echo "resource_type=bootstrap" >> $GITHUB_OUTPUT
+            else
+              echo "is_bootstrap=false" >> $GITHUB_OUTPUT
+              echo "is_infrastructure=true" >> $GITHUB_OUTPUT
+              echo "resource_type=infrastructure" >> $GITHUB_OUTPUT
+            fi
+            
+            if [[ "$TARGET" == tenant-* ]]; then
+              echo "is_tenant=true" >> $GITHUB_OUTPUT
+            else
+              echo "is_tenant=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+          
+          echo "📋 Destroy Configuration:"
+          echo "  Target: $TARGET"
+          echo "  Workspace: ${{ inputs.workspace }}"
+          echo "  Region: ${{ inputs.aws_region }}"
+      
+      - name: Configure AWS Credentials
+        if: steps.check.outputs.is_all != 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ (steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Get Account ID
+        if: steps.check.outputs.is_all != 'true'
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+          echo "Account Type: ${{ steps.check.outputs.account_type }}"
+      
+      - name: Check Dependencies
+        if: steps.check.outputs.is_bootstrap == 'true' && steps.check.outputs.is_all != 'true'
+        working-directory: c20_prj
+        run: |
+          ACCOUNT_TYPE="${{ steps.check.outputs.account_type }}"
+          INFRA_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/infrastructure/status"
+          
+          echo "🔍 Checking if infrastructure exists..."
+          
+          if aws ssm get-parameter \
+              --name "$INFRA_PATH" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
+            echo "❌ Cannot destroy bootstrap: Infrastructure still exists"
+            echo "📋 You must destroy ${ACCOUNT_TYPE}-infrastructure first"
+            echo "💡 Run workflow: 08-destroy with target=${ACCOUNT_TYPE}-infrastructure"
+            exit 1
+          fi
+          
+          echo "✅ No infrastructure found. Safe to destroy bootstrap."
+      
+      - name: Check Resources Exist
+        if: steps.check.outputs.is_all != 'true'
+        working-directory: c20_prj
+        run: |
+          ACCOUNT_TYPE="${{ steps.check.outputs.account_type }}"
+          RESOURCE_TYPE="${{ steps.check.outputs.resource_type }}"
+          STATUS_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/${RESOURCE_TYPE}/status"
+          
+          echo "🔍 Checking if resources exist..."
+          echo "📍 SSM Path: ${STATUS_PATH}"
+          
+          if ! aws ssm get-parameter \
+              --name "$STATUS_PATH" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
+            echo "⚠️ Resources not found in SSM"
+            echo "💡 Path: ${STATUS_PATH}"
+            echo "💡 Resources may already be destroyed or never created"
+            exit 1
+          fi
+          
+          echo "✅ Resources found. Proceeding with destroy."
+
+  destroy-infrastructure:
+    name: Destroy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: needs.validate.outputs.is_infrastructure == 'true' && needs.validate.outputs.is_all != 'true'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ (needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Get Bootstrap Configuration
+        id: bootstrap
+        working-directory: c20_prj
+        run: |
+          ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap"
+          
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
+          
+          echo "📦 Backend Config:"
+          echo "  Bucket: ${BACKEND_BUCKET}"
+          echo "  Table: ${DYNAMODB_TABLE}"
+      
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+      
+      - name: Get Bootstrap Outputs
+        id: bootstrap_outputs
+        working-directory: c20_prj
+        run: |
+          ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap"
+          
+          STEP_FUNCTIONS_ARN=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/step-functions-arn" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          echo "step_functions_arn=${STEP_FUNCTIONS_ARN}" >> $GITHUB_OUTPUT
+          echo "Step Functions ARN: ${STEP_FUNCTIONS_ARN}"
+      
+      - name: Terraform Init
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
+        run: |
+          if [[ "${{ needs.validate.outputs.account_type }}" == "admin" ]]; then
+            terraform init \
+              -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+              -backend-config="key=admin-portal-iac/terraform.tfstate" \
+              -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+              -backend-config="region=${{ inputs.aws_region }}" \
+              -backend-config="encrypt=true"
+          else
+            terraform init \
+              -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+              -backend-config="key=tenant-iac/terraform.tfstate" \
+              -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+              -backend-config="region=${{ inputs.aws_region }}" \
+              -backend-config="encrypt=true"
+          fi
+      
+      - name: Terraform Workspace
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
+        run: |
+          terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
+      
+      - name: Terraform Destroy
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
+        run: |
+          if [[ "${{ needs.validate.outputs.account_type }}" == "admin" ]]; then
+            terraform destroy \
+              -var="workspace_prefix=${{ inputs.workspace }}" \
+              -var="aws_region=${{ inputs.aws_region }}" \
+              -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
+              -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+              -var="create_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+              -var="delete_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+              -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \
+              -var-file="environments/${{ inputs.workspace }}.tfvars" \
+              -auto-approve
+          else
+            terraform destroy \
+              -var="workspace_prefix=${{ inputs.workspace }}" \
+              -var="aws_region=${{ inputs.aws_region }}" \
+              -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+              -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
+              -var-file="environments/${{ inputs.workspace }}.tfvars" \
+              -auto-approve
+          fi
+      
+      - name: Cleanup SSM Parameters
+        working-directory: c20_prj
+        run: |
+          ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
+          BASE_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/infrastructure"
+          
+          echo "🗑️  Cleaning up SSM Parameters"
+          echo "Path: ${BASE_PATH}"
+          
+          # Get all parameters under the path
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "$BASE_PATH" \
+            --recursive \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameters[*].Name' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -z "$PARAMS" ]]; then
+            echo "No parameters found to delete"
+          else
+            # Delete each parameter
+            for param_name in $PARAMS; do
+              echo "Deleting: $param_name"
+              aws ssm delete-parameter \
+                --name "$param_name" \
+                --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+            echo "✅ Cleanup complete"
+          fi
+          
+          echo "✅ Infrastructure destroyed and SSM parameters cleaned up"
+
+  destroy-bootstrap:
+    name: Destroy Bootstrap
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: needs.validate.outputs.is_bootstrap == 'true' && needs.validate.outputs.is_all != 'true'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ (needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Destroy Bootstrap Resources
+        working-directory: c20_prj
+        run: |
+          ACCOUNT_TYPE="${{ needs.validate.outputs.account_type }}"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/${ACCOUNT_TYPE}/bootstrap"
+          
+          echo "🔥 Destroying Bootstrap Resources"
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Account Type: ${ACCOUNT_TYPE}"
+          echo "Region: ${{ inputs.aws_region }}"
+          
+          # Step 1: Read bootstrap configuration from SSM
+          echo "📖 Reading bootstrap configuration from SSM..."
+          
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "${BOOTSTRAP_PATH}/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -z "$BACKEND_BUCKET" ]]; then
+            echo "❌ Bootstrap configuration not found in SSM"
+            echo "Expected path: ${BOOTSTRAP_PATH}"
+            exit 1
+          fi
+          
+          echo "Backend Bucket: ${BACKEND_BUCKET}"
+          echo "DynamoDB Table: ${DYNAMODB_TABLE}"
+          
+          # Step 2: Delete S3 bucket (must be manually emptied first)
+          echo "🗑️  Deleting S3 Bucket"
+          
+          if aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            echo "Deleting bucket: ${BACKEND_BUCKET}"
+            aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
+            echo "✅ S3 bucket deleted: ${BACKEND_BUCKET}"
+          else
+            echo "⚠️  Bucket not found or already deleted: ${BACKEND_BUCKET}"
+          fi
+          
+          # Step 3: Delete DynamoDB table
+          echo "🗑️  Deleting DynamoDB Table"
+          
+          if aws dynamodb describe-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            echo "Deleting table: ${DYNAMODB_TABLE}"
+            aws dynamodb delete-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            echo "Waiting for table deletion to complete..."
+            aws dynamodb wait table-not-exists --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            echo "✅ DynamoDB table deleted successfully"
+          else
+            echo "⚠️  Table not found or already deleted: ${DYNAMODB_TABLE}"
+          fi
+          
+          # Step 4: Cleanup SSM parameters
+          echo "🗑️  Cleaning up SSM Parameters"
+          
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "${BOOTSTRAP_PATH}" \
+            --recursive \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameters[*].Name' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              echo "Deleting: $param_name"
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
+          echo "✅ Bootstrap resources destroyed successfully"
+
+  # Jobs for 'all' option - destroys in correct order
+  destroy-all-admin-infrastructure:
+    name: Destroy All - Admin Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: needs.validate.outputs.is_all == 'true'
+    
+    defaults:
+      run:
+        working-directory: c20_prj
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials (Admin)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Check if Admin Infrastructure Exists
+        id: check
+        run: |
+          # Get bootstrap bucket from SSM (same as deploy workflow)
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          # Fallback: If SSM missing, search for bucket by naming pattern
+          if [[ -z "$BACKEND_BUCKET" ]]; then
+            echo "⚠️  SSM parameter not found, searching for bucket..."
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            BACKEND_BUCKET=$(aws s3api list-buckets \
+              --query "Buckets[?starts_with(Name, 'admin-portal-${{ inputs.workspace }}-terraform-state-${ACCOUNT_ID}-')].Name | [0]" \
+              --output text)
+            
+            if [[ "$BACKEND_BUCKET" == "None" || -z "$BACKEND_BUCKET" ]]; then
+              BACKEND_BUCKET=""
+            else
+              echo "Found bucket: ${BACKEND_BUCKET}"
+            fi
+          fi
+          
+          if [[ -z "$BACKEND_BUCKET" ]]; then
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Admin bootstrap bucket not found, skipping admin infrastructure destroy"
+          else
+            # Check if Terraform state file exists in S3
+            if aws s3 ls "s3://${BACKEND_BUCKET}/env:/${{ inputs.workspace }}/admin-portal-iac/terraform.tfstate" 2>/dev/null; then
+              echo "exists=true" >> $GITHUB_OUTPUT
+              echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+              echo "✅ Admin infrastructure state found in bucket: ${BACKEND_BUCKET}"
+            else
+              echo "exists=false" >> $GITHUB_OUTPUT
+              echo "⏭️  Admin infrastructure state not found, skipping"
+            fi
+          fi
+      
+      - name: Get Bootstrap Configuration
+        if: steps.check.outputs.exists == 'true'
+        id: bootstrap
+        run: |
+          # Backend bucket already retrieved in check step
+          BACKEND_BUCKET="${{ steps.check.outputs.backend_bucket }}"
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
+      
+      - name: Get AWS Account ID
+        if: steps.check.outputs.exists == 'true'
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+      
+      - name: Get Bootstrap Outputs
+        if: steps.check.outputs.exists == 'true'
+        id: bootstrap_outputs
+        run: |
+          STEP_FUNCTIONS_ARN=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/step-functions-arn" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          echo "step_functions_arn=${STEP_FUNCTIONS_ARN}" >> $GITHUB_OUTPUT
+      
+      - name: Terraform Init
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/admin-portal-iac
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+            -backend-config="key=admin-portal-iac/terraform.tfstate" \
+            -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="encrypt=true"
+      
+      - name: Terraform Workspace
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/admin-portal-iac
+        run: |
+          terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
+      
+      - name: Terraform Destroy
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/admin-portal-iac
+        run: |
+          terraform destroy \
+            -var="workspace_prefix=${{ inputs.workspace }}" \
+            -var="aws_region=${{ inputs.aws_region }}" \
+            -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="create_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+            -var="delete_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+            -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \
+            -var-file="environments/${{ inputs.workspace }}.tfvars" \
+            -auto-approve
+      
+      - name: Cleanup SSM Parameters
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          echo "🗑️  Cleaning up SSM Parameters"
+          
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "/admin-portal/${{ inputs.workspace }}/admin/infrastructure" \
+            --recursive \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameters[*].Name' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              echo "Deleting: $param_name"
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
+          echo "✅ Admin infrastructure destroyed"
+
+  destroy-all-admin-bootstrap:
+    name: Destroy All - Admin Bootstrap
+    runs-on: ubuntu-latest
+    needs: [validate, destroy-all-admin-infrastructure]
+    if: needs.validate.outputs.is_all == 'true' && always()
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials (Admin)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Check if Admin Bootstrap Exists
+        id: check
+        working-directory: c20_prj
+        run: |
+          if aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Admin bootstrap exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Admin bootstrap not found, skipping"
+          fi
+      
+      - name: Destroy Bootstrap Resources
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj
+        run: |
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/admin/bootstrap"
+          
+          echo "🔥 Destroying Admin Bootstrap Resources"
+          
+          # Read bootstrap configuration
+          BACKEND_BUCKET=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/backend-bucket" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+          DYNAMODB_TABLE=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/dynamodb-table" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+          
+          # Delete S3 bucket (must be manually emptied first)
+          if [[ -n "$BACKEND_BUCKET" ]] && aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
+            echo "✅ S3 bucket deleted"
+          fi
+          
+          # Delete DynamoDB table
+          if [[ -n "$DYNAMODB_TABLE" ]] && aws dynamodb describe-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            aws dynamodb delete-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            aws dynamodb wait table-not-exists --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            echo "✅ DynamoDB table deleted"
+          fi
+          
+          # Cleanup SSM parameters
+          PARAMS=$(aws ssm get-parameters-by-path --path "${BOOTSTRAP_PATH}" --recursive --region "${{ inputs.aws_region }}" --query 'Parameters[*].Name' --output text 2>/dev/null || echo "")
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
+          echo "✅ Admin bootstrap destroyed"
+
+  destroy-all-tenant-infrastructure:
+    name: Destroy All - Tenant Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate, destroy-all-admin-bootstrap]
+    if: needs.validate.outputs.is_all == 'true' && always()
+    
+    defaults:
+      run:
+        working-directory: c20_prj
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials (Tenant)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Check if Tenant Infrastructure Exists
+        id: check
+        run: |
+          # Get bootstrap bucket from SSM (same as deploy workflow)
+          BACKEND_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          
+          # Fallback: If SSM missing, search for bucket by naming pattern
+          if [[ -z "$BACKEND_BUCKET" ]]; then
+            echo "⚠️  SSM parameter not found, searching for bucket..."
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            BACKEND_BUCKET=$(aws s3api list-buckets \
+              --query "Buckets[?starts_with(Name, 'admin-portal-${{ inputs.workspace }}-terraform-state-${ACCOUNT_ID}-')].Name | [0]" \
+              --output text)
+            
+            if [[ "$BACKEND_BUCKET" == "None" || -z "$BACKEND_BUCKET" ]]; then
+              BACKEND_BUCKET=""
+            else
+              echo "Found bucket: ${BACKEND_BUCKET}"
+            fi
+          fi
+          
+          if [[ -z "$BACKEND_BUCKET" ]]; then
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Tenant bootstrap bucket not found, skipping tenant infrastructure destroy"
+          else
+            # Check if Terraform state file exists in S3
+            if aws s3 ls "s3://${BACKEND_BUCKET}/env:/${{ inputs.workspace }}/tenant-iac/terraform.tfstate" 2>/dev/null; then
+              echo "exists=true" >> $GITHUB_OUTPUT
+              echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+              echo "✅ Tenant infrastructure state found in bucket: ${BACKEND_BUCKET}"
+            else
+              echo "exists=false" >> $GITHUB_OUTPUT
+              echo "⏭️  Tenant infrastructure state not found, skipping"
+            fi
+          fi
+      
+      - name: Get Bootstrap Configuration
+        if: steps.check.outputs.exists == 'true'
+        id: bootstrap
+        run: |
+          # Backend bucket already retrieved in check step
+          BACKEND_BUCKET="${{ steps.check.outputs.backend_bucket }}"
+          
+          DYNAMODB_TABLE=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/dynamodb-table" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          
+          echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
+          echo "dynamodb_table=${DYNAMODB_TABLE}" >> $GITHUB_OUTPUT
+      
+      - name: Get AWS Account ID
+        if: steps.check.outputs.exists == 'true'
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+      
+      - name: Get Admin Account ID
+        if: steps.check.outputs.exists == 'true'
+        id: admin_account
+        run: |
+          # We need to temporarily switch to admin credentials to get admin account ID
+          # But since we're in tenant context, we'll try to get it from SSM if available
+          # Otherwise use the tenant account ID as fallback
+          ADMIN_ACCOUNT_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/shared/admin-account-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "${{ steps.account.outputs.account_id }}")
+          echo "admin_account_id=${ADMIN_ACCOUNT_ID}" >> $GITHUB_OUTPUT
+          echo "Admin Account ID: ${ADMIN_ACCOUNT_ID}"
+      
+      - name: Terraform Init
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/tenant-iac
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
+            -backend-config="key=tenant-iac/terraform.tfstate" \
+            -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="encrypt=true"
+      
+      - name: Terraform Workspace
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/tenant-iac
+        run: |
+          terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
+      
+      - name: Terraform Destroy
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj/tenant-iac
+        run: |
+          terraform destroy \
+            -var="workspace_prefix=${{ inputs.workspace }}" \
+            -var="aws_region=${{ inputs.aws_region }}" \
+            -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="admin_account_id=${{ steps.admin_account.outputs.admin_account_id }}" \
+            -var-file="environments/${{ inputs.workspace }}.tfvars" \
+            -auto-approve
+      
+      - name: Cleanup SSM Parameters
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          echo "🗑️  Cleaning up SSM Parameters"
+          
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure" \
+            --recursive \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameters[*].Name' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              echo "Deleting: $param_name"
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
+          echo "✅ Tenant infrastructure destroyed"
+
+  destroy-all-tenant-bootstrap:
+    name: Destroy All - Tenant Bootstrap
+    runs-on: ubuntu-latest
+    needs: [validate, destroy-all-tenant-infrastructure]
+    if: needs.validate.outputs.is_all == 'true' && always()
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Configure AWS Credentials (Tenant)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+      
+      - name: Check if Tenant Bootstrap Exists
+        id: check
+        working-directory: c20_prj
+        run: |
+          if aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Tenant bootstrap exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Tenant bootstrap not found, skipping"
+          fi
+      
+      - name: Destroy Bootstrap Resources
+        if: steps.check.outputs.exists == 'true'
+        working-directory: c20_prj
+        run: |
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/tenant/bootstrap"
+          
+          echo "🔥 Destroying Tenant Bootstrap Resources"
+          
+          # Read bootstrap configuration and strip any quotes
+          BACKEND_BUCKET=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/backend-bucket" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null | tr -d '"' || echo "")
+          DYNAMODB_TABLE=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/dynamodb-table" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null | tr -d '"' || echo "")
+          
+          echo "Backend Bucket: ${BACKEND_BUCKET}"
+          echo "DynamoDB Table: ${DYNAMODB_TABLE}"
+          
+          # Track deletion status
+          BUCKET_DELETED=false
+          TABLE_DELETED=false
+          
+          # Delete S3 bucket (must be manually emptied first)
+          if [[ -n "$BACKEND_BUCKET" ]] && aws s3 ls "s3://${BACKEND_BUCKET}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            aws s3 rb "s3://${BACKEND_BUCKET}" --force --region "${{ inputs.aws_region }}"
+            echo "✅ S3 bucket deleted"
+            BUCKET_DELETED=true
+          else
+            echo "⚠️  Bucket not found or already deleted: ${BACKEND_BUCKET}"
+            BUCKET_DELETED=true
+          fi
+          
+          # Delete DynamoDB table
+          if [[ -n "$DYNAMODB_TABLE" ]] && aws dynamodb describe-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}" 2>/dev/null; then
+            aws dynamodb delete-table --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            aws dynamodb wait table-not-exists --table-name "${DYNAMODB_TABLE}" --region "${{ inputs.aws_region }}"
+            echo "✅ DynamoDB table deleted"
+            TABLE_DELETED=true
+          else
+            echo "⚠️  Table not found or already deleted: ${DYNAMODB_TABLE}"
+            TABLE_DELETED=true
+          fi
+          
+          # Cleanup SSM parameters only if all resources are deleted
+          if [[ "$BUCKET_DELETED" == "true" && "$TABLE_DELETED" == "true" ]]; then
+            echo "🗑️  Cleaning up SSM Parameters"
+            PARAMS=$(aws ssm get-parameters-by-path --path "${BOOTSTRAP_PATH}" --recursive --region "${{ inputs.aws_region }}" --query 'Parameters[*].Name' --output text 2>/dev/null || echo "")
+            if [[ -n "$PARAMS" ]]; then
+              for param_name in $PARAMS; do
+                echo "Deleting: $param_name"
+                aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+              done
+              echo "✅ SSM parameters cleaned up"
+            fi
+          else
+            echo "⚠️  Skipping SSM cleanup - not all resources were deleted successfully"
+          fi
+          
+          # Cleanup SSM parameters
+          PARAMS=$(aws ssm get-parameters-by-path --path "${BOOTSTRAP_PATH}" --recursive --region "${{ inputs.aws_region }}" --query 'Parameters[*].Name' --output text 2>/dev/null || echo "")
+          if [[ -n "$PARAMS" ]]; then
+            for param_name in $PARAMS; do
+              aws ssm delete-parameter --name "$param_name" --region "${{ inputs.aws_region }}" 2>/dev/null || true
+            done
+          fi
+          
+          echo "✅ Tenant bootstrap destroyed"
+
+  summary:
+    name: Destruction Summary
+    runs-on: ubuntu-latest
+    needs: [validate, destroy-infrastructure, destroy-bootstrap, destroy-all-admin-infrastructure, destroy-all-admin-bootstrap, destroy-all-tenant-infrastructure, destroy-all-tenant-bootstrap]
+    if: always()
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: c20_prj
+      
+      - name: Display Summary
+        run: |
+          echo "🔥 Destruction Complete"
+          echo ""
+          echo "═══════════════════════════════════════════════════"
+          echo "📋 Destroy Summary"
+          echo "═══════════════════════════════════════════════════"
+          echo ""
+          echo "Target:      ${{ inputs.destroy_target }}"
+          echo "Workspace:   ${{ inputs.workspace }}"
+          echo "Region:      ${{ inputs.aws_region }}"
+          echo ""
+          
+          if [[ "${{ inputs.destroy_target }}" == "all" ]]; then
+            # Summary for 'all' option
+            echo "Destruction Order: Admin Infra → Admin Bootstrap → Tenant Infra → Tenant Bootstrap"
+            echo ""
+            
+            if [[ "${{ needs.destroy-all-admin-infrastructure.result }}" == "success" ]]; then
+              echo "✅ Admin Infrastructure Destroyed"
+            elif [[ "${{ needs.destroy-all-admin-infrastructure.result }}" == "skipped" ]]; then
+              echo "⏭️  Admin Infrastructure Skipped"
+            else
+              echo "❌ Admin Infrastructure Failed"
+            fi
+            
+            if [[ "${{ needs.destroy-all-admin-bootstrap.result }}" == "success" ]]; then
+              echo "✅ Admin Bootstrap Destroyed"
+            elif [[ "${{ needs.destroy-all-admin-bootstrap.result }}" == "skipped" ]]; then
+              echo "⏭️  Admin Bootstrap Skipped"
+            else
+              echo "❌ Admin Bootstrap Failed"
+            fi
+            
+            if [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "success" ]]; then
+              echo "✅ Tenant Infrastructure Destroyed"
+            elif [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "skipped" ]]; then
+              echo "⏭️  Tenant Infrastructure Skipped"
+            else
+              echo "❌ Tenant Infrastructure Failed"
+            fi
+            
+            if [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "success" ]]; then
+              echo "✅ Tenant Bootstrap Destroyed"
+            elif [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "skipped" ]]; then
+              echo "⏭️  Tenant Bootstrap Skipped"
+            else
+              echo "❌ Tenant Bootstrap Failed"
+            fi
+          else
+            # Summary for individual targets
+            if [[ "${{ needs.destroy-infrastructure.result }}" == "success" ]]; then
+              echo "✅ Infrastructure Destroyed"
+            elif [[ "${{ needs.destroy-infrastructure.result }}" == "skipped" ]]; then
+              echo "⏭️  Infrastructure Destroy Skipped"
+            else
+              echo "❌ Infrastructure Destroy Failed"
+            fi
+            
+            if [[ "${{ needs.destroy-bootstrap.result }}" == "success" ]]; then
+              echo "✅ Bootstrap Destroyed"
+            elif [[ "${{ needs.destroy-bootstrap.result }}" == "skipped" ]]; then
+              echo "⏭️  Bootstrap Destroy Skipped"
+            else
+              echo "❌ Bootstrap Destroy Failed"
+            fi
+          fi
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════"
+          
+          # Check for failures
+          if [[ "${{ inputs.destroy_target }}" == "all" ]]; then
+            if [[ "${{ needs.destroy-all-admin-infrastructure.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-all-admin-bootstrap.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "failure" ]]; then
+              echo "❌ Destruction completed with errors"
+              exit 1
+            fi
+          else
+            if [[ "${{ needs.destroy-infrastructure.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-bootstrap.result }}" == "failure" ]]; then
+              echo "❌ Destruction completed with errors"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Destruction completed successfully"

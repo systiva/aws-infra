@@ -1,0 +1,24 @@
+{
+  "name": "jwt-authorizer",
+  "version": "1.0.0",
+  "description": "JWT Authorizer Lambda for API Gateway",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1490.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "jwt",
+    "authorizer",
+    "cognito"
+  ],
+  "author": "Platform Team",
+  "license": "MIT"
+}

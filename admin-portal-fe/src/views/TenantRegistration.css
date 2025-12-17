@@ -1,0 +1,149 @@
+.registration-view {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.registration-view h1 {
+  font-size: 2.5rem;
+  color: #1f2937;
+  margin-bottom: 2rem;
+}
+
+.registration-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+.form-section {
+  margin-bottom: 1.5rem;
+}
+
+.field-label {
+  display: block;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.field-input {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.25rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+.field-input:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.tier-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 2rem 0;
+}
+
+.tier-info h3 {
+  margin-bottom: 1rem;
+  color: #1e3a5f;
+}
+
+.tier-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tier-info li {
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.tier-info li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #10b981;
+  font-weight: bold;
+}
+
+.submit-button {
+  width: 100%;
+  padding: 1rem;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.submit-button:hover:not(:disabled) {
+  background: #357abd;
+}
+
+.submit-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Admin Section Styling */
+.admin-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 2rem 0;
+}
+
+.admin-section h3 {
+  margin-bottom: 0.5rem;
+  color: #1e3a5f;
+  font-size: 1.25rem;
+}
+
+.admin-info {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Form Row Layout */
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.half-width {
+  flex: 1;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .half-width {
+    flex: none;
+  }
+}

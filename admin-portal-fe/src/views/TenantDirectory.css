@@ -1,0 +1,220 @@
+.directory-view {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.directory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.directory-header h1 {
+  font-size: 2.5rem;
+  color: #1f2937;
+  margin: 0;
+}
+
+.search-input {
+  width: 300px;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+  font-size: 1.125rem;
+  color: #6b7280;
+}
+
+.tenant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 1.5rem;
+}
+
+.tenant-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.tenant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.12);
+}
+
+.tenant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tenant-header h3 {
+  margin: 0;
+  color: #1f2937;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-badge.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.suspended {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-badge.creating {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.pending {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.tenant-details {
+  margin-bottom: 1.5rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+}
+
+.detail-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #1f2937;
+}
+
+.tier-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.tier-badge.starter {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.tier-badge.growth {
+  background: #ddd6fe;
+  color: #5b21b6;
+}
+
+.tier-badge.enterprise {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tenant-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.action-btn:not(.secondary) {
+  background: #4a90e2;
+  color: white;
+}
+
+.action-btn:not(.secondary):hover:not(:disabled) {
+  background: #357abd;
+}
+
+.action-btn.secondary {
+  background: #ef4444;
+  color: white;
+}
+
+.action-btn.secondary:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.action-btn.suspend-btn {
+  background: #f59e0b;
+  color: white;
+}
+
+.action-btn.suspend-btn:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.action-btn.activate-btn {
+  background: #10b981;
+  color: white;
+}
+
+.action-btn.activate-btn:hover:not(:disabled) {
+  background: #059669;
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-badge.inactive {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+}
+
+.empty-state p {
+  font-size: 1.125rem;
+}
