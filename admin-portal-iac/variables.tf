@@ -475,3 +475,9 @@ variable "app_backend_log_level" {
   type        = string
   default     = "info"
 }
+
+variable "ims_api_url" {
+  description = "IMS API URL - AUTO-SET by null_resource after API Gateway is created. No manual configuration needed."
+  type        = string
+  default     = ""
+}

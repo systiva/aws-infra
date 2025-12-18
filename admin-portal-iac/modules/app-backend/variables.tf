@@ -115,3 +115,9 @@ variable "common_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "ims_api_url" {
+  description = "IMS API URL - AUTO-SET by null_resource after API Gateway is created"
+  type        = string
+  default     = ""
+}

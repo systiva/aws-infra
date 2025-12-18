@@ -436,6 +436,11 @@ module "app_backend" {
   workspace_prefix        = var.workspace_prefix
   aws_region              = var.aws_region
 
+  # IMS API URL for Cognito authentication
+  # On first deploy, this will be empty. After API Gateway is created,
+  # the Lambda env vars are updated by the null_resource below.
+  ims_api_url = var.ims_api_url
+
   # Tags
   common_tags = local.common_tags
 
@@ -760,4 +765,31 @@ module "platform_bootstrap" {
   common_tags = local.common_tags
 
   depends_on = [module.cognito]
+}
+
+# -----------------------------------------------------------------------------
+# Update App Backend Lambda with IMS API URL after API Gateway is created
+# This solves the chicken-and-egg problem where:
+# 1. App Backend Lambda needs IMS_API_URL
+# 2. API Gateway needs Lambda ARN to create
+# 3. IMS_API_URL is the API Gateway URL
+# -----------------------------------------------------------------------------
+resource "null_resource" "update_app_backend_ims_url" {
+  count = var.enable_app_backend && var.enable_api_gateway ? 1 : 0
+
+  triggers = {
+    api_gateway_url = module.api_gateway[0].api_gateway_url
+    lambda_arn      = module.app_backend[0].lambda_function_arn
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws lambda update-function-configuration \
+        --function-name ${module.app_backend[0].lambda_function_name} \
+        --environment "Variables={NODE_ENV=${var.workspace_prefix},LOG_LEVEL=${var.log_level},TENANT_REGISTRY_TABLE_NAME=${local.tenant_registry_table_name},ADMIN_ACCOUNT_ID=${var.admin_account_id},TENANT_ACCOUNT_ID=${var.tenant_account_id},CROSS_ACCOUNT_ROLE_NAME=${var.cross_account_role_name},WORKSPACE=${var.workspace_prefix},AWS_REGION_NAME=${var.aws_region},IMS_API_URL=${module.api_gateway[0].api_gateway_url}}" \
+        --region ${var.aws_region}
+    EOT
+  }
+
+  depends_on = [module.app_backend, module.api_gateway]
 }

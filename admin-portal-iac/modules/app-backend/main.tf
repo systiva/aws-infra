@@ -42,6 +42,11 @@ resource "aws_lambda_function" "app_backend" {
       CROSS_ACCOUNT_ROLE_NAME          = var.cross_account_role_name
       WORKSPACE                        = var.workspace_prefix
       AWS_REGION_NAME                  = var.aws_region
+
+      # IMS API URL for Cognito authentication
+      # This allows the backend to proxy auth requests to the IMS service
+      IMS_API_URL                      = var.ims_api_url
+      STORAGE_MODE                     = "dynamodb"
     }
   }
 

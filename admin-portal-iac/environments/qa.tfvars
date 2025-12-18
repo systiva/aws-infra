@@ -121,3 +121,4 @@ enable_app_backend       = true
 app_backend_timeout      = 30
 app_backend_memory_size  = 512
 app_backend_log_level    = "info"
+# Note: IMS_API_URL is automatically set by Terraform null_resource after API Gateway is created
