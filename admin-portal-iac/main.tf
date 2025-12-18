@@ -786,7 +786,7 @@ resource "null_resource" "update_app_backend_ims_url" {
     command = <<-EOT
       aws lambda update-function-configuration \
         --function-name ${module.app_backend[0].lambda_function_name} \
-        --environment "Variables={NODE_ENV=${var.workspace_prefix},LOG_LEVEL=${var.log_level},TENANT_REGISTRY_TABLE_NAME=${local.tenant_registry_table_name},ADMIN_ACCOUNT_ID=${var.admin_account_id},TENANT_ACCOUNT_ID=${var.tenant_account_id},CROSS_ACCOUNT_ROLE_NAME=${var.cross_account_role_name},WORKSPACE=${var.workspace_prefix},AWS_REGION_NAME=${var.aws_region},IMS_API_URL=${module.api_gateway[0].api_gateway_url}}" \
+        --environment "Variables={NODE_ENV=${var.workspace_prefix},LOG_LEVEL=${var.app_backend_log_level},TENANT_REGISTRY_TABLE_NAME=${local.tenant_registry_table_name},ADMIN_ACCOUNT_ID=${local.admin_account_id},TENANT_ACCOUNT_ID=${local.tenant_account_id},CROSS_ACCOUNT_ROLE_NAME=${local.cross_account_role_name},WORKSPACE=${var.workspace_prefix},AWS_REGION_NAME=${var.aws_region},IMS_API_URL=${module.api_gateway[0].api_gateway_url}}" \
         --region ${var.aws_region}
     EOT
   }
