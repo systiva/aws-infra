@@ -130,7 +130,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: tripleh1701-dev/ppp-fe
-          ref: main
+          ref: main-cognito
 
       - name: Verify Checkout
         run: |
