@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       api_url: ${{ steps.config.outputs.api_url }}
+      api_base_url: ${{ steps.config.outputs.api_base_url }}
       cognito_user_pool_id: ${{ steps.config.outputs.cognito_user_pool_id }}
       cognito_client_id: ${{ steps.config.outputs.cognito_client_id }}
       cognito_domain: ${{ steps.config.outputs.cognito_domain }}
@@ -157,9 +158,12 @@ jobs:
 
       - name: Create Environment Configuration
         run: |
+          # Use api_base_url (without /api/v1) so frontend can construct full paths
+          # Frontend code adds /api/auth/login, /api/app/*, etc.
           cat > .env.production << EOF
           NEXT_PUBLIC_ENV=${{ inputs.workspace }}
-          NEXT_PUBLIC_API_BASE_URL=${{ needs.get-config.outputs.api_url }}
+          NEXT_PUBLIC_API_BASE_URL=${{ needs.get-config.outputs.api_base_url }}
+          NEXT_PUBLIC_API_BASE=${{ needs.get-config.outputs.api_base_url }}
           NEXT_PUBLIC_API_URL=${{ needs.get-config.outputs.api_url }}
           NEXT_PUBLIC_COGNITO_USER_POOL_ID=${{ needs.get-config.outputs.cognito_user_pool_id }}
           NEXT_PUBLIC_COGNITO_CLIENT_ID=${{ needs.get-config.outputs.cognito_client_id }}
@@ -169,7 +173,8 @@ jobs:
           EOF
 
           cp .env.production .env.local
-          echo "Environment configuration created"
+          echo "Environment configuration created:"
+          cat .env.production
 
       - name: Configure Next.js for Static Export
         run: |
