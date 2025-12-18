@@ -22,6 +22,7 @@ locals {
     ims_service_lambda_uri    = var.ims_service_lambda_invoke_arn
     oms_service_lambda_uri    = var.oms_service_lambda_invoke_arn
     app_frontend_lambda_uri   = var.app_frontend_lambda_invoke_arn
+    app_backend_lambda_uri    = var.app_backend_lambda_invoke_arn
     jwt_authorizer_uri        = var.enable_jwt_authorizer ? var.jwt_authorizer_lambda_invoke_arn : ""
     jwt_authorizer_enabled    = var.enable_jwt_authorizer
   })
@@ -407,6 +408,61 @@ resource "aws_lambda_permission" "app_frontend_fonts" {
   function_name = var.app_frontend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/fonts/*"
+}
+
+# ==============================================
+# Sys App Backend Lambda Permissions (Workflow 10)
+# Routes: /api/v1/app/* - Sys App API endpoints
+# ==============================================
+
+# Permission 1: /api/v1/app (base endpoint)
+resource "aws_lambda_permission" "app_backend_base" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app"
+}
+
+# Permission 2: /api/v1/app/* (all sub-paths)
+resource "aws_lambda_permission" "app_backend_all" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendAll"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/*"
+}
+
+# Permission 3: /api/v1/app/enterprises (enterprise management)
+resource "aws_lambda_permission" "app_backend_enterprises" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendEnterprises"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/enterprises/*"
+}
+
+# Permission 4: /api/v1/app/pipelines (pipeline management)
+resource "aws_lambda_permission" "app_backend_pipelines" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendPipelines"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/pipelines/*"
+}
+
+# Permission 5: /api/v1/app/templates (template management)
+resource "aws_lambda_permission" "app_backend_templates" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendTemplates"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/templates/*"
 }
 
 # ==============================================

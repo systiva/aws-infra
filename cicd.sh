@@ -2,7 +2,7 @@
 
 # Multi-Tenant POC CI/CD Pipeline Script
 # Tool-agnostic bash script for local development and CI/CD integration
-# 
+#
 # Usage: ./cicd.sh <command> [options]
 # Example: ./cicd.sh full-pipeline --env=dev --profile=fct_fct.admin
 
@@ -43,7 +43,12 @@ AUTO_APPROVE=false
 BACKEND_BUCKET=""
 
 # Valid service names
-VALID_SERVICES=("create-infra-worker" "delete-infra-worker" "poll-infra-worker" "create-admin-worker" "setup-rbac-worker" "jwt-authorizer" "admin-portal-be" "ims-service" "oms-service" "admin-portal-web-server" "admin-portal-fe")
+VALID_SERVICES=("create-infra-worker" "delete-infra-worker" "poll-infra-worker" "create-admin-worker" "setup-rbac-worker" "jwt-authorizer" "admin-portal-be" "ims-service" "oms-service" "admin-portal-web-server" "admin-portal-fe" "sys-app-be")
+
+# Sys App Backend Remote Git Repository
+SYS_APP_BE_GIT_REPO="https://github.com/tripleh1701-dev/ppp-be.git"
+SYS_APP_BE_GIT_BRANCH="main"
+SYS_APP_BE_DIR="sys-app-be"
 
 # Directories
 IAC_DIR="admin-portal-iac"
@@ -114,28 +119,28 @@ put_ssm_parameter() {
     local param_type=${3:-"String"}  # String, StringList, SecureString
     local description=${4:-"Managed by admin-portal CI/CD"}
     local overwrite=${5:-"true"}
-    
+
     print_info "Setting SSM parameter: ${param_path}"
-    
+
     local put_cmd="aws ssm put-parameter \
         --name \"${param_path}\" \
         --value \"${param_value}\" \
         --type \"${param_type}\" \
         --region \"${AWS_REGION}\""
-    
+
     if [[ -n "$description" ]]; then
         put_cmd="${put_cmd} --description \"${description}\""
     fi
-    
+
     if [[ "$overwrite" == "true" ]]; then
         put_cmd="${put_cmd} --overwrite"
     fi
-    
+
     if ! eval "$put_cmd" 2>/dev/null; then
         print_error "Failed to set parameter: ${param_path}"
         return 1
     fi
-    
+
     print_success "Parameter set: ${param_path}"
 }
 
@@ -143,23 +148,23 @@ put_ssm_parameter() {
 get_ssm_parameter() {
     local param_path=$1
     local with_decryption=${2:-"true"}
-    
+
     local get_cmd="aws ssm get-parameter \
         --name \"${param_path}\" \
         --region \"${AWS_REGION}\" \
         --query 'Parameter.Value' \
         --output text"
-    
+
     if [[ "$with_decryption" == "true" ]]; then
         get_cmd="${get_cmd} --with-decryption"
     fi
-    
+
     local value
     if ! value=$(eval "$get_cmd" 2>/dev/null); then
         print_error "Parameter not found: ${param_path}"
         return 1
     fi
-    
+
     echo "$value"
 }
 
@@ -168,7 +173,7 @@ get_ssm_parameter_or_default() {
     local param_path=$1
     local default_value=$2
     local with_decryption=${3:-"true"}
-    
+
     local value
     if value=$(get_ssm_parameter "$param_path" "$with_decryption" 2>/dev/null); then
         echo "$value"
@@ -180,7 +185,7 @@ get_ssm_parameter_or_default() {
 # Check if parameter exists
 ssm_parameter_exists() {
     local param_path=$1
-    
+
     if aws ssm get-parameter \
         --name "$param_path" \
         --region "${AWS_REGION}" \
@@ -195,16 +200,16 @@ ssm_parameter_exists() {
 # Delete parameter
 delete_ssm_parameter() {
     local param_path=$1
-    
+
     print_info "Deleting SSM parameter: ${param_path}"
-    
+
     if ! aws ssm delete-parameter \
         --name "$param_path" \
         --region "${AWS_REGION}" 2>/dev/null; then
         print_warning "Parameter not found or already deleted: ${param_path}"
         return 0
     fi
-    
+
     print_success "Parameter deleted: ${param_path}"
 }
 
@@ -213,21 +218,21 @@ get_ssm_parameters_by_path() {
     local path_prefix=$1
     local recursive=${2:-"true"}
     local with_decryption=${3:-"true"}
-    
+
     local get_cmd="aws ssm get-parameters-by-path \
         --path \"${path_prefix}\" \
         --region \"${AWS_REGION}\" \
         --query 'Parameters[*].[Name,Value]' \
         --output text"
-    
+
     if [[ "$recursive" == "true" ]]; then
         get_cmd="${get_cmd} --recursive"
     fi
-    
+
     if [[ "$with_decryption" == "true" ]]; then
         get_cmd="${get_cmd} --with-decryption"
     fi
-    
+
     eval "$get_cmd"
 }
 
@@ -236,28 +241,28 @@ upload_terraform_outputs_to_ssm() {
     local workspace=$1
     local account_type=$2  # admin/tenant
     local category=$3      # bootstrap/infrastructure
-    
+
     local ssm_prefix=$(get_ssm_prefix "$workspace")
     local base_path="${ssm_prefix}/${account_type}/${category}"
-    
+
     print_header "📤 Uploading Terraform Outputs to SSM"
     print_info "Base path: ${base_path}"
-    
+
     # Get Terraform outputs as JSON
     local outputs_json
     outputs_json=$(terraform output -json 2>/dev/null)
-    
+
     if [[ -z "$outputs_json" || "$outputs_json" == "{}" ]]; then
         print_warning "No Terraform outputs found"
         return 0
     fi
-    
+
     # Parse and upload each output
     echo "$outputs_json" | jq -r 'to_entries[] | "\(.key)=\(.value.value)"' | while IFS='=' read -r key value; do
         # Handle nested outputs (convert dots/underscores to slashes)
         local param_path="${base_path}/${key}"
         param_path=$(echo "$param_path" | tr '_' '-')
-        
+
         # Determine parameter type
         local param_type="String"
         if [[ "$key" =~ (password|secret|key-id|client-id) ]]; then
@@ -267,22 +272,22 @@ upload_terraform_outputs_to_ssm() {
             # Convert JSON array to comma-separated string
             value=$(echo "$value" | jq -r 'if type == "array" then join(",") else . end')
         fi
-        
+
         # Upload parameter
         put_ssm_parameter "$param_path" "$value" "$param_type"
     done
-    
+
     # Set metadata
     put_ssm_parameter "${base_path}/metadata/deployed-at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     put_ssm_parameter "${base_path}/metadata/version" "1.0"
-    
+
     local tf_version
     tf_version=$(terraform version -json 2>/dev/null | jq -r '.terraform_version' || echo "unknown")
     put_ssm_parameter "${base_path}/metadata/terraform-version" "$tf_version"
-    
+
     # Set status
     put_ssm_parameter "${base_path}/status" "completed"
-    
+
     print_success "✅ All outputs uploaded to SSM"
 }
 
@@ -291,29 +296,29 @@ download_ssm_parameters_as_env() {
     local workspace=$1
     local account_type=$2
     local category=$3
-    
+
     local ssm_prefix=$(get_ssm_prefix "$workspace")
     local base_path="${ssm_prefix}/${account_type}/${category}"
-    
+
     print_header "📥 Downloading SSM Parameters"
     print_info "Base path: ${base_path}"
-    
+
     # Get all parameters recursively
     local params
     params=$(get_ssm_parameters_by_path "$base_path" "true" "true")
-    
+
     if [[ -z "$params" ]]; then
         print_error "No parameters found at: ${base_path}"
         return 1
     fi
-    
+
     # Parse and export as environment variables
     echo "$params" | while read -r param_name param_value; do
         # Convert parameter path to env var name
         # /admin-portal/qa/admin/bootstrap/backend-bucket -> ADMIN_BOOTSTRAP_BACKEND_BUCKET
         local env_var_name
         env_var_name=$(echo "$param_name" | sed "s|${ssm_prefix}/||" | tr '/' '_' | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-        
+
         export "${env_var_name}=${param_value}"
         print_success "Exported: ${env_var_name}"
     done
@@ -324,12 +329,12 @@ validate_ssm_parameters() {
     local workspace=$1
     shift
     local required_params=("$@")
-    
+
     local ssm_prefix=$(get_ssm_prefix "$workspace")
     local missing_params=()
-    
+
     print_header "🔍 Validating Required Parameters"
-    
+
     for param_path in "${required_params[@]}"; do
         local full_path="${ssm_prefix}/${param_path}"
         if ! ssm_parameter_exists "$full_path"; then
@@ -339,12 +344,12 @@ validate_ssm_parameters() {
             print_success "Found: ${full_path}"
         fi
     done
-    
+
     if [[ ${#missing_params[@]} -gt 0 ]]; then
         print_error "❌ Missing ${#missing_params[@]} required parameters"
         return 1
     fi
-    
+
     print_success "✅ All required parameters exist"
     return 0
 }
@@ -353,17 +358,17 @@ validate_ssm_parameters() {
 cleanup_ssm_parameters() {
     local workspace=$1
     local account_type=$2  # admin/tenant/shared or empty for all
-    
+
     local ssm_prefix=$(get_ssm_prefix "$workspace")
     local base_path="$ssm_prefix"
-    
+
     if [[ -n "$account_type" ]]; then
         base_path="${ssm_prefix}/${account_type}"
     fi
-    
+
     print_header "🗑️  Cleaning up SSM Parameters"
     print_warning "This will delete all parameters under: ${base_path}"
-    
+
     # Get all parameters
     local params
     params=$(aws ssm get-parameters-by-path \
@@ -372,17 +377,17 @@ cleanup_ssm_parameters() {
         --region "${AWS_REGION}" \
         --query 'Parameters[*].Name' \
         --output text 2>/dev/null || echo "")
-    
+
     if [[ -z "$params" ]]; then
         print_info "No parameters found to delete"
         return 0
     fi
-    
+
     # Delete each parameter
     for param_name in $params; do
         delete_ssm_parameter "$param_name"
     done
-    
+
     print_success "✅ Cleanup complete"
 }
 
@@ -391,36 +396,36 @@ destroy_bootstrap_resources() {
     local workspace=$1
     local account_type=$2  # admin or tenant
     local region=${3:-"${AWS_REGION}"}
-    
+
     print_header "🔥 Destroying Bootstrap Resources"
     print_warning "Workspace: ${workspace}"
     print_warning "Account Type: ${account_type}"
     print_warning "Region: ${region}"
-    
+
     local ssm_prefix=$(get_ssm_prefix "$workspace")
     local bootstrap_path="${ssm_prefix}/${account_type}/bootstrap"
-    
+
     # Step 1: Read bootstrap configuration from SSM
     print_info "📖 Reading bootstrap configuration from SSM..."
-    
+
     local backend_bucket
     local dynamodb_table
-    
+
     backend_bucket=$(get_ssm_parameter "${bootstrap_path}/backend-bucket" "false")
     dynamodb_table=$(get_ssm_parameter "${bootstrap_path}/dynamodb-table" "false")
-    
+
     if [[ -z "$backend_bucket" ]]; then
         print_error "Bootstrap configuration not found in SSM"
         print_info "Expected path: ${bootstrap_path}"
         return 1
     fi
-    
+
     print_info "Backend Bucket: ${backend_bucket}"
     print_info "DynamoDB Table: ${dynamodb_table}"
-    
+
     # Step 2: Empty and delete S3 bucket
     print_header "🗑️  Deleting S3 Bucket"
-    
+
     if aws s3 ls "s3://${backend_bucket}" --region "${region}" 2>/dev/null; then
         print_info "Emptying bucket: ${backend_bucket}"
         if aws s3 rm "s3://${backend_bucket}" --recursive --region "${region}"; then
@@ -429,7 +434,7 @@ destroy_bootstrap_resources() {
             print_error "Failed to empty bucket"
             return 1
         fi
-        
+
         print_info "Deleting bucket: ${backend_bucket}"
         if aws s3 rb "s3://${backend_bucket}" --force --region "${region}"; then
             print_success "S3 bucket deleted: ${backend_bucket}"
@@ -440,10 +445,10 @@ destroy_bootstrap_resources() {
     else
         print_warning "Bucket not found or already deleted: ${backend_bucket}"
     fi
-    
+
     # Step 3: Delete DynamoDB table
     print_header "🗑️  Deleting DynamoDB Table"
-    
+
     if aws dynamodb describe-table --table-name "${dynamodb_table}" --region "${region}" 2>/dev/null; then
         print_info "Deleting table: ${dynamodb_table}"
         if aws dynamodb delete-table --table-name "${dynamodb_table}" --region "${region}"; then
@@ -458,11 +463,11 @@ destroy_bootstrap_resources() {
     else
         print_warning "Table not found or already deleted: ${dynamodb_table}"
     fi
-    
+
     # Step 4: Cleanup SSM parameters
     print_header "🗑️  Cleaning up SSM Parameters"
     cleanup_ssm_parameters "$workspace" "${account_type}/bootstrap"
-    
+
     print_success "✅ Bootstrap resources destroyed successfully"
     print_info ""
     print_info "Summary:"
@@ -482,13 +487,13 @@ validate_admin_command() {
         print_info "Allowed workspaces: ${ALLOWED_WORKSPACES[*]}"
         exit 1
     fi
-    
+
     if [[ -z "$AWS_ACCOUNT_ID" ]]; then
         print_error "AWS_ACCOUNT_ID is mandatory. Use --aws-account=ACCOUNT_ID"
         print_info "Example: --aws-account=583122682394"
         exit 1
     fi
-    
+
     validate_workspace
     print_success "Admin command validation passed"
 }
@@ -498,30 +503,30 @@ validate_tenant_command() {
         print_error "TERRAFORM_WORKSPACE is mandatory. Use --workspace=WORKSPACE"
         exit 1
     fi
-    
+
     if [[ -z "$AWS_ACCOUNT_ID" ]]; then
         print_error "AWS_ACCOUNT_ID (tenant) is mandatory. Use --aws-account=ACCOUNT_ID"
         exit 1
     fi
-    
+
     if [[ -z "$ADMIN_ACCOUNT_ID" ]]; then
         print_error "ADMIN_ACCOUNT_ID is mandatory. Use --admin-account=ACCOUNT_ID"
         exit 1
     fi
-    
+
     validate_workspace
     print_success "Tenant command validation passed"
 }
 
 validate_service_name() {
     local service_name="$1"
-    
+
     if [[ -z "$service_name" ]]; then
         print_error "Service name is required"
         print_info "Available services: ${VALID_SERVICES[*]}"
         exit 1
     fi
-    
+
     local service_valid=false
     for valid_service in "${VALID_SERVICES[@]}"; do
         if [[ "$service_name" == "$valid_service" ]]; then
@@ -529,13 +534,13 @@ validate_service_name() {
             break
         fi
     done
-    
+
     if [[ "$service_valid" == false ]]; then
         print_error "Invalid service: '$service_name'"
         print_info "Available services: ${VALID_SERVICES[*]}"
         exit 1
     fi
-    
+
     print_success "Service name validated: $service_name"
 }
 
@@ -550,7 +555,7 @@ validate_workspace() {
         print_info "Allowed values: ${ALLOWED_WORKSPACES[*]}"
         exit 1
     fi
-    
+
     # Check if workspace is in allowed list
     local workspace_valid=false
     for allowed_ws in "${ALLOWED_WORKSPACES[@]}"; do
@@ -559,14 +564,14 @@ validate_workspace() {
             break
         fi
     done
-    
+
     if [[ "$workspace_valid" == false ]]; then
         print_error "Invalid workspace: '$TERRAFORM_WORKSPACE'"
         print_info "Allowed workspaces: ${ALLOWED_WORKSPACES[*]}"
         print_info "Example: --workspace=dev or --workspace=prd"
         exit 1
     fi
-    
+
     WORKSPACE_PREFIX="$TERRAFORM_WORKSPACE"
     print_success "Workspace validated: $TERRAFORM_WORKSPACE"
 }
@@ -574,15 +579,15 @@ validate_workspace() {
 # Generate workspace-aware resource names
 generate_resource_names() {
     validate_workspace
-    
+
     # Resource naming pattern: {workspace}-{project}-{component}
     ADMIN_NAME_PREFIX="${WORKSPACE_PREFIX}-admin-portal"
     TENANT_NAME_PREFIX="${WORKSPACE_PREFIX}-tenant-infra"
-    
+
     # State bucket naming: {workspace}-{project}-terraform-state-{account-id}
     ADMIN_STATE_BUCKET="${WORKSPACE_PREFIX}-admin-portal-terraform-state-${ADMIN_ACCOUNT_ID}"
     TENANT_STATE_BUCKET="${WORKSPACE_PREFIX}-tenant-infra-terraform-state-${TENANT_ACCOUNT_ID}"
-    
+
     print_info "Resource naming:"
     print_info "   Admin Prefix: $ADMIN_NAME_PREFIX"
     print_info "   Tenant Prefix: $TENANT_NAME_PREFIX"
@@ -591,9 +596,9 @@ generate_resource_names() {
 # Admin workspace management
 manage_admin_workspace() {
     print_info "Managing Admin Terraform workspace: $TERRAFORM_WORKSPACE"
-    
+
     cd "$IAC_DIR"
-    
+
     # Initialize with workspace-specific backend - handle configuration changes
     print_info "Initializing Terraform with backend config: backend-${TERRAFORM_WORKSPACE}.conf"
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
@@ -608,7 +613,7 @@ manage_admin_workspace() {
             terraform init -reconfigure -backend-config="backend-${TERRAFORM_WORKSPACE}.conf"
         fi
     fi
-    
+
     # Select or create workspace
     if ! terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${TERRAFORM_WORKSPACE}[[:space:]]*$"; then
         print_info "Creating new workspace: $TERRAFORM_WORKSPACE"
@@ -617,14 +622,14 @@ manage_admin_workspace() {
         print_info "Selecting existing workspace: $TERRAFORM_WORKSPACE"
         terraform workspace select "$TERRAFORM_WORKSPACE"
     fi
-    
+
     # Verify workspace
     CURRENT_WS=$(terraform workspace show)
     if [[ "$CURRENT_WS" != "$TERRAFORM_WORKSPACE" ]]; then
         print_error "Failed to select workspace $TERRAFORM_WORKSPACE (current: $CURRENT_WS)"
         exit 1
     fi
-    
+
     print_success "Admin workspace ready: $CURRENT_WS"
     cd - > /dev/null
 }
@@ -632,9 +637,9 @@ manage_admin_workspace() {
 # Tenant workspace management
 manage_tenant_workspace() {
     print_info "Managing Tenant Terraform workspace: $TERRAFORM_WORKSPACE"
-    
+
     cd "$TENANT_IAC_DIR"
-    
+
     # Initialize with workspace-specific backend - handle configuration changes
     print_info "Initializing Terraform with backend config: backend-${TERRAFORM_WORKSPACE}.conf"
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
@@ -649,7 +654,7 @@ manage_tenant_workspace() {
             terraform init -reconfigure -backend-config="backend-${TERRAFORM_WORKSPACE}.conf"
         fi
     fi
-    
+
     # Select or create workspace
     if ! terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${TERRAFORM_WORKSPACE}[[:space:]]*$"; then
         print_info "Creating new workspace: $TERRAFORM_WORKSPACE"
@@ -658,14 +663,14 @@ manage_tenant_workspace() {
         print_info "Selecting existing workspace: $TERRAFORM_WORKSPACE"
         terraform workspace select "$TERRAFORM_WORKSPACE"
     fi
-    
+
     # Verify workspace
     CURRENT_WS=$(terraform workspace show)
     if [[ "$CURRENT_WS" != "$TERRAFORM_WORKSPACE" ]]; then
         print_error "Failed to select workspace $TERRAFORM_WORKSPACE (current: $CURRENT_WS)"
         exit 1
     fi
-    
+
     print_success "Tenant workspace ready: $CURRENT_WS"
     cd - > /dev/null
 }
@@ -673,31 +678,31 @@ manage_tenant_workspace() {
 # Validate workspace consistency between admin and tenant
 validate_workspace_consistency() {
     print_info "Validating workspace consistency"
-    
+
     # Check admin workspace
     cd "$IAC_DIR"
     terraform init -backend-config="${TERRAFORM_WORKSPACE}.conf" > /dev/null
     ADMIN_WORKSPACE=$(terraform workspace show)
     cd - > /dev/null
-    
+
     # Check tenant workspace if tenant IAC exists
     if [[ -d "$TENANT_IAC_DIR" ]]; then
         cd "$TENANT_IAC_DIR"
         terraform init -backend-config="${TERRAFORM_WORKSPACE}.conf" > /dev/null
         TENANT_WORKSPACE=$(terraform workspace show)
         cd - > /dev/null
-        
+
         if [[ "$ADMIN_WORKSPACE" != "$TENANT_WORKSPACE" ]]; then
             print_error "Workspace mismatch: Admin=$ADMIN_WORKSPACE, Tenant=$TENANT_WORKSPACE"
             exit 1
         fi
     fi
-    
+
     if [[ "$ADMIN_WORKSPACE" != "$TERRAFORM_WORKSPACE" ]]; then
         print_error "Current workspace ($ADMIN_WORKSPACE) doesn't match requested ($TERRAFORM_WORKSPACE)"
         exit 1
     fi
-    
+
     print_success "Workspace consistency validated: $TERRAFORM_WORKSPACE"
 }
 
@@ -717,7 +722,7 @@ Optional Parameters:
 
 Allowed Workspaces:
   dev  - Development environment
-  qa   - Quality Assurance environment  
+  qa   - Quality Assurance environment
   prd  - Production environment
   uat  - User Acceptance Testing environment
 
@@ -736,12 +741,12 @@ EOF
 bootstrap_admin_infrastructure() {
     print_header "Bootstrapping Admin Infrastructure"
     validate_admin_command
-    
+
     print_info "Account: $AWS_ACCOUNT_ID, Workspace: $TERRAFORM_WORKSPACE, Profile: $AWS_ADMIN_PROFILE"
-    
+
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
-    
+
     cd "$IAC_DIR/bootstrap"
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
@@ -768,10 +773,10 @@ bootstrap_admin_infrastructure() {
 plan_admin_infrastructure() {
     print_header "Planning Admin Infrastructure"
     validate_admin_command
-    
+
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
-    
+
     manage_admin_workspace
     cd "$IAC_DIR"
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
@@ -797,18 +802,18 @@ plan_admin_infrastructure() {
 apply_admin_infrastructure() {
     print_header "Applying Admin Infrastructure"
     validate_admin_command
-    
+
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
-    
+
     manage_admin_workspace
     cd "$IAC_DIR"
-    
+
     if [[ ! -f "tfplan-${TERRAFORM_WORKSPACE}" ]]; then
         print_error "Plan file not found. Run: ./cicd.sh admin-plan --workspace=${TERRAFORM_WORKSPACE} --aws-account=${AWS_ACCOUNT_ID}"
         exit 1
     fi
-    
+
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
         AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
@@ -822,7 +827,7 @@ apply_admin_infrastructure() {
 destroy_admin_infrastructure() {
     print_header "💥 Destroying Admin Infrastructure"
     print_warning "⚠️  This will destroy all admin infrastructure!"
-    
+
     # Skip confirmation prompt if --auto-approve is set
     if [[ "$AUTO_APPROVE" != "true" ]]; then
         echo "Press Ctrl+C to cancel, or Enter to continue..."
@@ -830,18 +835,18 @@ destroy_admin_infrastructure() {
     else
         print_info "Auto-approve enabled, skipping confirmation prompt"
     fi
-    
+
     validate_admin_command
-    
+
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_aws_profile="$AWS_ADMIN_PROFILE"
-    
+
     cd "$IAC_DIR"
-    
+
     # Use custom backend bucket if provided (skip manage_admin_workspace)
     if [[ -n "$BACKEND_BUCKET" ]]; then
         print_info "Using custom backend bucket: $BACKEND_BUCKET"
-        
+
         # Initialize with custom backend config
         if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
             AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform init -reconfigure \
@@ -858,7 +863,7 @@ destroy_admin_infrastructure() {
                 -backend-config="dynamodb_table=admin-portal-${TERRAFORM_WORKSPACE}-terraform-lock" \
                 -backend-config="encrypt=true"
         fi
-        
+
         # Select workspace
         if ! terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${TERRAFORM_WORKSPACE}[[:space:]]*$"; then
             print_info "Creating new workspace: $TERRAFORM_WORKSPACE"
@@ -867,7 +872,7 @@ destroy_admin_infrastructure() {
             print_info "Selecting existing workspace: $TERRAFORM_WORKSPACE"
             terraform workspace select "$TERRAFORM_WORKSPACE"
         fi
-        
+
         print_success "Admin workspace ready: $TERRAFORM_WORKSPACE"
     else
         # Use standard workspace management
@@ -875,7 +880,7 @@ destroy_admin_infrastructure() {
         manage_admin_workspace
         cd "$IAC_DIR"
     fi
-    
+
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
         AWS_PROFILE="$AWS_ADMIN_PROFILE" terraform destroy \
@@ -902,13 +907,13 @@ destroy_admin_infrastructure() {
 bootstrap_tenant_infrastructure() {
     print_header "🔧 Bootstrapping Tenant Infrastructure"
     validate_tenant_command
-    
+
     print_info "Tenant Account: $AWS_ACCOUNT_ID, Admin Account: $ADMIN_ACCOUNT_ID"
     print_info "Workspace: $TERRAFORM_WORKSPACE, Profile: $AWS_TENANT_PROFILE"
-    
+
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
-    
+
     cd "$TENANT_IAC_DIR/bootstrap"
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
@@ -937,10 +942,10 @@ bootstrap_tenant_infrastructure() {
 plan_tenant_infrastructure() {
     print_header "📋 Planning Tenant Infrastructure"
     validate_tenant_command
-    
+
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
-    
+
     manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
@@ -968,18 +973,18 @@ plan_tenant_infrastructure() {
 apply_tenant_infrastructure() {
     print_header "🚀 Applying Tenant Infrastructure"
     validate_tenant_command
-    
+
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
-    
+
     manage_tenant_workspace
     cd "$TENANT_IAC_DIR"
-    
+
     if [[ ! -f "tfplan-${TERRAFORM_WORKSPACE}" ]]; then
         print_error "Plan file not found. Run tenant-plan first"
         exit 1
     fi
-    
+
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
         AWS_PROFILE="$AWS_TENANT_PROFILE" terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
@@ -993,7 +998,7 @@ apply_tenant_infrastructure() {
 destroy_tenant_infrastructure() {
     print_header "💥 Destroying Tenant Infrastructure"
     print_warning "⚠️  This will destroy all tenant infrastructure!"
-    
+
     # Skip confirmation prompt if --auto-approve is set
     if [[ "$AUTO_APPROVE" != "true" ]]; then
         echo "Press Ctrl+C to cancel, or Enter to continue..."
@@ -1001,18 +1006,18 @@ destroy_tenant_infrastructure() {
     else
         print_info "Auto-approve enabled, skipping confirmation prompt"
     fi
-    
+
     validate_tenant_command
-    
+
     # Export profile as Terraform variable for compatibility with CI/CD
     export TF_VAR_tenant_aws_profile="$AWS_TENANT_PROFILE"
-    
+
     cd "$TENANT_IAC_DIR"
-    
+
     # Use custom backend bucket if provided (skip manage_tenant_workspace)
     if [[ -n "$BACKEND_BUCKET" ]]; then
         print_info "Using custom backend bucket: $BACKEND_BUCKET"
-        
+
         # Initialize with custom backend config
         if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
             AWS_PROFILE="$AWS_TENANT_PROFILE" terraform init -reconfigure \
@@ -1029,7 +1034,7 @@ destroy_tenant_infrastructure() {
                 -backend-config="dynamodb_table=tenant-${TERRAFORM_WORKSPACE}-terraform-lock" \
                 -backend-config="encrypt=true"
         fi
-        
+
         # Select workspace
         if ! terraform workspace list | grep -q "^[[:space:]]*\*\?[[:space:]]*${TERRAFORM_WORKSPACE}[[:space:]]*$"; then
             print_info "Creating new workspace: $TERRAFORM_WORKSPACE"
@@ -1038,7 +1043,7 @@ destroy_tenant_infrastructure() {
             print_info "Selecting existing workspace: $TERRAFORM_WORKSPACE"
             terraform workspace select "$TERRAFORM_WORKSPACE"
         fi
-        
+
         print_success "Tenant workspace ready: $TERRAFORM_WORKSPACE"
     else
         # Use standard workspace management
@@ -1046,7 +1051,7 @@ destroy_tenant_infrastructure() {
         manage_tenant_workspace
         cd "$TENANT_IAC_DIR"
     fi
-    
+
     # Only set AWS_PROFILE if not using default (CI/CD compatibility)
     if [[ "$AWS_TENANT_PROFILE" != "default" ]]; then
         AWS_PROFILE="$AWS_TENANT_PROFILE" terraform destroy \
@@ -1079,9 +1084,9 @@ destroy_tenant_infrastructure() {
 build_service() {
     local service_name="$1"
     validate_service_name "$service_name"
-    
+
     print_header "🔨 Building Service: $service_name"
-    
+
     case "$service_name" in
         "admin-portal-fe")
             build_react_frontend
@@ -1095,6 +1100,9 @@ build_service() {
         "admin-portal-be"|"ims-service"|"oms-service")
             build_backend_service "$service_name"
             ;;
+        "sys-app-be")
+            build_sys_app_be_service
+            ;;
         *)
             print_error "Service build not implemented: $service_name"
             exit 1
@@ -1105,15 +1113,18 @@ build_service() {
 deploy_service() {
     local service_name="$1"
     validate_service_name "$service_name"
-    
+
     print_header "🚀 Deploying Service: $service_name"
-    
+
     case "$service_name" in
         "admin-portal-fe")
             deploy_react_frontend
             ;;
         "admin-portal-web-server"|"create-infra-worker"|"delete-infra-worker"|"poll-infra-worker"|"create-admin-worker"|"setup-rbac-worker"|"jwt-authorizer"|"admin-portal-be"|"ims-service"|"oms-service")
             deploy_lambda_or_backend_service "$service_name"
+            ;;
+        "sys-app-be")
+            deploy_sys_app_be_service
             ;;
         *)
             print_error "Service deployment not implemented: $service_name"
@@ -1125,9 +1136,9 @@ deploy_service() {
 test_service() {
     local service_name="$1"
     validate_service_name "$service_name"
-    
+
     print_header "🧪 Testing Service: $service_name"
-    
+
     case "$service_name" in
         "admin-portal-fe")
             test_react_frontend
@@ -1137,6 +1148,9 @@ test_service() {
             ;;
         "admin-portal-be"|"ims-service"|"oms-service"|"admin-portal-web-server")
             test_backend_service "$service_name"
+            ;;
+        "sys-app-be")
+            test_sys_app_be_service
             ;;
         *)
             print_error "Service testing not implemented: $service_name"
@@ -1148,7 +1162,7 @@ test_service() {
 # React frontend functions
 build_react_frontend() {
     print_info "Building React frontend: admin-portal-fe"
-    
+
     # Get API Gateway URL from Terraform outputs
     cd "$IAC_DIR"
     if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
@@ -1157,46 +1171,46 @@ build_react_frontend() {
         API_GATEWAY_URL=$(terraform output -raw admin_backend_api_url 2>/dev/null || echo "")
     fi
     cd - > /dev/null
-    
+
     if [[ -z "$API_GATEWAY_URL" ]]; then
         print_warning "Could not get API Gateway URL from Terraform output"
         print_info "Using fallback localhost URL for development"
         API_GATEWAY_URL="http://localhost:3001/api/v1"
     fi
-    
+
     print_info "Using API Gateway URL for both tenant and IMS APIs: $API_GATEWAY_URL"
-    
+
     cd "$FE_DIR"
-    
+
     print_info "Installing frontend dependencies"
     npm install
-    
+
     print_info "Running frontend build with dynamic API endpoint"
     # Set environment variables and build
     export REACT_APP_API_BASE_URL="$API_GATEWAY_URL"
     export REACT_APP_IMS_BASE_URL="$API_GATEWAY_URL"
     export REACT_APP_ENVIRONMENT="$TERRAFORM_WORKSPACE"
-    
+
     npm run build
-    
+
     if [[ -d "build" ]]; then
         print_success "✅ admin-portal-fe built successfully with API URL: $API_GATEWAY_URL"
     else
         print_error "admin-portal-fe build failed - build directory not found"
         exit 1
     fi
-    
+
     cd - > /dev/null
 }
 
 deploy_react_frontend() {
     print_info "Deploying React frontend: admin-portal-fe"
-    
+
     if [[ ! -d "$FE_DIR/build" ]]; then
         print_error "Frontend build not found. Run: ./cicd.sh build --service=admin-portal-fe"
         exit 1
     fi
-    
+
     cd "$IAC_DIR"
     # Use AWS_ADMIN_PROFILE for terraform output command
     if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
@@ -1205,7 +1219,7 @@ deploy_react_frontend() {
         BUCKET_NAME=$(terraform output -raw admin_portal_bucket_name 2>/dev/null || echo "")
     fi
     cd - > /dev/null
-    
+
     if [[ -n "$BUCKET_NAME" ]]; then
         # Use --profile only if not default
         if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
@@ -1223,16 +1237,16 @@ deploy_react_frontend() {
 
 test_react_frontend() {
     print_info "Testing React frontend: admin-portal-fe"
-    
+
     cd "$FE_DIR"
-    
+
     if [[ -f "package.json" ]] && grep -q '"test"' package.json; then
         npm test -- --coverage --watchAll=false
         print_success "✅ admin-portal-fe tests passed"
     else
         print_warning "No tests found for admin-portal-fe"
     fi
-    
+
     cd - > /dev/null
 }
 
@@ -1240,21 +1254,21 @@ test_react_frontend() {
 build_web_server_service() {
     local service_name="$1"
     print_info "Building web server service: $service_name"
-    
+
     if [[ ! -d "$WEB_SERVER_DIR" ]]; then
         print_error "Web server directory not found: $WEB_SERVER_DIR"
         exit 1
     fi
-    
+
     cd "$WEB_SERVER_DIR"
-    
+
     print_info "Installing dependencies for $service_name"
     npm ci --production
-    
+
     print_info "Creating deployment package for $service_name"
     zip -r "../admin-portal-iac/lambda-packages/${service_name}.zip" . \
         -x "node_modules/.cache/*" "*.test.js" "test/*" ".git/*"
-    
+
     cd - > /dev/null
     print_success "✅ $service_name built successfully"
 }
@@ -1263,21 +1277,21 @@ build_web_server_service() {
 build_lambda_service() {
     local service_name="$1"
     print_info "Building Lambda service: $service_name"
-    
+
     if [[ ! -d "$service_name" ]]; then
         print_error "Lambda directory not found: $service_name"
         exit 1
     fi
-    
+
     cd "$service_name"
-    
+
     print_info "Installing dependencies for $service_name"
     npm ci --production
-    
+
     print_info "Creating deployment package for $service_name"
     zip -r "../admin-portal-iac/lambda-packages/${service_name}.zip" . \
         -x "node_modules/.cache/*" "*.test.js" "test/*" ".git/*"
-    
+
     cd - > /dev/null
     print_success "✅ $service_name built successfully"
 }
@@ -1286,23 +1300,164 @@ build_lambda_service() {
 build_backend_service() {
     local service_name="$1"
     print_info "Building backend service: $service_name"
-    
+
     if [[ ! -d "$service_name" ]]; then
         print_error "Backend directory not found: $service_name"
         exit 1
     fi
-    
+
     cd "$service_name"
-    
+
     print_info "Installing dependencies for $service_name"
     npm ci --production
-    
+
     print_info "Creating deployment package for $service_name"
     zip -r "../admin-portal-iac/lambda-packages/${service_name}.zip" . \
         -x "node_modules/.cache/*" "*.test.js" "test/*" ".git/*" "coverage/*"
-    
+
     cd - > /dev/null
     print_success "✅ $service_name built successfully"
+}
+
+# ============================================================================
+# Sys App Backend Service Functions (Remote Git Checkout)
+# ============================================================================
+
+# Clone or update Sys App Backend from remote repository
+checkout_sys_app_be() {
+    print_info "📥 Checking out Sys App Backend from remote repository"
+    print_info "Repository: $SYS_APP_BE_GIT_REPO"
+    print_info "Branch: $SYS_APP_BE_GIT_BRANCH"
+
+    if [[ -d "$SYS_APP_BE_DIR" ]]; then
+        print_info "Directory exists, pulling latest changes..."
+        cd "$SYS_APP_BE_DIR"
+        git fetch origin
+        git checkout "$SYS_APP_BE_GIT_BRANCH"
+        git pull origin "$SYS_APP_BE_GIT_BRANCH"
+        cd - > /dev/null
+    else
+        print_info "Cloning repository..."
+        git clone --branch "$SYS_APP_BE_GIT_BRANCH" "$SYS_APP_BE_GIT_REPO" "$SYS_APP_BE_DIR"
+    fi
+
+    print_success "✅ Sys App Backend code checked out successfully"
+}
+
+# Build Sys App Backend service
+build_sys_app_be_service() {
+    print_header "🔨 Building Sys App Backend Service"
+
+    # First, checkout/update from remote repository
+    checkout_sys_app_be
+
+    if [[ ! -d "$SYS_APP_BE_DIR" ]]; then
+        print_error "Sys App Backend directory not found after checkout: $SYS_APP_BE_DIR"
+        exit 1
+    fi
+
+    cd "$SYS_APP_BE_DIR"
+
+    print_info "Installing dependencies for sys-app-be"
+    npm ci --production
+
+    # Build TypeScript if tsconfig exists
+    if [[ -f "tsconfig.json" ]]; then
+        print_info "Building TypeScript..."
+        npm run build 2>/dev/null || npx tsc 2>/dev/null || print_warning "No TypeScript build script found"
+    fi
+
+    print_info "Creating deployment package for sys-app-be"
+
+    # Create lambda-packages directory if it doesn't exist
+    mkdir -p "../admin-portal-iac/lambda-packages"
+
+    # Create deployment package (include dist if it exists, otherwise include src)
+    if [[ -d "dist" ]]; then
+        zip -r "../admin-portal-iac/lambda-packages/sys-app-be.zip" . \
+            -x "node_modules/.cache/*" "*.test.js" "*.test.ts" "test/*" ".git/*" "coverage/*" "src/*" "*.ts" "tsconfig.json"
+    else
+        zip -r "../admin-portal-iac/lambda-packages/sys-app-be.zip" . \
+            -x "node_modules/.cache/*" "*.test.js" "*.test.ts" "test/*" ".git/*" "coverage/*"
+    fi
+
+    cd - > /dev/null
+    print_success "✅ sys-app-be built successfully"
+}
+
+# Deploy Sys App Backend service
+deploy_sys_app_be_service() {
+    print_header "🚀 Deploying Sys App Backend Service"
+
+    local package_path="$IAC_DIR/lambda-packages/sys-app-be.zip"
+    if [[ ! -f "$package_path" ]]; then
+        print_error "Package not found: $package_path"
+        print_info "Run: ./cicd.sh build --service=sys-app-be --workspace=${TERRAFORM_WORKSPACE}"
+        exit 1
+    fi
+
+    cd "$IAC_DIR"
+    local full_function_name="sys-app-${TERRAFORM_WORKSPACE:-dev}-backend"
+
+    # Verify Lambda function exists before attempting update
+    print_info "Verifying Lambda function: $full_function_name"
+    if ! aws lambda get-function --function-name "$full_function_name" --profile "$AWS_ADMIN_PROFILE" > /dev/null 2>&1; then
+        print_error "Lambda function not found: $full_function_name"
+        print_error "The Lambda function does not exist in AWS."
+        print_info "Expected function name: $full_function_name"
+        print_info "Workspace: ${TERRAFORM_WORKSPACE}"
+        print_info ""
+        print_info "To create the Lambda function, run:"
+        print_info "  ./cicd.sh admin-apply --workspace=${TERRAFORM_WORKSPACE} --aws-account=${AWS_ACCOUNT_ID} --admin-profile=${AWS_ADMIN_PROFILE}"
+        exit 1
+    fi
+
+    print_info "Updating Lambda function code: $full_function_name"
+    if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
+        if aws lambda update-function-code \
+            --function-name "$full_function_name" \
+            --zip-file "fileb://lambda-packages/sys-app-be.zip" \
+            --profile "$AWS_ADMIN_PROFILE" > /dev/null; then
+            print_success "✅ sys-app-be deployed successfully to $full_function_name"
+        else
+            print_error "Failed to deploy sys-app-be"
+            print_error "Check AWS credentials and permissions"
+            exit 1
+        fi
+    else
+        if aws lambda update-function-code \
+            --function-name "$full_function_name" \
+            --zip-file "fileb://lambda-packages/sys-app-be.zip" > /dev/null; then
+            print_success "✅ sys-app-be deployed successfully to $full_function_name"
+        else
+            print_error "Failed to deploy sys-app-be"
+            print_error "Check AWS credentials and permissions"
+            exit 1
+        fi
+    fi
+
+    cd - > /dev/null
+}
+
+# Test Sys App Backend service
+test_sys_app_be_service() {
+    print_info "Testing Sys App Backend service: sys-app-be"
+
+    # Checkout if not exists
+    if [[ ! -d "$SYS_APP_BE_DIR" ]]; then
+        checkout_sys_app_be
+    fi
+
+    cd "$SYS_APP_BE_DIR"
+
+    if [[ -f "package.json" ]] && grep -q '"test"' package.json; then
+        npm test
+        print_success "✅ sys-app-be tests passed"
+    else
+        print_warning "No tests found for sys-app-be"
+    fi
+
+    cd - > /dev/null
 }
 
 # Unified deployment for Lambda and backend services
@@ -1310,7 +1465,7 @@ build_backend_service() {
 get_lambda_function_name() {
     local service_name="$1"
     local terraform_function_name
-    
+
     case "$service_name" in
         "admin-portal-web-server")
             terraform_function_name="web-server"
@@ -1334,17 +1489,17 @@ get_lambda_function_name() {
 deploy_lambda_or_backend_service() {
     local service_name="$1"
     print_info "Deploying service: $service_name"
-    
+
     local package_path="$IAC_DIR/lambda-packages/${service_name}.zip"
     if [[ ! -f "$package_path" ]]; then
         print_error "Package not found: $package_path"
         print_info "Run: ./cicd.sh build --service=$service_name --workspace=${TERRAFORM_WORKSPACE}"
         exit 1
     fi
-    
+
     cd "$IAC_DIR"
     local full_function_name=$(get_lambda_function_name "$service_name")
-    
+
     # Verify Lambda function exists before attempting update
     print_info "Verifying Lambda function: $full_function_name"
     if ! aws lambda get-function --function-name "$full_function_name" --profile "$AWS_ADMIN_PROFILE" > /dev/null 2>&1; then
@@ -1357,7 +1512,7 @@ deploy_lambda_or_backend_service() {
         print_info "  ./cicd.sh admin-apply --workspace=${TERRAFORM_WORKSPACE} --aws-account=${AWS_ACCOUNT_ID} --admin-profile=${AWS_ADMIN_PROFILE}"
         exit 1
     fi
-    
+
     print_info "Updating Lambda function code: $full_function_name"
     if [[ "$AWS_ADMIN_PROFILE" != "default" ]]; then
         if aws lambda update-function-code \
@@ -1381,7 +1536,7 @@ deploy_lambda_or_backend_service() {
             exit 1
         fi
     fi
-    
+
     cd - > /dev/null
 }
 
@@ -1389,47 +1544,47 @@ deploy_lambda_or_backend_service() {
 test_lambda_service() {
     local service_name="$1"
     print_info "Testing Lambda service: $service_name"
-    
+
     if [[ ! -d "$service_name" ]]; then
         print_error "Lambda directory not found: $service_name"
         exit 1
     fi
-    
+
     cd "$service_name"
-    
+
     if [[ -f "package.json" ]] && grep -q '"test"' package.json; then
         npm test
         print_success "✅ $service_name tests passed"
     else
         print_warning "No tests found for $service_name"
     fi
-    
+
     cd - > /dev/null
 }
 
 test_backend_service() {
     local service_name="$1"
     print_info "Testing backend service: $service_name"
-    
+
     if [[ ! -d "$service_name" ]]; then
         print_error "Backend directory not found: $service_name"
         exit 1
     fi
-    
+
     cd "$service_name"
-    
+
     if [[ -f "package.json" ]] && grep -q '"test"' package.json; then
         npm test
         print_success "✅ $service_name tests passed"
     else
         print_warning "No tests found for $service_name"
     fi
-    
+
     cd - > /dev/null
 }
 validate_account_setup() {
     print_info "🔍 Validating account configuration"
-    
+
     if [[ -n "$TENANT_ACCOUNT_ID" && "$ADMIN_ACCOUNT_ID" == "$TENANT_ACCOUNT_ID" ]]; then
         print_warning "⚠️  Same account detected for admin and tenant"
         print_info "📋 Only DynamoDB resources will be created for tenant"
@@ -1446,12 +1601,12 @@ validate_tenant_config() {
         print_error "TENANT_ACCOUNT_ID is required for tenant deployment"
         exit 1
     fi
-    
+
     if [[ -z "$TENANT_ID" ]]; then
         print_error "TENANT_ID is required for tenant deployment"
         exit 1
     fi
-    
+
     validate_account_setup
 }
 
@@ -1539,57 +1694,57 @@ command_exists() {
 
 validate_env() {
     print_info "Validating environment configuration..."
-    
+
     if [[ -z "$ENV" ]]; then
         print_error "ENV is required"
         exit 1
     fi
-    
+
     if [[ -z "$AWS_REGION" ]]; then
         print_error "AWS_REGION is required"
         exit 1
     fi
-    
+
     echo "Environment: $ENV, Region: $AWS_REGION"
 }
 
 install_tools() {
     print_info "Validating required tools..."
-    
+
     local missing_tools=()
-    
+
     if ! command_exists terraform; then
         missing_tools+=("terraform")
     fi
-    
+
     if ! command_exists node; then
         missing_tools+=("node")
     fi
-    
+
     if ! command_exists npm; then
         missing_tools+=("npm")
     fi
-    
+
     if ! command_exists aws; then
         missing_tools+=("aws")
     fi
-    
+
     if [[ ${#missing_tools[@]} -gt 0 ]]; then
         print_error "Missing required tools: ${missing_tools[*]}"
         exit 1
     fi
-    
+
     print_success "All required tools are available"
 }
 
 validate_aws() {
     print_info "Validating AWS credentials..."
-    
+
     if ! aws sts get-caller-identity --profile "$AWS_PROFILE" >/dev/null 2>&1; then
         print_error "AWS credentials validation failed"
         exit 1
     fi
-    
+
     print_success "AWS credentials validated"
 }
 
@@ -1758,14 +1913,14 @@ test() {
 create_lambda_zips() {
     print_info "Creating Lambda deployment packages..."
     cd "$IAC_DIR/lambda-packages"
-    
+
     for dir in */; do
         if [[ -d "$dir" ]]; then
             echo -e "${CYAN}  Zipping $dir...${NC}"
             cd "$dir" && zip -r "../${dir%/}.zip" . -x "*.git*" "node_modules/.cache/*" >/dev/null && cd ..
         fi
     done
-    
+
     cd "$SCRIPT_DIR"
     print_success "Lambda packages created"
 }
@@ -1816,22 +1971,22 @@ terraform_apply() {
 
 deploy_infrastructure() {
     print_header "🏗️ Admin Infrastructure Deployment"
-    
+
     validate_workspace
     generate_resource_names
     manage_admin_workspace
-    
+
     cd "$IAC_DIR"
-    
+
     terraform plan \
         -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
         -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
         -var="tenant_account_id=${TENANT_ACCOUNT_ID}" \
         -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
         -out="tfplan-${TERRAFORM_WORKSPACE}"
-    
+
     terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
-    
+
     cd - > /dev/null
     print_success "✅ Admin infrastructure deployed in workspace: $TERRAFORM_WORKSPACE"
 }
@@ -1845,11 +2000,11 @@ deploy_admin_infrastructure() {
 # Deploy tenant infrastructure
 deploy_tenant_infrastructure() {
     print_header "🏢 Deploying Tenant Infrastructure"
-    
+
     validate_workspace
     validate_tenant_config
     generate_resource_names
-    
+
     # Check if bootstrap is needed
     if [[ "$ADMIN_ACCOUNT_ID" != "$TENANT_ACCOUNT_ID" ]]; then
         print_info "🔧 Running tenant bootstrap (different account)"
@@ -1857,11 +2012,11 @@ deploy_tenant_infrastructure() {
     else
         print_info "⏭️  Skipping tenant bootstrap (same account as admin)"
     fi
-    
+
     manage_tenant_workspace
-    
+
     cd "$TENANT_IAC_DIR"
-    
+
     terraform plan \
         -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
         -var="admin_account_id=${ADMIN_ACCOUNT_ID}" \
@@ -1869,9 +2024,9 @@ deploy_tenant_infrastructure() {
         -var="tenant_id=${TENANT_ID}" \
         -var-file="environments/${TERRAFORM_WORKSPACE}.tfvars" \
         -out="tfplan-${TERRAFORM_WORKSPACE}"
-    
+
     terraform apply "tfplan-${TERRAFORM_WORKSPACE}"
-    
+
     cd - > /dev/null
     print_success "✅ Tenant infrastructure deployed in workspace: $TERRAFORM_WORKSPACE"
 }
@@ -1879,9 +2034,9 @@ deploy_tenant_infrastructure() {
 # Deploy tenant bootstrap
 deploy_tenant_bootstrap() {
     print_info "🔧 Deploying Tenant Bootstrap"
-    
+
     cd "$TENANT_IAC_DIR/bootstrap"
-    
+
     terraform init
     terraform plan \
         -var="workspace_prefix=${TERRAFORM_WORKSPACE}" \
@@ -1890,9 +2045,9 @@ deploy_tenant_bootstrap() {
         -var="tenant_aws_profile=${TENANT_AWS_PROFILE}" \
         -var-file="../environments/${TERRAFORM_WORKSPACE}.tfvars" \
         -out="bootstrap-plan"
-    
+
     terraform apply "bootstrap-plan"
-    
+
     cd - > /dev/null
     print_success "✅ Tenant bootstrap completed"
 }
@@ -1900,15 +2055,15 @@ deploy_tenant_bootstrap() {
 # Deploy both admin and tenant infrastructure
 deploy_full_infrastructure() {
     print_info "🌐 Deploying Full Multi-Account Infrastructure"
-    
+
     validate_workspace
-    
+
     # Deploy admin first
     deploy_admin_infrastructure
-    
+
     # Deploy tenant second
     deploy_tenant_infrastructure
-    
+
     print_success "✅ Full infrastructure deployment completed in workspace: $TERRAFORM_WORKSPACE"
 }
 
@@ -1922,7 +2077,7 @@ deploy_s3_assets() {
         cd "$IAC_DIR"
         BUCKET_NAME=$(terraform output -raw s3_portal_bucket_name 2>/dev/null || echo "")
         cd "$SCRIPT_DIR"
-        
+
         if [[ -n "$BUCKET_NAME" ]]; then
             aws s3 sync "$FE_DIR/build/" "s3://$BUCKET_NAME/" --delete --profile "$AWS_PROFILE"
             print_success "Frontend assets deployed to S3"
@@ -1939,12 +2094,12 @@ deploy_s3_assets() {
 update_lambda_functions() {
     print_info "Updating Lambda functions..."
     cd "$IAC_DIR"
-    
+
     for zip in lambda-packages/*.zip; do
         if [[ -f "$zip" ]]; then
             FUNCTION_NAME=$(basename "$zip" .zip)
             echo -e "${CYAN}  Updating $FUNCTION_NAME...${NC}"
-            
+
             if [[ "$AWS_PROFILE" != "default" ]]; then
                 if aws lambda update-function-code \
                     --function-name "$PROJECT_NAME-$ENV-$FUNCTION_NAME" \
@@ -1965,7 +2120,7 @@ update_lambda_functions() {
             fi
         fi
     done
-    
+
     cd "$SCRIPT_DIR"
     print_success "Lambda functions updated"
 }
@@ -1984,7 +2139,7 @@ deploy_applications() {
 verify_infrastructure() {
     print_info "Verifying infrastructure..."
     cd "$IAC_DIR"
-    
+
     if terraform plan -var-file="environments/$ENV.tfvars" -detailed-exitcode >/dev/null 2>&1; then
         print_success "Infrastructure verified - no drift detected"
     else
@@ -1992,14 +2147,14 @@ verify_infrastructure() {
         cd "$SCRIPT_DIR"
         exit 1
     fi
-    
+
     cd "$SCRIPT_DIR"
 }
 
 verify_applications() {
     print_info "Verifying application deployment..."
     cd "$IAC_DIR"
-    
+
     API_URL=$(terraform output -raw api_gateway_url 2>/dev/null || echo "")
     if [[ -n "$API_URL" ]]; then
         if curl -f "$API_URL/health" >/dev/null 2>&1; then
@@ -2008,7 +2163,7 @@ verify_applications() {
             print_warning "API health check failed"
         fi
     fi
-    
+
     WEB_URL=$(terraform output -raw web_server_url 2>/dev/null || echo "")
     if [[ -n "$WEB_URL" ]]; then
         if curl -f "$WEB_URL" >/dev/null 2>&1; then
@@ -2017,7 +2172,7 @@ verify_applications() {
             print_warning "Web server check failed"
         fi
     fi
-    
+
     cd "$SCRIPT_DIR"
     print_success "Application verification completed"
 }
@@ -2130,13 +2285,13 @@ Admin Infrastructure Commands:
 ------------------------------
     admin-bootstrap --workspace=<workspace> --aws-account=<account-id>
                    Bootstrap Terraform backend for admin infrastructure
-    
+
     admin-plan     --workspace=<workspace> --aws-account=<account-id>
                    Plan admin infrastructure changes
-    
+
     admin-apply    --workspace=<workspace> --aws-account=<account-id>
                    Apply admin infrastructure changes
-    
+
     admin-destroy  --workspace=<workspace> --aws-account=<account-id>
                    Destroy admin infrastructure
 
@@ -2144,13 +2299,13 @@ Tenant Infrastructure Commands:
 -------------------------------
     tenant-bootstrap --workspace=<workspace> --aws-account=<account-id> --admin-account=<admin-id>
                      Bootstrap Terraform backend for tenant infrastructure
-    
+
     tenant-plan      --workspace=<workspace> --aws-account=<account-id> --admin-account=<admin-id>
                      Plan tenant infrastructure changes
-    
+
     tenant-apply     --workspace=<workspace> --aws-account=<account-id> --admin-account=<admin-id>
                      Apply tenant infrastructure changes
-    
+
     tenant-destroy   --workspace=<workspace> --aws-account=<account-id> --admin-account=<admin-id>
                      Destroy tenant infrastructure
 
@@ -2158,10 +2313,10 @@ Service Management Commands:
 ----------------------------
     build          --service=<service-name> [--workspace=<workspace>]
                    Build a specific service (Lambda, frontend, or backend)
-    
+
     deploy         --service=<service-name> --workspace=<workspace>
                    Deploy a specific service
-    
+
     test           --service=<service-name> [--workspace=<workspace>]
                    Test a specific service
 
@@ -2185,10 +2340,16 @@ VALID WORKSPACES:
 VALID SERVICES:
     admin-portal-fe              React frontend application
     admin-portal-web-server      Web server for admin portal
-    admin-api                    Admin API Lambda function
-    notification-processor       Notification processing Lambda
-    signed-url-generator         Signed URL generation Lambda
-    tenant-manager              Tenant management Lambda
+    admin-portal-be              Admin Backend API Lambda function
+    sys-app-be                   Sys App Backend API Lambda (from remote repo)
+    ims-service                  Identity Management Service Lambda
+    oms-service                  Order Management Service Lambda
+    create-infra-worker          Infrastructure creation Lambda
+    delete-infra-worker          Infrastructure deletion Lambda
+    poll-infra-worker            Infrastructure polling Lambda
+    create-admin-worker          Admin user creation Lambda
+    setup-rbac-worker            RBAC setup Lambda
+    jwt-authorizer               JWT Authorizer Lambda
 
 EXAMPLES:
 
@@ -2229,7 +2390,7 @@ EOF
 
 main() {
     parse_args "$@"
-    
+
     if [[ -z "${COMMAND}" ]]; then
         echo "Error: No command specified. Use --help for usage information."
         exit 1
@@ -2253,8 +2414,8 @@ main() {
             validate_admin_command
             destroy_admin_infrastructure
             ;;
-        
-        # Tenant Infrastructure Commands  
+
+        # Tenant Infrastructure Commands
         "tenant-bootstrap")
             validate_tenant_command
             bootstrap_tenant_infrastructure
@@ -2271,7 +2432,7 @@ main() {
             validate_tenant_command
             destroy_tenant_infrastructure
             ;;
-        
+
         # Service Management Commands
         "build")
             validate_service_name "$SERVICE_NAME"
@@ -2285,7 +2446,7 @@ main() {
             validate_service_name "$SERVICE_NAME"
             test_service "$SERVICE_NAME"
             ;;
-        
+
         # Legacy Commands (deprecated but supported)
         "bootstrap")
             echo "Warning: 'bootstrap' is deprecated. Use 'admin-bootstrap' or 'tenant-bootstrap'"
@@ -2307,12 +2468,12 @@ main() {
             validate_workspace
             destroy_terraform
             ;;
-        
+
         # Help Commands
         "help"|"--help"|"-h")
             show_enhanced_help
             ;;
-        
+
         *)
             echo "Error: Unknown command '${COMMAND}'"
             echo "Use './cicd.sh help' for available commands."

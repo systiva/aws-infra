@@ -446,3 +446,32 @@ variable "enable_app_frontend" {
   type        = bool
   default     = false
 }
+
+# ==============================================
+# Sys App Backend Configuration (Workflow 10)
+# Source: https://github.com/tripleh1701-dev/ppp-be
+# ==============================================
+
+variable "enable_app_backend" {
+  description = "Enable Sys App Backend Lambda (separate from admin backend)"
+  type        = bool
+  default     = false
+}
+
+variable "app_backend_timeout" {
+  description = "Sys App Backend Lambda timeout in seconds"
+  type        = number
+  default     = 30
+}
+
+variable "app_backend_memory_size" {
+  description = "Sys App Backend Lambda memory size in MB"
+  type        = number
+  default     = 512
+}
+
+variable "app_backend_log_level" {
+  description = "Log level for Sys App Backend Lambda"
+  type        = string
+  default     = "info"
+}

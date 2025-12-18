@@ -481,6 +481,159 @@ paths:
         passthroughBehavior: "when_no_match"
 
   # ==============================================
+  # Sys App Backend Routes (Workflow 10)
+  # Source: https://github.com/tripleh1701-dev/ppp-be
+  # Routes: /api/v1/app/* - Enterprise, Pipeline, Template APIs
+  # ==============================================
+  /api/v1/app:
+    x-amazon-apigateway-any-method:
+      summary: "Sys App Backend base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Sys App Backend endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/enterprises:
+    x-amazon-apigateway-any-method:
+      summary: "Enterprise management base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/enterprises/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Enterprise management endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/pipelines:
+    x-amazon-apigateway-any-method:
+      summary: "Pipeline management base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/pipelines/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Pipeline management endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/templates:
+    x-amazon-apigateway-any-method:
+      summary: "Template management base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/templates/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Template management endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # ==============================================
   # Sys App Frontend Routes
   # Serves React/Next.js UI from S3 via Lambda
   # ==============================================

@@ -80,6 +80,31 @@ output "oms_service_function_name" {
 }
 
 # ==============================================
+# Sys App Backend Outputs (Workflow 10)
+# Source: https://github.com/tripleh1701-dev/ppp-be
+# ==============================================
+
+output "app_backend_function_arn" {
+  description = "ARN of the Sys App Backend Lambda function"
+  value       = var.enable_app_backend ? module.app_backend[0].lambda_function_arn : null
+}
+
+output "app_backend_function_name" {
+  description = "Name of the Sys App Backend Lambda function"
+  value       = var.enable_app_backend ? module.app_backend[0].lambda_function_name : null
+}
+
+output "app_backend_function_url" {
+  description = "Function URL of the Sys App Backend Lambda (if enabled)"
+  value       = var.enable_app_backend && var.enable_lambda_function_urls ? module.app_backend[0].function_url : null
+}
+
+output "app_backend_api_url" {
+  description = "API Gateway URL for Sys App Backend"
+  value       = var.enable_api_gateway && var.enable_app_backend ? "${module.api_gateway[0].api_gateway_url}/api/v1/app" : null
+}
+
+# ==============================================
 # Platform Bootstrap Outputs
 # ==============================================
 
@@ -122,7 +147,7 @@ output "deployment_summary" {
       module.create_infra_worker.lambda_function_name,
       module.delete_infra_worker.lambda_function_name,
       module.poll_infra_worker.lambda_function_name
-    ], 
+    ],
     var.enable_jwt_authorizer && var.enable_cognito ? [module.jwt_authorizer[0].lambda_function_name] : [],
     var.enable_ims_service && var.enable_cognito ? [module.ims_service[0].lambda_function_name] : []
     )
@@ -308,7 +333,7 @@ output "platform_admin_quick_start" {
     }
     admin_capabilities = [
       "Tenant onboarding and offboarding",
-      "Tenant suspension and reactivation", 
+      "Tenant suspension and reactivation",
       "Tenant super-admin management",
       "Platform-wide governance",
       "User and role management"

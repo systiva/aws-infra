@@ -111,6 +111,15 @@ ims_lambda_memory_size    = 512
 ims_log_level            = "INFO"
 
 # ==============================================
-# Sys App Frontend Configuration
+# Sys App Frontend Configuration (Workflow 09)
 # ==============================================
 enable_app_frontend = true
+
+# ==============================================
+# Sys App Backend Configuration (Workflow 10)
+# Source: https://github.com/tripleh1701-dev/ppp-be
+# ==============================================
+enable_app_backend       = true
+app_backend_timeout      = 30
+app_backend_memory_size  = 512
+app_backend_log_level    = "info"

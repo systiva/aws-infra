@@ -114,3 +114,16 @@ variable "app_frontend_lambda_function_name" {
   type        = string
   default     = ""
 }
+
+# Sys App Backend Configuration (Workflow 10)
+variable "app_backend_lambda_invoke_arn" {
+  description = "Invoke ARN for Sys App Backend Lambda function"
+  type        = string
+  default     = ""
+}
+
+variable "app_backend_lambda_function_name" {
+  description = "Name of the Sys App Backend Lambda function"
+  type        = string
+  default     = ""
+}

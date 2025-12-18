@@ -405,6 +405,43 @@ module "app_frontend_web_server" {
   depends_on = [aws_s3_bucket.app_frontend]
 }
 
+# ==============================================
+# Sys App Backend Lambda (Workflow 10)
+# Source: https://github.com/tripleh1701-dev/ppp-be
+# ==============================================
+module "app_backend" {
+  count  = var.enable_app_backend ? 1 : 0
+  source = "./modules/app-backend"
+
+  # Basic configuration
+  project_name = "sys-app"
+  environment  = var.workspace_prefix
+
+  # Lambda configuration
+  runtime     = var.lambda_runtime
+  timeout     = var.app_backend_timeout
+  memory_size = var.app_backend_memory_size
+  log_level   = var.app_backend_log_level
+
+  # Function URL configuration
+  enable_function_url = var.enable_lambda_function_urls
+
+  # DynamoDB table names from bootstrap
+  tenant_registry_table_name = local.tenant_registry_table_name
+
+  # Cross-account access
+  admin_account_id        = local.admin_account_id
+  tenant_account_id       = local.tenant_account_id
+  cross_account_role_name = local.cross_account_role_name
+  workspace_prefix        = var.workspace_prefix
+  aws_region              = var.aws_region
+
+  # Tags
+  common_tags = local.common_tags
+
+  depends_on = [module.networking]
+}
+
 # Private API Gateway for application access
 module "api_gateway" {
   count  = var.enable_api_gateway ? 1 : 0
@@ -443,6 +480,10 @@ module "api_gateway" {
   # Sys App Frontend configuration
   app_frontend_lambda_invoke_arn      = var.enable_app_frontend ? module.app_frontend_web_server[0].lambda_function_invoke_arn : ""
   app_frontend_lambda_function_name   = var.enable_app_frontend ? module.app_frontend_web_server[0].lambda_function_name : ""
+
+  # Sys App Backend configuration (Workflow 10)
+  app_backend_lambda_invoke_arn       = var.enable_app_backend ? module.app_backend[0].lambda_function_invoke_arn : ""
+  app_backend_lambda_function_name    = var.enable_app_backend ? module.app_backend[0].lambda_function_name : ""
 
   # Tags
   common_tags = local.common_tags
@@ -629,6 +670,11 @@ module "infrastructure_ssm_outputs" {
     app-frontend-s3-bucket     = var.enable_app_frontend ? aws_s3_bucket.app_frontend[0].bucket : ""
     app-frontend-function-name = var.enable_app_frontend ? module.app_frontend_web_server[0].lambda_function_name : ""
 
+    # Sys App Backend (Workflow 10)
+    app-backend-function-name  = var.enable_app_backend ? module.app_backend[0].lambda_function_name : ""
+    app-backend-function-arn   = var.enable_app_backend ? module.app_backend[0].lambda_function_arn : ""
+    app-backend-function-url   = var.enable_app_backend && var.enable_lambda_function_urls ? module.app_backend[0].function_url : ""
+
     # Platform Bootstrap
     platform-admin-user-id = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_admin_cognito_user_id : ""
     platform-tenant-id     = var.enable_platform_bootstrap && var.enable_cognito ? module.platform_bootstrap[0].platform_tenant_id : ""
@@ -643,7 +689,8 @@ module "infrastructure_ssm_outputs" {
     module.api_gateway,
     module.jwt_authorizer,
     module.platform_bootstrap,
-    module.admin_portal_web_server
+    module.admin_portal_web_server,
+    module.app_backend
   ]
 }
 

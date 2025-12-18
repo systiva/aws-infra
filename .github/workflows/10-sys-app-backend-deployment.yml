@@ -1,0 +1,325 @@
+name: 10 - Sys App Backend Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+
+jobs:
+  get-config:
+    name: Get Configuration from SSM
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.config.outputs.api_url }}
+      lambda_function_name: ${{ steps.config.outputs.lambda_function_name }}
+      backend_api_url: ${{ steps.config.outputs.backend_api_url }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Validate Admin Infrastructure Exists
+        id: validate
+        run: |
+          # Check if admin infrastructure exists
+          if ! STATUS=$(aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null); then
+            echo "❌ Admin infrastructure not found."
+            echo "Please run '04 - Admin Infrastructure' first with enable_app_backend=true."
+            exit 1
+          fi
+          echo "✅ Admin infrastructure exists (status: $STATUS)"
+
+      - name: Get Configuration from SSM
+        id: config
+        run: |
+          # Get API Gateway URL
+          API_URL=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-url" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+
+          # Get Sys App Backend function name from SSM
+          LAMBDA_FUNCTION_NAME=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/app-backend-function-name" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+
+          # If SSM param not found, use convention
+          if [ -z "$LAMBDA_FUNCTION_NAME" ] || [ "$LAMBDA_FUNCTION_NAME" == "None" ]; then
+            LAMBDA_FUNCTION_NAME="sys-app-${{ inputs.workspace }}-backend"
+          fi
+
+          # Verify Lambda function exists
+          if ! aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
+            echo "❌ Lambda function $LAMBDA_FUNCTION_NAME not found."
+            echo "Please run '04 - Admin Infrastructure' with enable_app_backend=true first."
+            exit 1
+          fi
+
+          # Backend API URL
+          BACKEND_API_URL="${API_URL%/api/v1}/api/v1/app"
+
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "lambda_function_name=$LAMBDA_FUNCTION_NAME" >> $GITHUB_OUTPUT
+          echo "backend_api_url=$BACKEND_API_URL" >> $GITHUB_OUTPUT
+
+          echo "✅ Configuration retrieved successfully"
+          echo "  API URL: $API_URL"
+          echo "  Lambda Function: $LAMBDA_FUNCTION_NAME"
+          echo "  Backend API URL: $BACKEND_API_URL"
+
+  build-and-deploy:
+    name: Build and Deploy Sys App Backend
+    runs-on: ubuntu-latest
+    needs: [get-config]
+
+    steps:
+      - name: Checkout Code from Remote Repository
+        uses: actions/checkout@v4
+        with:
+          repository: tripleh1701-dev/ppp-be
+          ref: main
+
+      - name: Verify Checkout
+        run: |
+          echo "=== Verifying repository checkout ==="
+          echo "Current directory: $(pwd)"
+          echo "Files in root:"
+          ls -la
+          echo ""
+          if [ -f "package.json" ]; then
+            echo "✅ package.json found"
+            cat package.json | head -20
+          else
+            echo "❌ ERROR: package.json not found!"
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: |
+          echo "Installing production dependencies..."
+          npm ci --production || npm install --production
+          echo "✅ Dependencies installed"
+
+      - name: Build TypeScript (if applicable)
+        run: |
+          # Build TypeScript if tsconfig exists
+          if [ -f "tsconfig.json" ]; then
+            echo "TypeScript configuration found, building..."
+
+            # Install TypeScript as dev dependency for build
+            npm install typescript --save-dev
+
+            # Run build
+            if npm run build 2>/dev/null; then
+              echo "✅ TypeScript build successful"
+            elif npx tsc 2>/dev/null; then
+              echo "✅ TypeScript compiled with npx tsc"
+            else
+              echo "⚠️ TypeScript build failed, continuing with source files"
+            fi
+          else
+            echo "No TypeScript configuration found, skipping build"
+          fi
+
+      - name: Create Lambda Deployment Package
+        run: |
+          echo "Creating deployment package..."
+
+          # Create zip file
+          # Exclude dev files, tests, and TypeScript source if dist exists
+          if [ -d "dist" ]; then
+            echo "Using compiled dist directory..."
+            zip -r function.zip dist node_modules package.json \
+              -x "*.git*" \
+              -x "*.test.js" \
+              -x "*.test.ts" \
+              -x "test/*" \
+              -x "tests/*" \
+              -x "coverage/*" \
+              -x "*.md" \
+              -x "tsconfig.json" \
+              -x "src/*"
+          else
+            echo "Using source directory..."
+            zip -r function.zip . \
+              -x "*.git*" \
+              -x "*.test.js" \
+              -x "*.test.ts" \
+              -x "test/*" \
+              -x "tests/*" \
+              -x "coverage/*" \
+              -x "*.md" \
+              -x "node_modules/.cache/*"
+          fi
+
+          echo "Package created:"
+          ls -lh function.zip
+          echo "✅ Deployment package ready"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Deploy Lambda Function
+        run: |
+          FUNCTION_NAME="${{ needs.get-config.outputs.lambda_function_name }}"
+
+          echo "Deploying to Lambda function: $FUNCTION_NAME"
+
+          # Update function code
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://function.zip \
+            --region "${{ inputs.aws_region }}"
+
+          # Wait for update to complete
+          echo "Waiting for Lambda update to complete..."
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}"
+
+          echo "✅ Lambda deployment complete"
+
+      - name: Verify Deployment
+        run: |
+          FUNCTION_NAME="${{ needs.get-config.outputs.lambda_function_name }}"
+
+          # Get function details
+          echo "Verifying deployment..."
+
+          FUNCTION_ARN=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.FunctionArn' \
+            --output text)
+
+          LAST_MODIFIED=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.LastModified' \
+            --output text)
+
+          CODE_SHA=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.CodeSha256' \
+            --output text)
+
+          echo "✅ Deployment verified"
+          echo "  Function ARN: $FUNCTION_ARN"
+          echo "  Last Modified: $LAST_MODIFIED"
+          echo "  Code SHA256: $CODE_SHA"
+
+      - name: Update SSM with Deployment Metadata
+        run: |
+          FUNCTION_NAME="${{ needs.get-config.outputs.lambda_function_name }}"
+
+          # Get function details
+          CODE_SHA=$(aws lambda get-function \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Configuration.CodeSha256' \
+            --output text)
+
+          # Store Sys App Backend deployment metadata
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/backend/last-deployment-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/backend/build-number" \
+            --value "${{ github.run_number }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/backend/code-sha256" \
+            --value "$CODE_SHA" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/backend/commit-sha" \
+            --value "${{ github.sha }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/backend/api-url" \
+            --value "${{ needs.get-config.outputs.backend_api_url }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/backend/function-name" \
+            --value "$FUNCTION_NAME" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          echo "✅ SSM metadata updated"
+
+      - name: Display Deployment Summary
+        run: |
+          echo "=========================================="
+          echo "Sys App Backend Deployment Complete"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Build Number: ${{ github.run_number }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "Source: tripleh1701-dev/ppp-be (main branch)"
+          echo ""
+          echo "Lambda Function: ${{ needs.get-config.outputs.lambda_function_name }}"
+          echo "Backend API URL: ${{ needs.get-config.outputs.backend_api_url }}"
+          echo "Region: ${{ inputs.aws_region }}"
+          echo ""
+          echo "API Endpoints Available:"
+          echo "  - GET/POST/PUT/DELETE /api/v1/app/*"
+          echo "  - GET/POST/PUT/DELETE /api/v1/app/enterprises/*"
+          echo "  - GET/POST/PUT/DELETE /api/v1/app/pipelines/*"
+          echo "  - GET/POST/PUT/DELETE /api/v1/app/templates/*"
+          echo ""
+          echo "Sys App Frontend (Workflow 09) can now interact"
+          echo "with this backend via the above API endpoints."
+          echo "=========================================="
