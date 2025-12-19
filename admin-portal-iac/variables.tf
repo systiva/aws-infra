@@ -423,7 +423,7 @@ variable "enable_platform_bootstrap" {
 variable "platform_admin_email" {
   description = "Email address for the platform admin user"
   type        = string
-  default     = "demo_platform_admin@platform.com"
+  default     = "admin@systiva.ai"
 }
 
 variable "temporary_password" {
