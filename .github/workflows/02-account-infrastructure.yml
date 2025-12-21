@@ -33,7 +33,6 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCOUNT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ACCOUNT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_ACCOUNT_SESSION_TOKEN || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Check Account Bootstrap
@@ -73,7 +72,6 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_ADMIN_SESSION_TOKEN || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Get Admin Account ID
@@ -108,7 +106,6 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCOUNT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ACCOUNT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_ACCOUNT_SESSION_TOKEN || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Get Account Account ID
