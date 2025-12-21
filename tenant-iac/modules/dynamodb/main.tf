@@ -1,13 +1,14 @@
 # DynamoDB table for tenant public data
 # Simple table with PK/SK for multi-tenant data storage
+# Naming: account-admin-public-{workspace} (e.g., account-admin-public-uat)
 resource "aws_dynamodb_table" "tenant_public" {
-  name             = "${var.project_name}-${var.environment}-tenant-public"
+  name             = "account-admin-public-${var.environment}"
   billing_mode     = var.billing_mode
   read_capacity    = var.billing_mode == "PROVISIONED" ? var.read_capacity : null
   write_capacity   = var.billing_mode == "PROVISIONED" ? var.write_capacity : null
   hash_key         = "PK"
   range_key        = "SK"
-  
+
   deletion_protection_enabled = false  # Allow deletion for all environments
 
   # Primary key attributes
@@ -40,7 +41,7 @@ resource "aws_dynamodb_table" "tenant_public" {
   }
 
   tags = merge(var.common_tags, {
-    Name        = "${var.project_name}-${var.environment}-tenant-public"
+    Name        = "account-admin-public-${var.environment}"
     Purpose     = "Multi-Tenant Public Data"
     DataPattern = "Single Table Design with PK/SK"
   })

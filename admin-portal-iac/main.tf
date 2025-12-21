@@ -77,8 +77,8 @@ locals {
 
   # DynamoDB table naming - uses naming convention instead of SSM parameter
   # SSM parameter is stored in tenant account (cross-account access not supported)
-  # Convention: {project_name}-{workspace_prefix}-tenant-public
-  tenant_public_table_name = "${var.project_name}-${local.workspace_prefix}-tenant-public"
+  # Convention: account-admin-public-{workspace}
+  tenant_public_table_name = "account-admin-public-${local.workspace_prefix}"
 
   # Step Functions ARN - retrieved from admin bootstrap SSM
   step_functions_arn = data.aws_ssm_parameter.step_functions_arn.value

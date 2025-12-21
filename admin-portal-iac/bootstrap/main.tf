@@ -3,7 +3,7 @@
 
 terraform {
   required_version = ">= 1.5"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -19,7 +19,7 @@ terraform {
 # Configure AWS Provider
 provider "aws" {
   region = var.aws_region
-  
+
   # Only use profile for local development
   # GitHub Actions and CI/CD use environment variables
   profile = var.aws_profile != "default" ? var.aws_profile : null
@@ -28,7 +28,7 @@ provider "aws" {
 # Random suffix for unique resource names - keepers ensure same suffix for same workspace
 resource "random_id" "suffix" {
   byte_length = 4
-  
+
   keepers = {
     # Ensures the same suffix is generated for the same workspace and account
     workspace  = var.workspace_prefix
@@ -44,7 +44,10 @@ locals {
   account_id  = data.aws_caller_identity.current.account_id
   region      = data.aws_region.current.name
   name_prefix = "${var.project_name}-${var.workspace_prefix}"
-  
+
+  # Admin DynamoDB table name: systiva-admin-{workspace}
+  admin_dynamodb_name = "systiva-admin-${var.workspace_prefix}"
+
   # Common tags for all resources
   common_tags = {
     Environment   = var.workspace_prefix
@@ -120,8 +123,9 @@ resource "aws_dynamodb_table" "terraform_lock" {
 }
 
 # DynamoDB table for tenant registry (independent)
+# Naming: systiva-admin-{workspace} (e.g., systiva-admin-uat)
 resource "aws_dynamodb_table" "tenant_registry" {
-  name           = "${local.name_prefix}-tenant-registry"
+  name           = local.admin_dynamodb_name
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "PK"
   range_key      = "SK"
@@ -141,7 +145,7 @@ resource "aws_dynamodb_table" "tenant_registry" {
   }
 
   tags = merge(local.common_tags, {
-    Name    = "${local.name_prefix}-tenant-registry"
+    Name    = local.admin_dynamodb_name
     Purpose = "Tenant Registry and Configuration"
     Type    = "DynamoDBTable"
   })
@@ -422,12 +426,12 @@ EOF
 # Store bootstrap outputs in SSM Parameter Store
 module "bootstrap_ssm_outputs" {
   source = "../modules/ssm-outputs"
-  
+
   workspace    = var.workspace_prefix
   account_type = "admin"
   category     = "bootstrap"
   aws_region   = var.aws_region
-  
+
   outputs = {
     backend-bucket           = aws_s3_bucket.terraform_state.id
     backend-bucket-arn       = aws_s3_bucket.terraform_state.arn
@@ -440,7 +444,7 @@ module "bootstrap_ssm_outputs" {
     region                   = var.aws_region
     status                   = "completed"
   }
-  
+
   depends_on = [
     aws_s3_bucket.terraform_state,
     aws_dynamodb_table.terraform_lock,

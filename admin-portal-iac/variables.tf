@@ -197,9 +197,9 @@ variable "tenant_registry_table_name" {
 }
 
 variable "tenant_public_table_name" {
-  description = "Name of the DynamoDB table in tenant account for public tenant data"
+  description = "Name of the DynamoDB table in tenant account for public tenant data. Convention: account-admin-public-{workspace}"
   type        = string
-  default     = "TENANT_PUBLIC"
+  default     = ""  # Will be auto-generated as account-admin-public-{workspace}
 }
 
 variable "step_functions_arn" {

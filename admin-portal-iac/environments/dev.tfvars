@@ -37,7 +37,7 @@ lambda_function_url_cors = {
 }
 
 # External Dependencies (using bootstrap created tables)
-tenant_registry_table_name = "admin-portal-dev-tenant-registry"  # From bootstrap
+tenant_registry_table_name = ""  # Auto-generated as systiva-admin-dev from bootstrap
 step_functions_arn         = ""  # Optional - legacy
 
 # Step Functions Configuration for Tenant Lifecycle Management
@@ -56,7 +56,7 @@ vpc_endpoint_services = [
 ]
 
 # Cross-Account Access
-tenant_public_table_name = "TENANT_PUBLIC"  # Table name in tenant account for public tenant data
+tenant_public_table_name = ""  # Auto-generated as account-admin-public-dev
 trusted_tenant_account_ids = [
   # Add tenant account IDs here when available
 ]
