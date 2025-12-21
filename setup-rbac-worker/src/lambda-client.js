@@ -21,7 +21,7 @@ class IMSLambdaClient {
    * Invoke IMS Lambda directly with API Gateway-compatible event structure
    * @private
    */
-  async invokeLambda(httpMethod, path, body = null, tenantId = null, userId = 'setup-rbac-worker') {
+  async invokeLambda(httpMethod, path, body = null, accountId = null, userId = 'setup-rbac-worker') {
     // Construct event in API Gateway format for serverless-http compatibility
     const event = {
       httpMethod,
@@ -33,7 +33,7 @@ class IMSLambdaClient {
       requestContext: {
         // Simulate authenticated request context
         authorizer: {
-          tenantId: tenantId || 'platform',
+          accountId: accountId || 'platform',
           sub: userId,
           source: 'lambda-direct-invocation'
         }
@@ -45,7 +45,7 @@ class IMSLambdaClient {
       functionName: this.functionName,
       method: httpMethod,
       path,
-      tenantId,
+      accountId,
       userId
     }, 'Invoking IMS Lambda directly');
 
@@ -112,17 +112,17 @@ class IMSLambdaClient {
    * Create permission via IMS
    * POST /api/v1/rbac/permissions
    */
-  async createPermission(permissionData, tenantId) {
+  async createPermission(permissionData, accountId) {
     logger.debug({
       name: permissionData.name,
-      tenantId
+      accountId
     }, 'Creating permission via IMS');
 
     return this.invokeLambda(
       'POST',
       '/api/v1/rbac/permissions',
       permissionData,
-      tenantId
+      accountId
     );
   }
 
@@ -130,18 +130,18 @@ class IMSLambdaClient {
    * Create role via IMS (with permissions array)
    * POST /api/v1/rbac/roles
    */
-  async createRole(roleData, tenantId) {
+  async createRole(roleData, accountId) {
     logger.debug({
       name: roleData.name,
       permissionsCount: roleData.permissions?.length || 0,
-      tenantId
+      accountId
     }, 'Creating role via IMS');
 
     return this.invokeLambda(
       'POST',
       '/api/v1/rbac/roles',
       roleData,
-      tenantId
+      accountId
     );
   }
 
@@ -149,17 +149,17 @@ class IMSLambdaClient {
    * Create group via IMS
    * POST /api/v1/rbac/groups
    */
-  async createGroup(groupData, tenantId) {
+  async createGroup(groupData, accountId) {
     logger.debug({
       name: groupData.name,
-      tenantId
+      accountId
     }, 'Creating group via IMS');
 
     return this.invokeLambda(
       'POST',
       '/api/v1/rbac/groups',
       groupData,
-      tenantId
+      accountId
     );
   }
 
@@ -167,18 +167,18 @@ class IMSLambdaClient {
    * Assign role to group via IMS
    * POST /api/v1/rbac/groups/{groupId}/roles
    */
-  async assignRoleToGroup(groupId, roleId, tenantId) {
+  async assignRoleToGroup(groupId, roleId, accountId) {
     logger.debug({
       groupId,
       roleId,
-      tenantId
+      accountId
     }, 'Assigning role to group via IMS');
 
     return this.invokeLambda(
       'POST',
       `/api/v1/rbac/groups/${groupId}/roles`,
       { roleId },
-      tenantId
+      accountId
     );
   }
 }

@@ -20,7 +20,7 @@ const server = app.listen(config.PORT, () => {
     environment: config.NODE_ENV,
     cors: config.CORS_ORIGINS,
     userPoolId: config.USER_POOL_ID,
-    tableName: config.TENANT_REGISTRY_TABLE_NAME
+    tableName: config.ACCOUNT_REGISTRY_TABLE_NAME
   });
   
   console.log(`🚀 IMS Service running on http://localhost:${config.PORT}`);

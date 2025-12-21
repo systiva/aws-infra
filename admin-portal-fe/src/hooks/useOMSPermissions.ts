@@ -6,20 +6,20 @@ export const useOMSPermissions = () => {
   const hasWritePermission = () => {
     if (!state.user?.groups) return false;
     
-    // Only tenant-user-rw and tenant-admin have write access
+    // Only account-user-rw and account-admin have write access
     return state.user.groups.some(g => 
-      g.name === 'tenant-user-rw' || g.name === 'tenant-admin'
+      g.name === 'account-user-rw' || g.name === 'account-admin'
     );
   };
   
   const hasReadPermission = () => {
     if (!state.user?.groups) return false;
     
-    // All tenant-user groups have read access
+    // All account-user groups have read access
     return state.user.groups.some(g => 
-      g.name === 'tenant-user-ro' || 
-      g.name === 'tenant-user-rw' || 
-      g.name === 'tenant-admin'
+      g.name === 'account-user-ro' || 
+      g.name === 'account-user-rw' || 
+      g.name === 'account-admin'
     );
   };
   

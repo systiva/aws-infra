@@ -18,7 +18,7 @@ const authenticateToken = (req, res, next) => {
           sub: authorizer.userId || authorizer.sub,
           username: authorizer.username || authorizer['cognito:username'],
           email: authorizer.email,
-          tenantId: authorizer.tenantId || authorizer['custom:tenant_id'],
+          accountId: authorizer.accountId || authorizer['custom:account_id'],
           userRole: authorizer.userRole || authorizer['custom:user_role'],
           roles: authorizer.roles ? (typeof authorizer.roles === 'string' ? JSON.parse(authorizer.roles) : authorizer.roles) : [],
           groups: authorizer.groups ? (typeof authorizer.groups === 'string' ? JSON.parse(authorizer.groups) : authorizer.groups) : [],
@@ -27,7 +27,7 @@ const authenticateToken = (req, res, next) => {
         
         logger.debug('User context from API Gateway authorizer', { 
           userId: userContext.sub,
-          tenantId: userContext.tenantId
+          accountId: userContext.accountId
         });
       }
     }
@@ -37,7 +37,7 @@ const authenticateToken = (req, res, next) => {
       const userId = req.headers['x-user-id'] || req.headers['x-user-sub'];
       const username = req.headers['x-user-name'] || req.headers['x-username'];
       const email = req.headers['x-user-email'];
-      const tenantId = req.headers['x-tenant-id'];
+      const accountId = req.headers['x-account-id'];
       const roles = req.headers['x-user-roles'] ? req.headers['x-user-roles'].split(',') : [];
       const groups = req.headers['x-user-groups'] ? req.headers['x-user-groups'].split(',') : [];
 
@@ -46,14 +46,14 @@ const authenticateToken = (req, res, next) => {
           sub: userId,
           username: username,
           email: email,
-          tenantId: tenantId,
+          accountId: accountId,
           roles: roles,
           groups: groups
         };
         
         logger.debug('User context from headers', { 
           userId: userContext.sub,
-          tenantId: userContext.tenantId
+          accountId: userContext.accountId
         });
       }
     }
@@ -65,7 +65,7 @@ const authenticateToken = (req, res, next) => {
       logger.info('User context from authorizer', { 
         userId: req.user.sub, 
         username: req.user.username,
-        tenantId: req.user.tenantId 
+        accountId: req.user.accountId 
       });
     } else {
       // Check if Authorization header exists, if so, it should have been processed

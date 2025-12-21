@@ -19,28 +19,28 @@ class DynamoDBService {
     this.dynamodb = new AWS.DynamoDB.DocumentClient({
       region: config.DYNAMODB.REGION
     });
-    this.tableName = config.DYNAMODB.TENANT_REGISTRY_TABLE;
+    this.tableName = config.DYNAMODB.ACCOUNT_REGISTRY_TABLE;
   }
 
   /**
-   * Update tenant registry with infrastructure status
-   * @param {string} tenantId - Tenant ID
+   * Update account registry with infrastructure status
+   * @param {string} accountId - Account ID
    * @param {Object} stackData - Stack polling data
    * @param {string} operation - Operation type (CREATE or DELETE)
    * @returns {Promise} Update result
    */
-  async updateTenantInfrastructureStatus(tenantId, stackData, operation = 'CREATE') {
+  async updateAccountInfrastructureStatus(accountId, stackData, operation = 'CREATE') {
     logger.info({
-      tenantId,
+      accountId,
       stackStatus: stackData.status,
       isComplete: stackData.isComplete,
       isFailed: stackData.isFailed
-    }, 'Updating tenant registry with infrastructure status');
+    }, 'Updating account registry with infrastructure status');
 
     const updateParams = {
       TableName: this.tableName,
       Key: { 
-        PK: `TENANT#${tenantId}`,
+        PK: `ACCOUNT#${accountId}`,
         SK: 'METADATA'
       },
       UpdateExpression: `SET 
@@ -50,7 +50,7 @@ class DynamoDBService {
         '#lastModified': 'lastModified'
       },
       ExpressionAttributeValues: {
-        ':status': this.mapStackStatusToTenantStatus(stackData.status, stackData.isComplete, stackData.isFailed, operation),
+        ':status': this.mapStackStatusToAccountStatus(stackData.status, stackData.isComplete, stackData.isFailed, operation),
         ':updatedAt': new Date().toISOString()
       }
     };
@@ -77,30 +77,30 @@ class DynamoDBService {
       const result = await this.dynamodb.update(updateParams).promise();
       
       logger.info({
-        tenantId,
+        accountId,
         updatedStatus: result.Attributes.provisioningState
-      }, 'Successfully updated tenant registry');
+      }, 'Successfully updated account registry');
 
       return result.Attributes;
     } catch (error) {
       logger.error({
         error: error.message,
-        tenantId,
+        accountId,
         tableName: this.tableName
-      }, 'Failed to update tenant registry');
+      }, 'Failed to update account registry');
       throw error;
     }
   }
 
   /**
-   * Map CloudFormation stack status to tenant status
+   * Map CloudFormation stack status to account status
    * @param {string} stackStatus - CloudFormation status
    * @param {boolean} isComplete - Is stack complete
    * @param {boolean} isFailed - Is stack failed
    * @param {string} operation - Operation type (CREATE or DELETE)
-   * @returns {string} Tenant status
+   * @returns {string} Account status
    */
-  mapStackStatusToTenantStatus(stackStatus, isComplete, isFailed, operation = 'CREATE') {
+  mapStackStatusToAccountStatus(stackStatus, isComplete, isFailed, operation = 'CREATE') {
     if (isComplete) {
       // For DELETE operations, mark as deleted when complete
       if (operation === 'DELETE') {
@@ -122,17 +122,17 @@ class DynamoDBService {
   }
 
   /**
-   * Get tenant from registry
-   * @param {string} tenantId - Tenant ID
-   * @returns {Object} Tenant data
+   * Get account from registry
+   * @param {string} accountId - Account ID
+   * @returns {Object} Account data
    */
-  async getTenant(tenantId) {
-    logger.debug({ tenantId }, 'Retrieving tenant from registry');
+  async getAccount(accountId) {
+    logger.debug({ accountId }, 'Retrieving account from registry');
 
     const params = {
       TableName: this.tableName,
       Key: { 
-        PK: `TENANT#${tenantId}`,
+        PK: `ACCOUNT#${accountId}`,
         SK: 'METADATA'
       }
     };
@@ -141,35 +141,35 @@ class DynamoDBService {
       const result = await this.dynamodb.get(params).promise();
       
       if (!result.Item) {
-        throw new Error(`Tenant not found: ${tenantId}`);
+        throw new Error(`Account not found: ${accountId}`);
       }
 
       return result.Item;
     } catch (error) {
       logger.error({
         error: error.message,
-        tenantId
-      }, 'Failed to retrieve tenant from registry');
+        accountId
+      }, 'Failed to retrieve account from registry');
       throw error;
     }
   }
 
   /**
    * Record polling attempt
-   * @param {string} tenantId - Tenant ID
+   * @param {string} accountId - Account ID
    * @param {number} attempts - Number of polling attempts
    * @returns {Promise} Update result
    */
-  async recordPollingAttempt(tenantId, attempts) {
+  async recordPollingAttempt(accountId, attempts) {
     logger.debug({
-      tenantId,
+      accountId,
       attempts
     }, 'Recording polling attempt');
 
     const updateParams = {
       TableName: this.tableName,
       Key: { 
-        PK: `TENANT#${tenantId}`,
+        PK: `ACCOUNT#${accountId}`,
         SK: 'METADATA'
       },
       UpdateExpression: `SET 
@@ -186,7 +186,7 @@ class DynamoDBService {
     } catch (error) {
       logger.error({
         error: error.message,
-        tenantId
+        accountId
       }, 'Failed to record polling attempt');
       // Don't throw - this is not critical
     }
@@ -194,20 +194,20 @@ class DynamoDBService {
 
   /**
    * Record polling timeout
-   * @param {string} tenantId - Tenant ID
+   * @param {string} accountId - Account ID
    * @param {number} totalAttempts - Total polling attempts made
    * @returns {Promise} Update result
    */
-  async recordPollingTimeout(tenantId, totalAttempts) {
+  async recordPollingTimeout(accountId, totalAttempts) {
     logger.warn({
-      tenantId,
+      accountId,
       totalAttempts
     }, 'Recording polling timeout');
 
     const updateParams = {
       TableName: this.tableName,
       Key: { 
-        PK: `TENANT#${tenantId}`,
+        PK: `ACCOUNT#${accountId}`,
         SK: 'METADATA'
       },
       UpdateExpression: `SET 
@@ -230,7 +230,7 @@ class DynamoDBService {
     } catch (error) {
       logger.error({
         error: error.message,
-        tenantId
+        accountId
       }, 'Failed to record polling timeout');
       throw error;
     }

@@ -15,9 +15,9 @@ class RBACService {
 
   // ===== USER OPERATIONS =====
   
-  async createUser(tenantId, userData) {
+  async createUser(accountId, userData) {
     try {
-      logger.info(`Creating user in tenant: ${tenantId}`);
+      logger.info(`Creating user in account: ${accountId}`);
       
       // userId must be provided (typically Cognito sub)
       const userId = userData.userId;
@@ -39,8 +39,8 @@ class RBACService {
         created_by: userData.created_by || 'system'
       };
 
-      const result = await UserManagement.createUser(tenantId, userToCreate);
-      await this.createAuditLog(tenantId, 'CREATE_USER', 'USER', userId, userData.created_by);
+      const result = await UserManagement.createUser(accountId, userToCreate);
+      await this.createAuditLog(accountId, 'CREATE_USER', 'USER', userId, userData.created_by);
       
       return {
         ...result,
@@ -53,12 +53,12 @@ class RBACService {
     }
   }
 
-  async updateUser(tenantId, userId, updateData) {
+  async updateUser(accountId, userId, updateData) {
     try {
-      logger.info(`Updating user: ${userId} in tenant: ${tenantId}`);
+      logger.info(`Updating user: ${userId} in account: ${accountId}`);
       
-      const result = await UserManagement.updateUser(tenantId, userId, updateData);
-      await this.createAuditLog(tenantId, 'UPDATE_USER', 'USER', userId, updateData.updated_by);
+      const result = await UserManagement.updateUser(accountId, userId, updateData);
+      await this.createAuditLog(accountId, 'UPDATE_USER', 'USER', userId, updateData.updated_by);
       
       return result;
     } catch (error) {
@@ -67,13 +67,13 @@ class RBACService {
     }
   }
 
-  async deleteUser(tenantId, userId, deletedBy) {
+  async deleteUser(accountId, userId, deletedBy) {
     try {
-      logger.info(`Deleting user: ${userId} from tenant: ${tenantId}`);
+      logger.info(`Deleting user: ${userId} from account: ${accountId}`);
       
       // Step 1: Delete all user-group mappings
       try {
-        const userGroupsPK = `USER#${tenantId}#${userId}#GROUPS`;
+        const userGroupsPK = `USER#${accountId}#${userId}#GROUPS`;
         const { RBACModel } = require('../db/db');
         const groupMappings = await RBACModel.query("PK").eq(userGroupsPK).exec();
         
@@ -82,7 +82,7 @@ class RBACService {
           for (const mapping of groupMappings) {
             const groupId = mapping.SK.replace('GROUP#', '');
             try {
-              await UserManagement.removeUserFromGroup(tenantId, userId, groupId);
+              await UserManagement.removeUserFromGroup(accountId, userId, groupId);
               logger.debug(`Removed user ${userId} from group ${groupId}`);
             } catch (err) {
               logger.error(`Error removing user ${userId} from group ${groupId}: ${err.message}`);
@@ -94,9 +94,9 @@ class RBACService {
       }
       
       // Step 2: Delete the user entity itself
-      await UserManagement.deleteUser(tenantId, userId);
+      await UserManagement.deleteUser(accountId, userId);
 
-      await this.createAuditLog(tenantId, 'DELETE_USER', 'USER', userId, deletedBy);
+      await this.createAuditLog(accountId, 'DELETE_USER', 'USER', userId, deletedBy);
       return { message: 'User deleted successfully', userId };
     } catch (error) {
       logger.error(`Error deleting user: ${error.message}`);
@@ -104,35 +104,35 @@ class RBACService {
     }
   }
 
-  async getUser(tenantId, userId) {
+  async getUser(accountId, userId) {
     try {
-      logger.info(`Getting user: ${userId} from tenant: ${tenantId}`);
-      return await UserManagement.getUser(tenantId, userId);
+      logger.info(`Getting user: ${userId} from account: ${accountId}`);
+      return await UserManagement.getUser(accountId, userId);
     } catch (error) {
       logger.error(`Error getting user: ${error.message}`);
       throw error;
     }
   }
 
-  async getAllUsersInTenant(tenantId) {
+  async getAllUsersInAccount(accountId) {
     try {
-      logger.info(`Getting all users in tenant: ${tenantId}`);
-      return await UserManagement.getAllUsersInTenant(tenantId);
+      logger.info(`Getting all users in account: ${accountId}`);
+      return await UserManagement.getAllUsersInAccount(accountId);
     } catch (error) {
-      logger.error(`Error getting users in tenant: ${error.message}`);
+      logger.error(`Error getting users in account: ${error.message}`);
       throw error;
     }
   }
 
-  async getUserByCognitoSub(tenantId, cognitoSub) {
+  async getUserByCognitoSub(accountId, cognitoSub) {
     try {
-      logger.info(`Finding user by cognito sub: ${cognitoSub} in tenant: ${tenantId}`);
+      logger.info(`Finding user by cognito sub: ${cognitoSub} in account: ${accountId}`);
       
       // Directly query by user ID (which should be the cognito sub)
-      const user = await UserManagement.getUser(tenantId, cognitoSub);
+      const user = await UserManagement.getUser(accountId, cognitoSub);
       
       if (!user) {
-        logger.warn(`User with cognito sub ${cognitoSub} not found in tenant ${tenantId}`);
+        logger.warn(`User with cognito sub ${cognitoSub} not found in account ${accountId}`);
         return null;
       }
       
@@ -144,19 +144,19 @@ class RBACService {
     }
   }
 
-  async createUserContext(tenantId, userSub, email, cognitoUsername = null) {
+  async createUserContext(accountId, userSub, email, cognitoUsername = null) {
     try {
-      logger.info(`Creating user context for cognito sub: ${userSub} in tenant: ${tenantId}`);
+      logger.info(`Creating user context for cognito sub: ${userSub} in account: ${accountId}`);
       
       // Find user in RBAC system using cognito sub as user ID
-      const user = await this.getUserByCognitoSub(tenantId, userSub);
+      const user = await this.getUserByCognitoSub(accountId, userSub);
       if (!user) {
         logger.warn(`User not found in RBAC system: ${userSub}`);
         return {
           userId: null,
           username: cognitoUsername || userSub,
           email: email,
-          tenantId: tenantId,
+          accountId: accountId,
           userRoles: [],
           permissions: [],
           groups: [],
@@ -166,7 +166,7 @@ class RBACService {
       }
       
       // Get user's groups
-      const userGroups = await this.getUserGroups(tenantId, user.userId);
+      const userGroups = await this.getUserGroups(accountId, user.userId);
       logger.info(userGroups, "User Groups:")
       logger.info(`Found ${userGroups.length} groups for user: ${user.userId}`);
       
@@ -177,7 +177,7 @@ class RBACService {
       
       for (const groupRel of userGroups) {
         const groupId = groupRel.groupId;
-        const group = await this.getGroup(tenantId, groupId);
+        const group = await this.getGroup(accountId, groupId);
         
         if (group) {
           groupDetails.push({
@@ -187,9 +187,9 @@ class RBACService {
           });
           
           // Get roles for this group
-          const groupRoles = await this.getGroupRoles(tenantId, groupId);
+          const groupRoles = await this.getGroupRoles(accountId, groupId);
           for (const roleRel of groupRoles) {
-            const role = await this.getRole(tenantId, roleRel.roleId);
+            const role = await this.getRole(accountId, roleRel.roleId);
             if (role) {
               allRoles.push({
                 id: role.roleId,
@@ -211,7 +211,7 @@ class RBACService {
         userId: user.userId,
         username: cognitoUsername || user.cognito_username || userSub,
         email: email || user.email,
-        tenantId: tenantId,
+        accountId: accountId,
         userRoles: allRoles,
         permissions: [...new Set(allPermissions)], // Remove duplicates
         groups: groupDetails,
@@ -235,9 +235,9 @@ class RBACService {
 
   // ===== GROUP OPERATIONS =====
 
-  async createGroup(tenantId, groupData) {
+  async createGroup(accountId, groupData) {
     try {
-      logger.info(`Creating group in tenant: ${tenantId}`);
+      logger.info(`Creating group in account: ${accountId}`);
       const groupId = groupData.groupId || uuidv4();
       
       const groupToCreate = {
@@ -248,8 +248,8 @@ class RBACService {
         created_by: groupData.created_by || 'system'
       };
 
-      const result = await GroupManagement.createGroup(tenantId, groupToCreate);
-      await this.createAuditLog(tenantId, 'CREATE_GROUP', 'GROUP', groupId, groupData.created_by);
+      const result = await GroupManagement.createGroup(accountId, groupToCreate);
+      await this.createAuditLog(accountId, 'CREATE_GROUP', 'GROUP', groupId, groupData.created_by);
       
       return result;
     } catch (error) {
@@ -258,12 +258,12 @@ class RBACService {
     }
   }
 
-  async updateGroup(tenantId, groupId, updateData) {
+  async updateGroup(accountId, groupId, updateData) {
     try {
-      logger.info(`Updating group: ${groupId} in tenant: ${tenantId}`);
+      logger.info(`Updating group: ${groupId} in account: ${accountId}`);
       
-      const result = await GroupManagement.updateGroup(tenantId, groupId, updateData);
-      await this.createAuditLog(tenantId, 'UPDATE_GROUP', 'GROUP', groupId, updateData.updated_by);
+      const result = await GroupManagement.updateGroup(accountId, groupId, updateData);
+      await this.createAuditLog(accountId, 'UPDATE_GROUP', 'GROUP', groupId, updateData.updated_by);
       
       return result;
     } catch (error) {
@@ -272,13 +272,13 @@ class RBACService {
     }
   }
 
-  async deleteGroup(tenantId, groupId, deletedBy) {
+  async deleteGroup(accountId, groupId, deletedBy) {
     try {
-      logger.info(`Deleting group: ${groupId} from tenant: ${tenantId}`);
+      logger.info(`Deleting group: ${groupId} from account: ${accountId}`);
       
       // Step 1: Delete all group-role mappings
       try {
-        const groupRolesPK = `GROUP#${tenantId}#${groupId}#ROLES`;
+        const groupRolesPK = `GROUP#${accountId}#${groupId}#ROLES`;
         const { RBACModel } = require('../db/db');
         const roleMappings = await RBACModel.query("PK").eq(groupRolesPK).exec();
         
@@ -287,7 +287,7 @@ class RBACService {
           for (const mapping of roleMappings) {
             const roleId = mapping.SK.replace('ROLE#', '');
             try {
-              await GroupManagement.removeRoleFromGroup(tenantId, groupId, roleId);
+              await GroupManagement.removeRoleFromGroup(accountId, groupId, roleId);
               logger.debug(`Removed role ${roleId} from group ${groupId}`);
             } catch (err) {
               logger.error(`Error removing role ${roleId} from group ${groupId}: ${err.message}`);
@@ -300,7 +300,7 @@ class RBACService {
       
       // Step 2: Delete all group-user mappings
       try {
-        const groupUsersPK = `GROUP#${tenantId}#${groupId}#USERS`;
+        const groupUsersPK = `GROUP#${accountId}#${groupId}#USERS`;
         const { RBACModel } = require('../db/db');
         const userMappings = await RBACModel.query("PK").eq(groupUsersPK).exec();
         
@@ -309,7 +309,7 @@ class RBACService {
           for (const mapping of userMappings) {
             const userId = mapping.SK.replace('USER#', '');
             try {
-              await UserManagement.removeUserFromGroup(tenantId, userId, groupId);
+              await UserManagement.removeUserFromGroup(accountId, userId, groupId);
               logger.debug(`Removed user ${userId} from group ${groupId}`);
             } catch (err) {
               logger.error(`Error removing user ${userId} from group ${groupId}: ${err.message}`);
@@ -321,9 +321,9 @@ class RBACService {
       }
       
       // Step 3: Delete the group entity itself
-      await GroupManagement.deleteGroup(tenantId, groupId);
+      await GroupManagement.deleteGroup(accountId, groupId);
 
-      await this.createAuditLog(tenantId, 'DELETE_GROUP', 'GROUP', groupId, deletedBy);
+      await this.createAuditLog(accountId, 'DELETE_GROUP', 'GROUP', groupId, deletedBy);
       return { success: true, message: 'Group deleted successfully' };
     } catch (error) {
       logger.error(`Error deleting group: ${error.message}`);
@@ -331,31 +331,31 @@ class RBACService {
     }
   }
 
-  async getGroup(tenantId, groupId) {
+  async getGroup(accountId, groupId) {
     try {
-      logger.info(`Getting group: ${groupId} from tenant: ${tenantId}`);
-      return await GroupManagement.getGroup(tenantId, groupId);
+      logger.info(`Getting group: ${groupId} from account: ${accountId}`);
+      return await GroupManagement.getGroup(accountId, groupId);
     } catch (error) {
       logger.error(`Error getting group: ${error.message}`);
       throw error;
     }
   }
 
-  async getAllGroupsInTenant(tenantId) {
+  async getAllGroupsInAccount(accountId) {
     try {
-      logger.info(`Getting all groups in tenant: ${tenantId}`);
-      return await GroupManagement.getAllGroupsInTenant(tenantId);
+      logger.info(`Getting all groups in account: ${accountId}`);
+      return await GroupManagement.getAllGroupsInAccount(accountId);
     } catch (error) {
-      logger.error(`Error getting groups in tenant: ${error.message}`);
+      logger.error(`Error getting groups in account: ${error.message}`);
       throw error;
     }
   }
 
   // ===== ROLE OPERATIONS =====
 
-  async createRole(tenantId, roleData) {
+  async createRole(accountId, roleData) {
     try {
-      logger.info(`Creating role in tenant: ${tenantId}`);
+      logger.info(`Creating role in account: ${accountId}`);
       const roleId = roleData.roleId || uuidv4();
       
       const roleToCreate = {
@@ -368,7 +368,7 @@ class RBACService {
       };
 
       // Step 1: Create the role entity
-      const result = await RoleManagement.createRole(tenantId, roleToCreate);
+      const result = await RoleManagement.createRole(accountId, roleToCreate);
       
       // Step 2: Create bidirectional permission-role mappings for each permission
       const permissions = roleData.permissions || [];
@@ -377,8 +377,8 @@ class RBACService {
         
         for (const permissionId of permissions) {
           try {
-            await RoleManagement.addPermissionToRole(tenantId, roleId, permissionId);
-            logger.debug(`Permission ${permissionId} mapped to role ${roleId} in tenant ${tenantId}`);
+            await RoleManagement.addPermissionToRole(accountId, roleId, permissionId);
+            logger.debug(`Permission ${permissionId} mapped to role ${roleId} in account ${accountId}`);
           } catch (mappingError) {
             logger.error(`Error mapping permission ${permissionId} to role ${roleId}: ${mappingError.message}`);
             // Continue with other permissions even if one fails
@@ -386,7 +386,7 @@ class RBACService {
         }
       }
       
-      await this.createAuditLog(tenantId, 'CREATE_ROLE', 'ROLE', roleId, roleData.created_by);
+      await this.createAuditLog(accountId, 'CREATE_ROLE', 'ROLE', roleId, roleData.created_by);
       
       return result;
     } catch (error) {
@@ -395,16 +395,16 @@ class RBACService {
     }
   }
 
-  async updateRole(tenantId, roleId, updateData) {
+  async updateRole(accountId, roleId, updateData) {
     try {
-      logger.info(`Updating role: ${roleId} in tenant: ${tenantId}`);
+      logger.info(`Updating role: ${roleId} in account: ${accountId}`);
       
       // If permissions are being updated, sync the permission-role mappings
       if (updateData.permissions) {
         logger.info(`Syncing permission-role mappings for role ${roleId}`);
         
         // Get current role to find existing permissions
-        const currentRole = await RoleManagement.getRole(tenantId, roleId);
+        const currentRole = await RoleManagement.getRole(accountId, roleId);
         const currentPermissions = currentRole?.permissions || [];
         const newPermissions = updateData.permissions || [];
         
@@ -415,7 +415,7 @@ class RBACService {
         // Remove old mappings
         for (const permissionId of permissionsToRemove) {
           try {
-            await RoleManagement.removePermissionFromRole(tenantId, roleId, permissionId);
+            await RoleManagement.removePermissionFromRole(accountId, roleId, permissionId);
             logger.debug(`Removed permission ${permissionId} from role ${roleId}`);
           } catch (err) {
             logger.error(`Error removing permission ${permissionId} from role ${roleId}: ${err.message}`);
@@ -425,7 +425,7 @@ class RBACService {
         // Add new mappings
         for (const permissionId of permissionsToAdd) {
           try {
-            await RoleManagement.addPermissionToRole(tenantId, roleId, permissionId);
+            await RoleManagement.addPermissionToRole(accountId, roleId, permissionId);
             logger.debug(`Added permission ${permissionId} to role ${roleId}`);
           } catch (err) {
             logger.error(`Error adding permission ${permissionId} to role ${roleId}: ${err.message}`);
@@ -433,8 +433,8 @@ class RBACService {
         }
       }
       
-      const result = await RoleManagement.updateRole(tenantId, roleId, updateData);
-      await this.createAuditLog(tenantId, 'UPDATE_ROLE', 'ROLE', roleId, updateData.updated_by);
+      const result = await RoleManagement.updateRole(accountId, roleId, updateData);
+      await this.createAuditLog(accountId, 'UPDATE_ROLE', 'ROLE', roleId, updateData.updated_by);
       
       return result;
     } catch (error) {
@@ -443,12 +443,12 @@ class RBACService {
     }
   }
 
-  async deleteRole(tenantId, roleId, deletedBy) {
+  async deleteRole(accountId, roleId, deletedBy) {
     try {
-      logger.info(`Deleting role: ${roleId} from tenant: ${tenantId}`);
+      logger.info(`Deleting role: ${roleId} from account: ${accountId}`);
       
       // Step 1: Get the role to find its permissions
-      const role = await RoleManagement.getRole(tenantId, roleId);
+      const role = await RoleManagement.getRole(accountId, roleId);
       const permissions = role?.permissions || [];
       
       // Step 2: Delete all permission-role mappings
@@ -456,7 +456,7 @@ class RBACService {
         logger.info(`Removing ${permissions.length} permission-role mappings for role ${roleId}`);
         for (const permissionId of permissions) {
           try {
-            await RoleManagement.removePermissionFromRole(tenantId, roleId, permissionId);
+            await RoleManagement.removePermissionFromRole(accountId, roleId, permissionId);
             logger.debug(`Removed permission ${permissionId} mapping from role ${roleId}`);
           } catch (err) {
             logger.error(`Error removing permission ${permissionId} from role ${roleId}: ${err.message}`);
@@ -468,7 +468,7 @@ class RBACService {
       // Step 3: Delete all role-group mappings (roles assigned to groups)
       // Query for all groups that have this role
       try {
-        const roleGroupsPK = `ROLE#${tenantId}#${roleId}#GROUPS`;
+        const roleGroupsPK = `ROLE#${accountId}#${roleId}#GROUPS`;
         const { RBACModel } = require('../db/db');
         const groupMappings = await RBACModel.query("PK").eq(roleGroupsPK).exec();
         
@@ -477,7 +477,7 @@ class RBACService {
           for (const mapping of groupMappings) {
             const groupId = mapping.SK.replace('GROUP#', '');
             try {
-              await GroupManagement.removeRoleFromGroup(tenantId, groupId, roleId);
+              await GroupManagement.removeRoleFromGroup(accountId, groupId, roleId);
               logger.debug(`Removed role ${roleId} from group ${groupId}`);
             } catch (err) {
               logger.error(`Error removing role ${roleId} from group ${groupId}: ${err.message}`);
@@ -490,9 +490,9 @@ class RBACService {
       }
       
       // Step 4: Delete the role entity itself
-      await RoleManagement.deleteRole(tenantId, roleId);
+      await RoleManagement.deleteRole(accountId, roleId);
 
-      await this.createAuditLog(tenantId, 'DELETE_ROLE', 'ROLE', roleId, deletedBy);
+      await this.createAuditLog(accountId, 'DELETE_ROLE', 'ROLE', roleId, deletedBy);
       return { success: true, message: 'Role deleted successfully' };
     } catch (error) {
       logger.error(`Error deleting role: ${error.message}`);
@@ -500,31 +500,31 @@ class RBACService {
     }
   }
 
-  async getRole(tenantId, roleId) {
+  async getRole(accountId, roleId) {
     try {
-      logger.info(`Getting role: ${roleId} from tenant: ${tenantId}`);
-      return await RoleManagement.getRole(tenantId, roleId);
+      logger.info(`Getting role: ${roleId} from account: ${accountId}`);
+      return await RoleManagement.getRole(accountId, roleId);
     } catch (error) {
       logger.error(`Error getting role: ${error.message}`);
       throw error;
     }
   }
 
-  async getAllRolesInTenant(tenantId) {
+  async getAllRolesInAccount(accountId) {
     try {
-      logger.info(`Getting all roles in tenant: ${tenantId}`);
-      return await RoleManagement.getAllRolesInTenant(tenantId);
+      logger.info(`Getting all roles in account: ${accountId}`);
+      return await RoleManagement.getAllRolesInAccount(accountId);
     } catch (error) {
-      logger.error(`Error getting roles in tenant: ${error.message}`);
+      logger.error(`Error getting roles in account: ${error.message}`);
       throw error;
     }
   }
 
   // ===== PERMISSION OPERATIONS =====
 
-  async createPermission(tenantId, permissionData) {
+  async createPermission(accountId, permissionData) {
     try {
-      logger.info(`Creating permission in tenant: ${tenantId}`);
+      logger.info(`Creating permission in account: ${accountId}`);
       const permissionId = permissionData.permissionId || uuidv4();
       
       const permissionToCreate = {
@@ -537,8 +537,8 @@ class RBACService {
         created_by: permissionData.created_by || 'system'
       };
 
-      const result = await PermissionManagement.createPermission(tenantId, permissionToCreate);
-      await this.createAuditLog(tenantId, 'CREATE_PERMISSION', 'PERMISSION', permissionId, permissionData.created_by);
+      const result = await PermissionManagement.createPermission(accountId, permissionToCreate);
+      await this.createAuditLog(accountId, 'CREATE_PERMISSION', 'PERMISSION', permissionId, permissionData.created_by);
       
       return result;
     } catch (error) {
@@ -547,12 +547,12 @@ class RBACService {
     }
   }
 
-  async updatePermission(tenantId, permissionId, updateData) {
+  async updatePermission(accountId, permissionId, updateData) {
     try {
-      logger.info(`Updating permission: ${permissionId} in tenant: ${tenantId}`);
+      logger.info(`Updating permission: ${permissionId} in account: ${accountId}`);
       
-      const result = await PermissionManagement.updatePermission(tenantId, permissionId, updateData);
-      await this.createAuditLog(tenantId, 'UPDATE_PERMISSION', 'PERMISSION', permissionId, updateData.updated_by);
+      const result = await PermissionManagement.updatePermission(accountId, permissionId, updateData);
+      await this.createAuditLog(accountId, 'UPDATE_PERMISSION', 'PERMISSION', permissionId, updateData.updated_by);
       
       return result;
     } catch (error) {
@@ -561,12 +561,12 @@ class RBACService {
     }
   }
 
-  async deletePermission(tenantId, permissionId, deletedBy) {
+  async deletePermission(accountId, permissionId, deletedBy) {
     try {
-      logger.info(`Deleting permission: ${permissionId} from tenant: ${tenantId}`);
+      logger.info(`Deleting permission: ${permissionId} from account: ${accountId}`);
       
-      await PermissionManagement.deletePermission(tenantId, permissionId);
-      await this.createAuditLog(tenantId, 'DELETE_PERMISSION', 'PERMISSION', permissionId, deletedBy);
+      await PermissionManagement.deletePermission(accountId, permissionId);
+      await this.createAuditLog(accountId, 'DELETE_PERMISSION', 'PERMISSION', permissionId, deletedBy);
       
       return { success: true, message: 'Permission deleted successfully' };
     } catch (error) {
@@ -575,34 +575,34 @@ class RBACService {
     }
   }
 
-  async getPermission(tenantId, permissionId) {
+  async getPermission(accountId, permissionId) {
     try {
-      logger.info(`Getting permission: ${permissionId} from tenant: ${tenantId}`);
-      return await PermissionManagement.getPermission(tenantId, permissionId);
+      logger.info(`Getting permission: ${permissionId} from account: ${accountId}`);
+      return await PermissionManagement.getPermission(accountId, permissionId);
     } catch (error) {
       logger.error(`Error getting permission: ${error.message}`);
       throw error;
     }
   }
 
-  async getAllPermissionsInTenant(tenantId) {
+  async getAllPermissionsInAccount(accountId) {
     try {
-      logger.info(`Getting all permissions in tenant: ${tenantId}`);
-      return await PermissionManagement.getAllPermissionsInTenant(tenantId);
+      logger.info(`Getting all permissions in account: ${accountId}`);
+      return await PermissionManagement.getAllPermissionsInAccount(accountId);
     } catch (error) {
-      logger.error(`Error getting permissions in tenant: ${error.message}`);
+      logger.error(`Error getting permissions in account: ${error.message}`);
       throw error;
     }
   }
 
   // ===== ASSIGNMENT OPERATIONS =====
 
-  async addUserToGroup(tenantId, userId, groupId, assignedBy) {
+  async addUserToGroup(accountId, userId, groupId, assignedBy) {
     try {
-      logger.info(`Adding user ${userId} to group ${groupId} in tenant ${tenantId}`);
+      logger.info(`Adding user ${userId} to group ${groupId} in account ${accountId}`);
       
-      await UserManagement.addUserToGroup(tenantId, userId, groupId);
-      await this.createAuditLog(tenantId, 'ADD_USER_TO_GROUP', 'USER_GROUP', `${userId}-${groupId}`, assignedBy);
+      await UserManagement.addUserToGroup(accountId, userId, groupId);
+      await this.createAuditLog(accountId, 'ADD_USER_TO_GROUP', 'USER_GROUP', `${userId}-${groupId}`, assignedBy);
       
       return { success: true, message: 'User added to group successfully', userId, groupId };
     } catch (error) {
@@ -611,12 +611,12 @@ class RBACService {
     }
   }
 
-  async removeUserFromGroup(tenantId, userId, groupId, removedBy) {
+  async removeUserFromGroup(accountId, userId, groupId, removedBy) {
     try {
-      logger.info(`Removing user ${userId} from group ${groupId} in tenant ${tenantId}`);
+      logger.info(`Removing user ${userId} from group ${groupId} in account ${accountId}`);
       
-      await UserManagement.removeUserFromGroup(tenantId, userId, groupId);
-      await this.createAuditLog(tenantId, 'REMOVE_USER_FROM_GROUP', 'USER_GROUP', `${userId}-${groupId}`, removedBy);
+      await UserManagement.removeUserFromGroup(accountId, userId, groupId);
+      await this.createAuditLog(accountId, 'REMOVE_USER_FROM_GROUP', 'USER_GROUP', `${userId}-${groupId}`, removedBy);
       
       return { success: true, message: 'User removed from group successfully', userId, groupId };
     } catch (error) {
@@ -625,12 +625,12 @@ class RBACService {
     }
   }
 
-  async assignRoleToGroup(tenantId, groupId, roleId, assignedBy) {
+  async assignRoleToGroup(accountId, groupId, roleId, assignedBy) {
     try {
-      logger.info(`Assigning role ${roleId} to group ${groupId} in tenant ${tenantId}`);
+      logger.info(`Assigning role ${roleId} to group ${groupId} in account ${accountId}`);
       
-      await GroupManagement.addRoleToGroup(tenantId, groupId, roleId);
-      await this.createAuditLog(tenantId, 'ASSIGN_ROLE_TO_GROUP', 'GROUP_ROLE', `${groupId}-${roleId}`, assignedBy);
+      await GroupManagement.addRoleToGroup(accountId, groupId, roleId);
+      await this.createAuditLog(accountId, 'ASSIGN_ROLE_TO_GROUP', 'GROUP_ROLE', `${groupId}-${roleId}`, assignedBy);
       
       return { success: true, message: 'Role assigned to group successfully', groupId, roleId };
     } catch (error) {
@@ -639,12 +639,12 @@ class RBACService {
     }
   }
 
-  async removeRoleFromGroup(tenantId, groupId, roleId, removedBy) {
+  async removeRoleFromGroup(accountId, groupId, roleId, removedBy) {
     try {
-      logger.info(`Removing role ${roleId} from group ${groupId} in tenant ${tenantId}`);
+      logger.info(`Removing role ${roleId} from group ${groupId} in account ${accountId}`);
       
-      await GroupManagement.removeRoleFromGroup(tenantId, groupId, roleId);
-      await this.createAuditLog(tenantId, 'REMOVE_ROLE_FROM_GROUP', 'GROUP_ROLE', `${groupId}-${roleId}`, removedBy);
+      await GroupManagement.removeRoleFromGroup(accountId, groupId, roleId);
+      await this.createAuditLog(accountId, 'REMOVE_ROLE_FROM_GROUP', 'GROUP_ROLE', `${groupId}-${roleId}`, removedBy);
       
       return { success: true, message: 'Role removed from group successfully', groupId, roleId };
     } catch (error) {
@@ -655,46 +655,46 @@ class RBACService {
 
   // ===== QUERY OPERATIONS =====
 
-  async getUserGroups(tenantId, userId) {
+  async getUserGroups(accountId, userId) {
     try {
-      logger.info(`Getting groups for user ${userId} in tenant ${tenantId}`);
-      return await UserManagement.getUserGroups(tenantId, userId);
+      logger.info(`Getting groups for user ${userId} in account ${accountId}`);
+      return await UserManagement.getUserGroups(accountId, userId);
     } catch (error) {
       logger.error(`Error getting user groups: ${error.message}`);
       throw error;
     }
   }
 
-  async getGroupMembers(tenantId, groupId) {
+  async getGroupMembers(accountId, groupId) {
     try {
-      logger.info(`Getting members for group ${groupId} in tenant ${tenantId}`);
-      return await GroupManagement.getGroupMembers(tenantId, groupId);
+      logger.info(`Getting members for group ${groupId} in account ${accountId}`);
+      return await GroupManagement.getGroupMembers(accountId, groupId);
     } catch (error) {
       logger.error(`Error getting group members: ${error.message}`);
       throw error;
     }
   }
 
-  async getGroupRoles(tenantId, groupId) {
+  async getGroupRoles(accountId, groupId) {
     try {
-      logger.info(`Getting roles for group ${groupId} in tenant ${tenantId}`);
-      return await GroupManagement.getGroupRoles(tenantId, groupId);
+      logger.info(`Getting roles for group ${groupId} in account ${accountId}`);
+      return await GroupManagement.getGroupRoles(accountId, groupId);
     } catch (error) {
       logger.error(`Error getting group roles: ${error.message}`);
       throw error;
     }
   }
 
-  async getRoleGroups(tenantId, roleId) {
+  async getRoleGroups(accountId, roleId) {
     try {
-      logger.info(`Getting groups for role ${roleId} in tenant ${tenantId}`);
+      logger.info(`Getting groups for role ${roleId} in account ${accountId}`);
       // Note: This method would need to be implemented in RoleManagement or GroupManagement
       // For now, using GroupManagement to get groups by role
-      const groups = await GroupManagement.getAllGroupsInTenant(tenantId);
+      const groups = await GroupManagement.getAllGroupsInAccount(accountId);
       const groupsWithRole = [];
       
       for (const group of groups) {
-        const groupRoles = await GroupManagement.getGroupRoles(tenantId, group.groupId);
+        const groupRoles = await GroupManagement.getGroupRoles(accountId, group.groupId);
         if (groupRoles.some(role => role.roleId === roleId)) {
           groupsWithRole.push(group);
         }
@@ -709,17 +709,17 @@ class RBACService {
 
   // ===== AUDIT LOG =====
 
-  async createAuditLog(tenantId, action, entityType, entityId, performedBy, details = {}) {
+  async createAuditLog(accountId, action, entityType, entityId, performedBy, details = {}) {
     try {
       const { RBACModel } = require('../db/db');
       const auditId = uuidv4();
       const timestamp = moment().toISOString();
       
       const auditRecord = {
-        PK: `TENANT#${tenantId}#AUDIT`,
+        PK: `ACCOUNT#${accountId}#AUDIT`,
         SK: `${timestamp}#${auditId}`,
         entity_type: 'AUDIT_LOG',
-        tenant_id: tenantId,
+        account_id: accountId,
         audit_id: auditId,
         action: action,
         entity_type_audited: entityType,

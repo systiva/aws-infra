@@ -6,16 +6,16 @@ const logger = require('../../logger');
 
 /**
  * GET /api/v1/oms/orders
- * Get all orders for the tenant
+ * Get all orders for the account
  */
 router.get('/', checkOMSAccess, async (req, res, next) => {
     try {
         logger.debug('Getting all orders', { 
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const orders = await OrderManagement.getAllOrders(req.tenantContext);
+        const orders = await OrderManagement.getAllOrders(req.accountContext);
         
         res.json({
             success: true,
@@ -39,11 +39,11 @@ router.get('/customer/:customerId', checkOMSAccess, async (req, res, next) => {
         
         logger.debug('Getting orders by customer', { 
             customerId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const orders = await OrderManagement.getOrdersByCustomer(req.tenantContext, customerId);
+        const orders = await OrderManagement.getOrdersByCustomer(req.accountContext, customerId);
         
         res.json({
             success: true,
@@ -67,11 +67,11 @@ router.get('/:orderId', checkOMSAccess, async (req, res, next) => {
         
         logger.debug('Getting order', { 
             orderId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const order = await OrderManagement.getOrder(req.tenantContext, orderId);
+        const order = await OrderManagement.getOrder(req.accountContext, orderId);
         
         if (!order) {
             return res.status(404).json({
@@ -101,11 +101,11 @@ router.get('/:orderId/status-history', checkOMSAccess, async (req, res, next) =>
         
         logger.debug('Getting order status history', { 
             orderId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const history = await OrderManagement.getOrderStatusHistory(req.tenantContext, orderId);
+        const history = await OrderManagement.getOrderStatusHistory(req.accountContext, orderId);
         
         res.json({
             success: true,
@@ -151,7 +151,7 @@ router.post('/', checkWritePermission, async (req, res, next) => {
         logger.debug('Creating order', { 
             customerId,
             itemCount: items.length,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
@@ -171,7 +171,7 @@ router.post('/', checkWritePermission, async (req, res, next) => {
         };
         
         const order = await OrderManagement.createOrder(
-            req.tenantContext,
+            req.accountContext,
             orderData,
             req.user.userId
         );
@@ -208,7 +208,7 @@ router.put('/:orderId', checkWritePermission, async (req, res, next) => {
         
         logger.debug('Updating order', { 
             orderId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
@@ -224,7 +224,7 @@ router.put('/:orderId', checkWritePermission, async (req, res, next) => {
         if (metadata !== undefined) updateData.metadata = metadata;
         
         const order = await OrderManagement.updateOrder(
-            req.tenantContext,
+            req.accountContext,
             orderId,
             updateData,
             req.user.userId
@@ -260,12 +260,12 @@ router.patch('/:orderId/status', checkWritePermission, async (req, res, next) =>
         logger.debug('Updating order status', { 
             orderId,
             status,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
         const order = await OrderManagement.updateOrderStatus(
-            req.tenantContext,
+            req.accountContext,
             orderId,
             status,
             req.user.userId
@@ -292,11 +292,11 @@ router.delete('/:orderId', checkWritePermission, async (req, res, next) => {
         
         logger.debug('Deleting order', { 
             orderId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        await OrderManagement.deleteOrder(req.tenantContext, orderId);
+        await OrderManagement.deleteOrder(req.accountContext, orderId);
         
         res.json({
             success: true,

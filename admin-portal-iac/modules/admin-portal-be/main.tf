@@ -34,17 +34,17 @@ resource "aws_lambda_function" "admin_backend" {
     variables = {
       NODE_ENV                    = var.environment
       LOG_LEVEL                  = "info"  # Updated to lowercase as required
-      TENANT_REGISTRY_TABLE_NAME = var.tenant_registry_table_name
+      ACCOUNT_REGISTRY_TABLE_NAME = var.account_registry_table_name
       STEP_FUNCTIONS_ARN         = var.step_functions_arn
       CORS_ORIGIN                = "*"
       
       # Step Functions Configuration
-      CREATE_TENANT_STATE_MACHINE_ARN = var.create_tenant_step_function_arn
-      DELETE_TENANT_STATE_MACHINE_ARN = var.delete_tenant_step_function_arn
+      CREATE_ACCOUNT_STATE_MACHINE_ARN = var.create_account_step_function_arn
+      DELETE_ACCOUNT_STATE_MACHINE_ARN = var.delete_account_step_function_arn
       
       # Cross-account access configuration
-      TENANT_ACCOUNT_ROLE_NAME   = var.tenant_account_role_name
-      TRUSTED_TENANT_ACCOUNTS    = join(",", var.trusted_tenant_account_ids)
+      ACCOUNT_ACCOUNT_ROLE_NAME   = var.account_account_role_name
+      TRUSTED_ACCOUNT_ACCOUNTS    = join(",", var.trusted_account_account_ids)
       
       # API Configuration
       DEFAULT_PAGE_SIZE          = "10"
@@ -159,8 +159,8 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
           "dynamodb:*"  # Full DynamoDB access for all operations
         ]
         Resource = [
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.tenant_registry_table_name}",
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.tenant_registry_table_name}/index/*",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}/index/*",
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/platform-admin*",
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/platform-admin*/index/*"
         ]
@@ -189,14 +189,14 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
         ]
         Resource = var.step_functions_arn
       }] : [],
-      length(var.trusted_tenant_account_ids) > 0 ? [{
+      length(var.trusted_account_account_ids) > 0 ? [{
         Effect = "Allow"
         Action = [
           "sts:AssumeRole"
         ]
         Resource = [
-          for account_id in var.trusted_tenant_account_ids :
-          "arn:aws:iam::${account_id}:role/${var.tenant_account_role_name}"
+          for account_id in var.trusted_account_account_ids :
+          "arn:aws:iam::${account_id}:role/${var.account_account_role_name}"
         ]
         Condition = {
           StringEquals = {

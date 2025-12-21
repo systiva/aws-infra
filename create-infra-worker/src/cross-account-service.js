@@ -9,20 +9,20 @@ class CrossAccountService {
   }
 
   /**
-   * Assume cross-account role for tenant infrastructure operations
-   * @param {string} tenantAccountId - Target tenant account ID
-   * @param {string} tenantId - Unique tenant identifier
+   * Assume cross-account role for account infrastructure operations
+   * @param {string} accountAccountId - Target account account ID
+   * @param {string} accountId - Unique account identifier
    * @returns {Object} AWS credentials for assumed role
    */
-  async assumeTenantRole(tenantAccountId, tenantId) {
-    const roleArn = `arn:aws:iam::${tenantAccountId}:role/${config.CROSS_ACCOUNT.ROLE_NAME}`;
-    const sessionName = `TenantInfraWorker-${tenantId}-${Date.now()}`;
+  async assumeAccountRole(accountAccountId, accountId) {
+    const roleArn = `arn:aws:iam::${accountAccountId}:role/${config.CROSS_ACCOUNT.ROLE_NAME}`;
+    const sessionName = `AccountInfraWorker-${accountId}-${Date.now()}`;
     
     logger.info({
       roleArn,
       sessionName,
-      tenantAccountId,
-      tenantId
+      accountAccountId,
+      accountId
     }, 'Attempting to assume cross-account role');
 
     try {
@@ -35,8 +35,8 @@ class CrossAccountService {
       const result = await this.sts.assumeRole(params).promise();
       
       logger.info({
-        tenantId,
-        tenantAccountId,
+        accountId,
+        accountAccountId,
         assumedRoleArn: result.AssumedRoleUser.Arn
       }, 'Successfully assumed cross-account role');
 
@@ -45,8 +45,8 @@ class CrossAccountService {
       logger.error({
         error: error.message,
         roleArn,
-        tenantAccountId,
-        tenantId,
+        accountAccountId,
+        accountId,
         errorCode: error.code
       }, 'Failed to assume cross-account role');
       throw error;

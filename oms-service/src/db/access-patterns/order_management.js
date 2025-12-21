@@ -1,4 +1,4 @@
-const { createTenantDynamooseInstance } = require('../db');
+const { createAccountDynamooseInstance } = require('../db');
 const { wrapDynamoDBOperation } = require('../dynamodb-error');
 const logger = require('../../../logger');
 const { v4: uuidv4 } = require('uuid');
@@ -12,13 +12,13 @@ class OrderManagement {
     /**
      * Create a new order
      */
-    static async createOrder(tenantContext, orderData, userId) {
+    static async createOrder(accountContext, orderData, userId) {
         return wrapDynamoDBOperation(async () => {
             const orderId = orderData.orderId || uuidv4();
             const now = new Date().toISOString();
             const orderDate = orderData.orderDate || now;
             
-            const orderPK = `TENANT#${tenantContext.tenantId}`;
+            const orderPK = `ACCOUNT#${accountContext.accountId}`;
             const orderSK = `ORDER#${orderId}`;
             
             const orderItem = {
@@ -43,11 +43,11 @@ class OrderManagement {
                 createdBy: userId
             };
             
-            logger.debug('Creating order', { orderId, tenantId: tenantContext.tenantId });
+            logger.debug('Creating order', { orderId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             await dbClient.docClient.put({
@@ -59,7 +59,7 @@ class OrderManagement {
             if (orderData.customerId) {
                 await this.createCustomerOrderLink(
                     dbClient,
-                    tenantContext,
+                    accountContext,
                     orderData.customerId,
                     orderId,
                     orderDate
@@ -68,14 +68,14 @@ class OrderManagement {
             
             return this.cleanOrderResponse(orderItem);
             
-        }, 'createOrder', { tenantId: tenantContext.tenantId });
+        }, 'createOrder', { accountId: accountContext.accountId });
     }
     
     /**
      * Create customer-order relationship
      */
-    static async createCustomerOrderLink(dbClient, tenantContext, customerId, orderId, orderDate) {
-        const linkPK = `CUSTOMER#${tenantContext.tenantId}#${customerId}#ORDERS`;
+    static async createCustomerOrderLink(dbClient, accountContext, customerId, orderId, orderDate) {
+        const linkPK = `CUSTOMER#${accountContext.accountId}#${customerId}#ORDERS`;
         const linkSK = `ORDER#${orderDate}#${orderId}`;
         
         await dbClient.docClient.put({
@@ -96,16 +96,16 @@ class OrderManagement {
     /**
      * Get order by ID
      */
-    static async getOrder(tenantContext, orderId) {
+    static async getOrder(accountContext, orderId) {
         return wrapDynamoDBOperation(async () => {
-            const orderPK = `TENANT#${tenantContext.tenantId}`;
+            const orderPK = `ACCOUNT#${accountContext.accountId}`;
             const orderSK = `ORDER#${orderId}`;
             
-            logger.debug('Getting order', { orderId, tenantId: tenantContext.tenantId });
+            logger.debug('Getting order', { orderId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.get({
@@ -122,21 +122,21 @@ class OrderManagement {
             
             return this.cleanOrderResponse(result.Item);
             
-        }, 'getOrder', { tenantId: tenantContext.tenantId, orderId });
+        }, 'getOrder', { accountId: accountContext.accountId, orderId });
     }
     
     /**
-     * Get all orders in tenant
+     * Get all orders in account
      */
-    static async getAllOrders(tenantContext) {
+    static async getAllOrders(accountContext) {
         return wrapDynamoDBOperation(async () => {
-            const orderPK = `TENANT#${tenantContext.tenantId}`;
+            const orderPK = `ACCOUNT#${accountContext.accountId}`;
             
-            logger.debug('Getting all orders', { tenantId: tenantContext.tenantId });
+            logger.debug('Getting all orders', { accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.query({
@@ -150,21 +150,21 @@ class OrderManagement {
             
             return result.Items.map(order => this.cleanOrderResponse(order));
             
-        }, 'getAllOrders', { tenantId: tenantContext.tenantId });
+        }, 'getAllOrders', { accountId: accountContext.accountId });
     }
     
     /**
      * Get orders by customer
      */
-    static async getOrdersByCustomer(tenantContext, customerId) {
+    static async getOrdersByCustomer(accountContext, customerId) {
         return wrapDynamoDBOperation(async () => {
-            const customerOrderPK = `CUSTOMER#${tenantContext.tenantId}#${customerId}#ORDERS`;
+            const customerOrderPK = `CUSTOMER#${accountContext.accountId}#${customerId}#ORDERS`;
             
-            logger.debug('Getting orders by customer', { customerId, tenantId: tenantContext.tenantId });
+            logger.debug('Getting orders by customer', { customerId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.query({
@@ -180,29 +180,29 @@ class OrderManagement {
             const orders = [];
             
             for (const orderId of orderIds) {
-                const order = await this.getOrder(tenantContext, orderId);
+                const order = await this.getOrder(accountContext, orderId);
                 if (order) orders.push(order);
             }
             
             return orders;
             
-        }, 'getOrdersByCustomer', { tenantId: tenantContext.tenantId, customerId });
+        }, 'getOrdersByCustomer', { accountId: accountContext.accountId, customerId });
     }
     
     /**
      * Update order
      */
-    static async updateOrder(tenantContext, orderId, updateData, userId) {
+    static async updateOrder(accountContext, orderId, updateData, userId) {
         return wrapDynamoDBOperation(async () => {
-            const orderPK = `TENANT#${tenantContext.tenantId}`;
+            const orderPK = `ACCOUNT#${accountContext.accountId}`;
             const orderSK = `ORDER#${orderId}`;
             const now = new Date().toISOString();
             
-            logger.debug('Updating order', { orderId, tenantId: tenantContext.tenantId });
+            logger.debug('Updating order', { orderId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const updateItem = {
@@ -235,23 +235,23 @@ class OrderManagement {
             
             return this.cleanOrderResponse(result.Attributes);
             
-        }, 'updateOrder', { tenantId: tenantContext.tenantId, orderId });
+        }, 'updateOrder', { accountId: accountContext.accountId, orderId });
     }
     
     /**
      * Update order status
      */
-    static async updateOrderStatus(tenantContext, orderId, status, userId) {
+    static async updateOrderStatus(accountContext, orderId, status, userId) {
         return wrapDynamoDBOperation(async () => {
-            const orderPK = `TENANT#${tenantContext.tenantId}`;
+            const orderPK = `ACCOUNT#${accountContext.accountId}`;
             const orderSK = `ORDER#${orderId}`;
             const now = new Date().toISOString();
             
-            logger.debug('Updating order status', { orderId, status, tenantId: tenantContext.tenantId });
+            logger.debug('Updating order status', { orderId, status, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             // Update order status
@@ -273,7 +273,7 @@ class OrderManagement {
             }).promise();
             
             // Create status history entry
-            const historyPK = `ORDER#${tenantContext.tenantId}#${orderId}#STATUS`;
+            const historyPK = `ORDER#${accountContext.accountId}#${orderId}#STATUS`;
             const historySK = `HISTORY#${now}`;
             
             await dbClient.docClient.put({
@@ -291,21 +291,21 @@ class OrderManagement {
             
             return this.cleanOrderResponse(result.Attributes);
             
-        }, 'updateOrderStatus', { tenantId: tenantContext.tenantId, orderId, status });
+        }, 'updateOrderStatus', { accountId: accountContext.accountId, orderId, status });
     }
     
     /**
      * Get order status history
      */
-    static async getOrderStatusHistory(tenantContext, orderId) {
+    static async getOrderStatusHistory(accountContext, orderId) {
         return wrapDynamoDBOperation(async () => {
-            const historyPK = `ORDER#${tenantContext.tenantId}#${orderId}#STATUS`;
+            const historyPK = `ORDER#${accountContext.accountId}#${orderId}#STATUS`;
             
-            logger.debug('Getting order status history', { orderId, tenantId: tenantContext.tenantId });
+            logger.debug('Getting order status history', { orderId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.query({
@@ -322,22 +322,22 @@ class OrderManagement {
                 updatedBy: history.updatedBy
             }));
             
-        }, 'getOrderStatusHistory', { tenantId: tenantContext.tenantId, orderId });
+        }, 'getOrderStatusHistory', { accountId: accountContext.accountId, orderId });
     }
     
     /**
      * Delete order
      */
-    static async deleteOrder(tenantContext, orderId) {
+    static async deleteOrder(accountContext, orderId) {
         return wrapDynamoDBOperation(async () => {
-            const orderPK = `TENANT#${tenantContext.tenantId}`;
+            const orderPK = `ACCOUNT#${accountContext.accountId}`;
             const orderSK = `ORDER#${orderId}`;
             
-            logger.debug('Deleting order', { orderId, tenantId: tenantContext.tenantId });
+            logger.debug('Deleting order', { orderId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             await dbClient.docClient.delete({
@@ -347,7 +347,7 @@ class OrderManagement {
             
             return { success: true, orderId };
             
-        }, 'deleteOrder', { tenantId: tenantContext.tenantId, orderId });
+        }, 'deleteOrder', { accountId: accountContext.accountId, orderId });
     }
     
     /**

@@ -1,11 +1,11 @@
 // Validate required environment variables
 const requiredEnvVars = [
   'ADMIN_ACCOUNT_ID',
-  'TENANT_ACCOUNT_ID',
+  'ACCOUNT_ACCOUNT_ID',
   'AWS_REGION',
   'CROSS_ACCOUNT_ROLE_NAME',
-  'CREATE_TENANT_STATE_MACHINE_ARN',
-  'DELETE_TENANT_STATE_MACHINE_ARN'
+  'CREATE_ACCOUNT_STATE_MACHINE_ARN',
+  'DELETE_ACCOUNT_STATE_MACHINE_ARN'
 ];
 
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -26,19 +26,19 @@ module.exports = {
     ACCESS_KEY: 'test',
     ACCESS_SECRET: 'test',
   },
-  // Cross-account configuration for tenant provisioning
+  // Cross-account configuration for account provisioning
   CROSS_ACCOUNT: {
     ADMIN_ACCOUNT_ID: process.env.ADMIN_ACCOUNT_ID,
-    TENANT_ACCOUNT_ID: process.env.TENANT_ACCOUNT_ID,
+    ACCOUNT_ACCOUNT_ID: process.env.ACCOUNT_ACCOUNT_ID,
     AWS_REGION: process.env.AWS_REGION,
     CROSS_ACCOUNT_ROLE_NAME: process.env.CROSS_ACCOUNT_ROLE_NAME
   },
   
-  // Step Functions configuration for tenant lifecycle management
+  // Step Functions configuration for account lifecycle management
   STEP_FUNCTIONS: {
     REGION: process.env.AWS_REGION,
-    CREATE_TENANT_STATE_MACHINE_ARN: process.env.CREATE_TENANT_STATE_MACHINE_ARN,
-    DELETE_TENANT_STATE_MACHINE_ARN: process.env.DELETE_TENANT_STATE_MACHINE_ARN,
+    CREATE_ACCOUNT_STATE_MACHINE_ARN: process.env.CREATE_ACCOUNT_STATE_MACHINE_ARN,
+    DELETE_ACCOUNT_STATE_MACHINE_ARN: process.env.DELETE_ACCOUNT_STATE_MACHINE_ARN,
     EXECUTION_TIMEOUT: 900 // 15 minutes
   },
   

@@ -21,7 +21,7 @@ class IMSLambdaClient {
    * Invoke IMS Lambda directly with API Gateway-compatible event structure
    * @private
    */
-  async invokeLambda(httpMethod, path, body = null, tenantId = null, userId = 'system-worker') {
+  async invokeLambda(httpMethod, path, body = null, accountId = null, userId = 'system-worker') {
     // Construct event in API Gateway format for serverless-http compatibility
     const event = {
       httpMethod,
@@ -33,7 +33,7 @@ class IMSLambdaClient {
       requestContext: {
         // Simulate authenticated request context
         authorizer: {
-          tenantId: tenantId,  // Tenant ID is always required for RBAC operations
+          accountId: accountId,  // Account ID is always required for RBAC operations
           sub: userId,
           source: 'lambda-direct-invocation'
         }
@@ -45,7 +45,7 @@ class IMSLambdaClient {
       functionName: this.functionName,
       method: httpMethod,
       path,
-      tenantId,
+      accountId,
       userId
     }, 'Invoking IMS Lambda directly');
 
@@ -112,17 +112,17 @@ class IMSLambdaClient {
    * Create a new user in IMS service
    * POST /api/v1/users
    */
-  async createUser(userData, tenantId) {
+  async createUser(userData, accountId) {
     logger.info({
       email: userData.email,
-      tenantId
+      accountId
     }, 'Creating user via Lambda invocation');
 
     return this.invokeLambda(
       'POST',
       '/api/v1/users',
       userData,
-      tenantId
+      accountId
     );
   }
 
@@ -130,18 +130,18 @@ class IMSLambdaClient {
    * Assign user to a group
    * POST /api/v1/rbac/users/{userId}/groups
    */
-  async assignUserToGroup(userId, groupData, tenantId) {
+  async assignUserToGroup(userId, groupData, accountId) {
     logger.info({
       userId,
       groupId: groupData.groupId,
-      tenantId
+      accountId
     }, 'Assigning user to group via Lambda invocation');
 
     return this.invokeLambda(
       'POST',
       `/api/v1/rbac/users/${userId}/groups`,
       groupData,
-      tenantId
+      accountId
     );
   }
 
@@ -149,17 +149,17 @@ class IMSLambdaClient {
    * Get user by ID
    * GET /api/v1/users/{userId}
    */
-  async getUser(userId, tenantId) {
+  async getUser(userId, accountId) {
     logger.info({
       userId,
-      tenantId
+      accountId
     }, 'Getting user via Lambda invocation');
 
     return this.invokeLambda(
       'GET',
       `/api/v1/users/${userId}`,
       null,
-      tenantId
+      accountId
     );
   }
 }

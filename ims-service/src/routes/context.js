@@ -31,7 +31,7 @@ router.get('/user/:username', async (req, res) => {
 
     // Create user context with RBAC
     const userContext = await rbacService.createUserContext(
-      user.customAttributes.tenantId,
+      user.customAttributes.accountId,
       user.sub || user.username, // use sub if available as user ID
       user.email,
       user.username
@@ -57,7 +57,7 @@ router.get('/user/:username', async (req, res) => {
  */
 router.post('/authorize', async (req, res) => {
   try {
-    const { username, permissions, tenantId, requireAll = false } = req.body;
+    const { username, permissions, accountId, requireAll = false } = req.body;
 
     if (!username || !permissions || !Array.isArray(permissions)) {
       return res.status(400).json({
@@ -66,7 +66,7 @@ router.post('/authorize', async (req, res) => {
       });
     }
 
-    logger.info('Checking authorization', { username, permissions, tenantId, requireAll });
+    logger.info('Checking authorization', { username, permissions, accountId, requireAll });
 
     // Get user details
     const user = await cognitoService.getUser(username);
@@ -79,7 +79,7 @@ router.post('/authorize', async (req, res) => {
     }
 
     const userRole = user.customAttributes.userRole || 'viewer';
-    const userTenantId = user.customAttributes.tenantId;
+    const userAccountId = user.customAttributes.accountId;
 
     // Check permissions
     let hasPermission = false;
@@ -89,7 +89,7 @@ router.post('/authorize', async (req, res) => {
       // User must have ALL specified permissions
       hasPermission = await rbacService.hasAllPermissions(
         username, 
-        tenantId || userTenantId, 
+        accountId || userAccountId, 
         userRole, 
         permissions
       );
@@ -98,7 +98,7 @@ router.post('/authorize', async (req, res) => {
       for (const permission of permissions) {
         const hasThis = await rbacService.hasPermission(
           username, 
-          tenantId || userTenantId, 
+          accountId || userAccountId, 
           userRole, 
           permission
         );
@@ -111,7 +111,7 @@ router.post('/authorize', async (req, res) => {
       // User must have ANY of the specified permissions
       hasPermission = await rbacService.hasAnyPermission(
         username, 
-        tenantId || userTenantId, 
+        accountId || userAccountId, 
         userRole, 
         permissions
       );
@@ -120,7 +120,7 @@ router.post('/authorize', async (req, res) => {
       for (const permission of permissions) {
         const hasThis = await rbacService.hasPermission(
           username, 
-          tenantId || userTenantId, 
+          accountId || userAccountId, 
           userRole, 
           permission
         );
@@ -141,7 +141,7 @@ router.post('/authorize', async (req, res) => {
       authorized: hasPermission,
       username,
       userRole,
-      tenantId: tenantId || userTenantId,
+      accountId: accountId || userAccountId,
       checkedPermissions,
       requireAll
     });
@@ -161,7 +161,7 @@ router.post('/authorize', async (req, res) => {
  */
 router.post('/permission-check', async (req, res) => {
   try {
-    const { username, permission, tenantId } = req.body;
+    const { username, permission, accountId } = req.body;
 
     if (!username || !permission) {
       return res.status(400).json({
@@ -170,7 +170,7 @@ router.post('/permission-check', async (req, res) => {
       });
     }
 
-    logger.info('Detailed permission check', { username, permission, tenantId });
+    logger.info('Detailed permission check', { username, permission, accountId });
 
     // Get user details
     const user = await cognitoService.getUser(username);
@@ -183,13 +183,13 @@ router.post('/permission-check', async (req, res) => {
     }
 
     const userRole = user.customAttributes.userRole || 'viewer';
-    const userTenantId = user.customAttributes.tenantId;
-    const effectiveTenantId = tenantId || userTenantId;
+    const userAccountId = user.customAttributes.accountId;
+    const effectiveAccountId = accountId || userAccountId;
 
     // Check permission
     const hasPermission = await rbacService.hasPermission(
       username, 
-      effectiveTenantId, 
+      effectiveAccountId, 
       userRole, 
       permission
     );
@@ -197,7 +197,7 @@ router.post('/permission-check', async (req, res) => {
     // Get all user permissions for context
     const allPermissions = await rbacService.getUserPermissions(
       username,
-      effectiveTenantId,
+      effectiveAccountId,
       userRole
     );
 
@@ -212,7 +212,7 @@ router.post('/permission-check', async (req, res) => {
         username,
         email: user.email,
         userRole,
-        tenantId: effectiveTenantId,
+        accountId: effectiveAccountId,
         userStatus: user.userStatus,
         enabled: user.enabled
       },
@@ -220,7 +220,7 @@ router.post('/permission-check', async (req, res) => {
       allPermissions,
       context: {
         checkTime: new Date().toISOString(),
-        effectiveTenantId
+        effectiveAccountId
       }
     });
 
@@ -234,18 +234,18 @@ router.post('/permission-check', async (req, res) => {
 });
 
 /**
- * GET /context/tenant/:tenantId/users
- * Get all users for a specific tenant
+ * GET /context/account/:accountId/users
+ * Get all users for a specific account
  */
-router.get('/tenant/:tenantId/users', async (req, res) => {
+router.get('/account/:accountId/users', async (req, res) => {
   try {
-    const { tenantId } = req.params;
+    const { accountId } = req.params;
     const { limit = 20, paginationToken } = req.query;
 
-    logger.info('Getting tenant users', { tenantId });
+    logger.info('Getting account users', { accountId });
 
-    // Use filter to get users with specific tenant_id
-    const filter = `custom:tenant_id = "${tenantId}"`;
+    // Use filter to get users with specific account_id
+    const filter = `custom:account_id = "${accountId}"`;
     
     const result = await cognitoService.listUsers({
       limit: parseInt(limit),
@@ -258,7 +258,7 @@ router.get('/tenant/:tenantId/users', async (req, res) => {
       result.users.map(async (user) => {
         try {
           const userContext = await rbacService.createUserContext(
-            user.customAttributes.tenantId,
+            user.customAttributes.accountId,
             user.sub || user.username, // use sub if available as user ID
             user.email,
             user.username
@@ -280,17 +280,17 @@ router.get('/tenant/:tenantId/users', async (req, res) => {
 
     res.json({
       success: true,
-      tenantId,
+      accountId,
       users: enhancedUsers,
       paginationToken: result.paginationToken,
       count: enhancedUsers.length
     });
 
   } catch (error) {
-    logger.error('Get tenant users failed', { tenantId: req.params.tenantId, error: error.message });
+    logger.error('Get account users failed', { accountId: req.params.accountId, error: error.message });
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to get tenant users'
+      message: 'Failed to get account users'
     });
   }
 });
@@ -310,7 +310,7 @@ router.get('/stats', async (req, res) => {
     const stats = {
       totalUsers: usersResult.users.length,
       usersByRole: {},
-      usersByTenant: {},
+      usersByAccount: {},
       usersByStatus: {},
       enabledUsers: 0,
       disabledUsers: 0
@@ -318,14 +318,14 @@ router.get('/stats', async (req, res) => {
 
     usersResult.users.forEach(user => {
       const role = user.customAttributes.userRole || 'viewer';
-      const tenantId = user.customAttributes.tenantId || 'no-tenant';
+      const accountId = user.customAttributes.accountId || 'no-account';
       const status = user.userStatus;
       
       // Count by role
       stats.usersByRole[role] = (stats.usersByRole[role] || 0) + 1;
       
-      // Count by tenant
-      stats.usersByTenant[tenantId] = (stats.usersByTenant[tenantId] || 0) + 1;
+      // Count by account
+      stats.usersByAccount[accountId] = (stats.usersByAccount[accountId] || 0) + 1;
       
       // Count by status
       stats.usersByStatus[status] = (stats.usersByStatus[status] || 0) + 1;

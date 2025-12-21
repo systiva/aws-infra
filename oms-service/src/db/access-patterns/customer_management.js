@@ -1,4 +1,4 @@
-const { createTenantDynamooseInstance } = require('../db');
+const { createAccountDynamooseInstance } = require('../db');
 const { wrapDynamoDBOperation } = require('../dynamodb-error');
 const logger = require('../../../logger');
 const { v4: uuidv4 } = require('uuid');
@@ -12,12 +12,12 @@ class CustomerManagement {
     /**
      * Create a new customer
      */
-    static async createCustomer(tenantContext, customerData, userId) {
+    static async createCustomer(accountContext, customerData, userId) {
         return wrapDynamoDBOperation(async () => {
             const customerId = customerData.customerId || uuidv4();
             const now = new Date().toISOString();
             
-            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerPK = `ACCOUNT#${accountContext.accountId}`;
             const customerSK = `CUSTOMER#${customerId}`;
             
             const customerItem = {
@@ -36,11 +36,11 @@ class CustomerManagement {
                 createdBy: userId
             };
             
-            logger.debug('Creating customer', { customerId, tenantId: tenantContext.tenantId });
+            logger.debug('Creating customer', { customerId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             await dbClient.docClient.put({
@@ -50,22 +50,22 @@ class CustomerManagement {
             
             return this.cleanCustomerResponse(customerItem);
             
-        }, 'createCustomer', { tenantId: tenantContext.tenantId });
+        }, 'createCustomer', { accountId: accountContext.accountId });
     }
     
     /**
      * Get customer by ID
      */
-    static async getCustomer(tenantContext, customerId) {
+    static async getCustomer(accountContext, customerId) {
         return wrapDynamoDBOperation(async () => {
-            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerPK = `ACCOUNT#${accountContext.accountId}`;
             const customerSK = `CUSTOMER#${customerId}`;
             
-            logger.debug('Getting customer', { customerId, tenantId: tenantContext.tenantId });
+            logger.debug('Getting customer', { customerId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.get({
@@ -82,21 +82,21 @@ class CustomerManagement {
             
             return this.cleanCustomerResponse(result.Item);
             
-        }, 'getCustomer', { tenantId: tenantContext.tenantId, customerId });
+        }, 'getCustomer', { accountId: accountContext.accountId, customerId });
     }
     
     /**
-     * Get all customers in tenant
+     * Get all customers in account
      */
-    static async getAllCustomers(tenantContext) {
+    static async getAllCustomers(accountContext) {
         return wrapDynamoDBOperation(async () => {
-            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerPK = `ACCOUNT#${accountContext.accountId}`;
             
-            logger.debug('Getting all customers', { tenantId: tenantContext.tenantId });
+            logger.debug('Getting all customers', { accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.query({
@@ -110,23 +110,23 @@ class CustomerManagement {
             
             return result.Items.map(customer => this.cleanCustomerResponse(customer));
             
-        }, 'getAllCustomers', { tenantId: tenantContext.tenantId });
+        }, 'getAllCustomers', { accountId: accountContext.accountId });
     }
     
     /**
      * Update customer
      */
-    static async updateCustomer(tenantContext, customerId, updateData, userId) {
+    static async updateCustomer(accountContext, customerId, updateData, userId) {
         return wrapDynamoDBOperation(async () => {
-            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerPK = `ACCOUNT#${accountContext.accountId}`;
             const customerSK = `CUSTOMER#${customerId}`;
             const now = new Date().toISOString();
             
-            logger.debug('Updating customer', { customerId, tenantId: tenantContext.tenantId });
+            logger.debug('Updating customer', { customerId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const updateItem = {
@@ -159,22 +159,22 @@ class CustomerManagement {
             
             return this.cleanCustomerResponse(result.Attributes);
             
-        }, 'updateCustomer', { tenantId: tenantContext.tenantId, customerId });
+        }, 'updateCustomer', { accountId: accountContext.accountId, customerId });
     }
     
     /**
      * Delete customer
      */
-    static async deleteCustomer(tenantContext, customerId) {
+    static async deleteCustomer(accountContext, customerId) {
         return wrapDynamoDBOperation(async () => {
-            const customerPK = `TENANT#${tenantContext.tenantId}`;
+            const customerPK = `ACCOUNT#${accountContext.accountId}`;
             const customerSK = `CUSTOMER#${customerId}`;
             
-            logger.debug('Deleting customer', { customerId, tenantId: tenantContext.tenantId });
+            logger.debug('Deleting customer', { customerId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             await dbClient.docClient.delete({
@@ -184,7 +184,7 @@ class CustomerManagement {
             
             return { success: true, customerId };
             
-        }, 'deleteCustomer', { tenantId: tenantContext.tenantId, customerId });
+        }, 'deleteCustomer', { accountId: accountContext.accountId, customerId });
     }
     
     /**

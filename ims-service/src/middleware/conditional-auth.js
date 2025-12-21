@@ -81,7 +81,7 @@ const conditionalAuthPublic = async (req, res, next) => {
           userId: decoded.sub,
           email: decoded.email,
           username: decoded.username,
-          tenantId: decoded.tenant_id || decoded['custom:tenant_id'],
+          accountId: decoded.account_id || decoded['custom:account_id'],
           userRole: decoded.user_role || decoded['custom:user_role'],
           permissions: decoded.permissions || (decoded['custom:permissions'] ? JSON.parse(decoded['custom:permissions']) : []),
           groups: decoded.groups || (decoded['custom:groups'] ? JSON.parse(decoded['custom:groups']) : []),
@@ -107,7 +107,7 @@ const conditionalAuthPublic = async (req, res, next) => {
             userId: decoded.sub,
             email: decoded.email,
             username: decoded['cognito:username'] || decoded.username,
-            tenantId: decoded['custom:tenant_id'] || null,
+            accountId: decoded['custom:account_id'] || null,
             userRole: decoded['custom:user_role'] || null,
             permissions: decoded['custom:permissions'] ? JSON.parse(decoded['custom:permissions']) : [],
             groups: decoded['custom:groups'] ? JSON.parse(decoded['custom:groups']) : [],
@@ -125,7 +125,7 @@ const conditionalAuthPublic = async (req, res, next) => {
       req.headers['x-user-id'] = userInfo.userId;
       req.headers['x-user-name'] = userInfo.username || '';
       req.headers['x-user-email'] = userInfo.email || '';
-      req.headers['x-tenant-id'] = userInfo.tenantId || '';
+      req.headers['x-account-id'] = userInfo.accountId || '';
       req.headers['x-user-role'] = userInfo.userRole || '';
       req.headers['x-user-groups'] = Array.isArray(userInfo.groups) ? userInfo.groups.join(',') : '';
       req.headers['x-user-permissions'] = Array.isArray(userInfo.permissions) ? JSON.stringify(userInfo.permissions) : '[]';
@@ -136,7 +136,7 @@ const conditionalAuthPublic = async (req, res, next) => {
         sub: userInfo.userId,
         username: userInfo.username,
         email: userInfo.email,
-        tenantId: userInfo.tenantId,
+        accountId: userInfo.accountId,
         userRole: userInfo.userRole,
         roles: userInfo.groups || [],
         groups: userInfo.groups || [],
@@ -145,7 +145,7 @@ const conditionalAuthPublic = async (req, res, next) => {
 
       logger.debug('Token verified successfully for user (public)', { 
         userId: userInfo.userId,
-        tenantId: userInfo.tenantId
+        accountId: userInfo.accountId
       });
     }
 
@@ -164,7 +164,7 @@ const conditionalAuthPublic = async (req, res, next) => {
 const authenticateTokenPublic = (req, res, next) => {
   try {
     // Primary: Extract user context from API Gateway authorizer context
-    let userId, username, email, tenantId, userRole, roles, groups, permissions;
+    let userId, username, email, accountId, userRole, roles, groups, permissions;
     
     if (req.apiGateway?.event?.requestContext?.authorizer) {
       const authorizer = req.apiGateway.event.requestContext.authorizer;
@@ -172,7 +172,7 @@ const authenticateTokenPublic = (req, res, next) => {
       userId = authorizer.userId || authorizer.sub;
       username = authorizer.username;
       email = authorizer.email;
-      tenantId = authorizer.tenantId;
+      accountId = authorizer.accountId;
       userRole = authorizer.userRole;
       
       // Parse roles if it's a JSON string
@@ -190,19 +190,19 @@ const authenticateTokenPublic = (req, res, next) => {
         permissions = typeof authorizer.permissions === 'string' ? JSON.parse(authorizer.permissions) : authorizer.permissions;
       }
       
-      logger.debug('User context extracted from API Gateway authorizer (public)', { userId, username, tenantId });
+      logger.debug('User context extracted from API Gateway authorizer (public)', { userId, username, accountId });
     } else {
       // Fallback: Extract from headers (for backward compatibility or direct Lambda invocation)
       userId = req.headers['x-user-id'] || req.headers['x-user-sub'];
       username = req.headers['x-user-name'] || req.headers['x-username'];
       email = req.headers['x-user-email'];
-      tenantId = req.headers['x-tenant-id'];
+      accountId = req.headers['x-account-id'];
       userRole = req.headers['x-user-role'];
       roles = req.headers['x-user-roles'] ? req.headers['x-user-roles'].split(',') : [];
       groups = req.headers['x-user-groups'] ? req.headers['x-user-groups'].split(',') : [];
       
       if (userId) {
-        logger.debug('User context extracted from headers (public)', { userId, username, tenantId });
+        logger.debug('User context extracted from headers (public)', { userId, username, accountId });
       }
     }
 
@@ -212,7 +212,7 @@ const authenticateTokenPublic = (req, res, next) => {
         sub: userId,
         username: username,
         email: email,
-        tenantId: tenantId,
+        accountId: accountId,
         userRole: userRole,
         roles: roles || [],
         groups: groups || [],
@@ -222,7 +222,7 @@ const authenticateTokenPublic = (req, res, next) => {
       logger.debug('User context available (public)', { 
         userId: req.user.sub, 
         username: req.user.username,
-        tenantId: req.user.tenantId 
+        accountId: req.user.accountId 
       });
     } else {
       logger.debug('No user context found - continuing as public');

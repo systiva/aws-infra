@@ -9,18 +9,18 @@ class UserManagement {
     /**
      * Create a new user
      */
-    static async createUser(tenantId, userData) {
+    static async createUser(accountId, userData) {
         try {
 
             
-            const userPK = `TENANT#${tenantId}`;
+            const userPK = `ACCOUNT#${accountId}`;
             const userSK = `USER#${userData.userId}`;
             
             const userItem = {
                 PK: userPK,
                 SK: userSK,
                 entityType: 'USER',
-                tenantId,
+                accountId,
                 userId: userData.userId,
                 email: userData.email,
                 firstName: userData.firstName,
@@ -40,11 +40,11 @@ class UserManagement {
     /**
      * Get user by ID
      */
-    static async getUser(tenantId, userId) {
+    static async getUser(accountId, userId) {
         try {
 
             
-            const userPK = `TENANT#${tenantId}`;
+            const userPK = `ACCOUNT#${accountId}`;
             const userSK = `USER#${userId}`;
             const result = await RBACModel.get({
                 PK: userPK,
@@ -64,11 +64,11 @@ class UserManagement {
     /**
      * Get user by email
      */
-    static async getUserByEmail(tenantId, email) {
+    static async getUserByEmail(accountId, email) {
         try {
 
             
-            const userPK = `TENANT#${tenantId}`;
+            const userPK = `ACCOUNT#${accountId}`;
             const users = await RBACModel.query("PK").eq(userPK)
                 .where('SK').beginsWith('USER#')
                 .filter('email').eq(email)
@@ -87,11 +87,11 @@ class UserManagement {
     /**
      * Update user
      */
-    static async updateUser(tenantId, userId, updateData) {
+    static async updateUser(accountId, userId, updateData) {
         try {
 
             
-            const userPK = `TENANT#${tenantId}`;
+            const userPK = `ACCOUNT#${accountId}`;
             const userSK = `USER#${userId}`;
             
             const updateItem = {
@@ -113,11 +113,11 @@ class UserManagement {
     /**
      * Delete user
      */
-    static async deleteUser(tenantId, userId) {
+    static async deleteUser(accountId, userId) {
         try {
 
             
-            const userPK = `TENANT#${tenantId}`;
+            const userPK = `ACCOUNT#${accountId}`;
             const userSK = `USER#${userId}`;
             return await RBACModel.delete({
                 PK: userPK,
@@ -130,20 +130,20 @@ class UserManagement {
     }
 
     /**
-     * Get all users in a tenant
+     * Get all users in a account
      */
-    static async getAllUsersInTenant(tenantId) {
+    static async getAllUsersInAccount(accountId) {
         try {
 
             
-            const userPK = `TENANT#${tenantId}`;
+            const userPK = `ACCOUNT#${accountId}`;
             const users = await RBACModel.query("PK").eq(userPK)
                 .where('SK').beginsWith('USER#')
                 .exec();
             
             return users.map(user => this.cleanUserResponse(user));
         } catch (error) {
-            logger.error('Error getting all users in tenant:', error);
+            logger.error('Error getting all users in account:', error);
             throw error;
         }
     }
@@ -151,10 +151,10 @@ class UserManagement {
     /**
      * Get user groups
      */
-    static async getUserGroups(tenantId, userId) {
+    static async getUserGroups(accountId, userId) {
         try {
-            // PK: USER#<tenant_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
-            const userGroupsPK = `USER#${tenantId}#${userId}#GROUPS`;
+            // PK: USER#<account_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
+            const userGroupsPK = `USER#${accountId}#${userId}#GROUPS`;
             
             logger.info(`Querying user groups with PK: ${userGroupsPK}`);
             const memberships = await RBACModel.query("PK").eq(userGroupsPK).exec();
@@ -177,31 +177,31 @@ class UserManagement {
     /**
      * Add user to group
      */
-    static async addUserToGroup(tenantId, userId, groupId) {
+    static async addUserToGroup(accountId, userId, groupId) {
         try {
-            // User's group mapping: PK: USER#<tenant_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
-            const userGroupPK = `USER#${tenantId}#${userId}#GROUPS`;
+            // User's group mapping: PK: USER#<account_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
+            const userGroupPK = `USER#${accountId}#${userId}#GROUPS`;
             const userGroupSK = `GROUP#${groupId}`;
             
             const userGroupItem = {
                 PK: userGroupPK,
                 SK: userGroupSK,
                 entityType: 'USER_GROUP_MEMBERSHIP',
-                tenantId,
+                accountId,
                 userId,
                 groupId,
                 createdAt: new Date().toISOString()
             };
 
-            // Group's user mapping: PK: GROUP#<tenant_id>#<group_id>#USERS, SK: USER#<userID>
-            const groupUserPK = `GROUP#${tenantId}#${groupId}#USERS`;
+            // Group's user mapping: PK: GROUP#<account_id>#<group_id>#USERS, SK: USER#<userID>
+            const groupUserPK = `GROUP#${accountId}#${groupId}#USERS`;
             const groupUserSK = `USER#${userId}`;
             
             const groupUserItem = {
                 PK: groupUserPK,
                 SK: groupUserSK,
                 entityType: 'GROUP_USER_MEMBERSHIP',
-                tenantId,
+                accountId,
                 userId,
                 groupId,
                 createdAt: new Date().toISOString()
@@ -223,13 +223,13 @@ class UserManagement {
     /**
      * Remove user from group
      */
-    static async removeUserFromGroup(tenantId, userId, groupId) {
+    static async removeUserFromGroup(accountId, userId, groupId) {
         try {
             // Remove both mappings in parallel
-            const userGroupPK = `USER#${tenantId}#${userId}#GROUPS`;
+            const userGroupPK = `USER#${accountId}#${userId}#GROUPS`;
             const userGroupSK = `GROUP#${groupId}`;
             
-            const groupUserPK = `GROUP#${tenantId}#${groupId}#USERS`;
+            const groupUserPK = `GROUP#${accountId}#${groupId}#USERS`;
             const groupUserSK = `USER#${userId}`;
             
             await Promise.all([

@@ -16,14 +16,14 @@ export const PermissionManagement: React.FC = () => {
 
   const { state } = useAuth();
   const token = state.tokens?.accessToken || '';
-  const currentUserTenantId = state.user?.tenantId;
+  const currentUserAccountId = state.user?.accountId;
 
   useEffect(() => {
-    if (currentUserTenantId && currentUserTenantId !== 'platform') {
-      rbacApiClient.setTenantId(currentUserTenantId);
+    if (currentUserAccountId && currentUserAccountId !== 'platform') {
+      rbacApiClient.setAccountId(currentUserAccountId);
       loadPermissions();
     }
-  }, [currentUserTenantId, token]);
+  }, [currentUserAccountId, token]);
 
   const loadPermissions = async () => {
     try {

@@ -4,17 +4,17 @@ const config = require('../../config');
 const logger = require('../../logger');
 
 /**
- * Create DynamoDB DocumentClient with tenant-specific credentials
+ * Create DynamoDB DocumentClient with account-specific credentials
  * Uses AWS SDK directly like create-infra-worker for cross-account operations
  * 
  * @param {Object} credentials - Temporary AWS credentials from STS
  * @param {string} tableName - DynamoDB table name  
  * @param {string} region - AWS region
- * @returns {Object} AWS DocumentClient configured with tenant credentials
+ * @returns {Object} AWS DocumentClient configured with account credentials
  */
-function createTenantDynamooseInstance(credentials, tableName, region = config.AWS_REGION) {
+function createAccountDynamooseInstance(credentials, tableName, region = config.AWS_REGION) {
     try {
-        logger.debug({ tableName, region }, 'Creating tenant DynamoDB DocumentClient');
+        logger.debug({ tableName, region }, 'Creating account DynamoDB DocumentClient');
         
         // Use AWS SDK DocumentClient directly with assumed role credentials
         // This is the same pattern as create-infra-worker for cross-account operations
@@ -25,7 +25,7 @@ function createTenantDynamooseInstance(credentials, tableName, region = config.A
             sessionToken: credentials.sessionToken
         });
         
-        logger.debug('Tenant DynamoDB DocumentClient created successfully');
+        logger.debug('Account DynamoDB DocumentClient created successfully');
         
         return {
             tableName,
@@ -37,7 +37,7 @@ function createTenantDynamooseInstance(credentials, tableName, region = config.A
             error: error.message,
             tableName,
             stack: error.stack
-        }, 'Error creating tenant DynamoDB DocumentClient');
+        }, 'Error creating account DynamoDB DocumentClient');
         throw error;
     }
 }
@@ -70,6 +70,6 @@ function initializeDefaultDynamoose() {
 
 module.exports = {
     dynamoose,
-    createTenantDynamooseInstance,
+    createAccountDynamooseInstance,
     initializeDefaultDynamoose
 };

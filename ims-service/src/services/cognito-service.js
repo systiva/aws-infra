@@ -345,7 +345,7 @@ class CognitoService {
         created: result.UserCreateDate,
         modified: result.UserLastModifiedDate,
         customAttributes: {
-          tenantId: attributes.tenant_id,
+          accountId: attributes.account_id,
           userRole: attributes.user_role,
           permissions: attributes.permissions ? JSON.parse(attributes.permissions) : []
         }
@@ -463,7 +463,7 @@ class CognitoService {
           created: user.UserCreateDate,
           modified: user.UserLastModifiedDate,
           customAttributes: {
-            tenantId: attributes.tenant_id,
+            accountId: attributes.account_id,
             userRole: attributes.user_role,
             permissions: attributes.permissions ? JSON.parse(attributes.permissions) : []
           }

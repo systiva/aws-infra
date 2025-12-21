@@ -18,7 +18,7 @@ async function testPasswordPolicyErrors() {
           password: '123',  // Too short
           firstName: 'Test',
           lastName: 'User',
-          tenantId: 'test-tenant',
+          accountId: 'test-account',
           userRole: 'viewer'
         },
         expectedStatus: 400
@@ -31,13 +31,13 @@ async function testPasswordPolicyErrors() {
           password: 'password',  // No special chars, numbers, uppercase
           firstName: 'Test',
           lastName: 'User',
-          tenantId: 'test-tenant',
+          accountId: 'test-account',
           userRole: 'viewer'
         },
         expectedStatus: 400
       },
       {
-        name: 'Missing Tenant-ID (should return 400)',
+        name: 'Missing Account-ID (should return 400)',
         data: {
           username: 'testuser3@example.com',
           email: 'testuser3@example.com',
@@ -45,7 +45,7 @@ async function testPasswordPolicyErrors() {
           firstName: 'Test',
           lastName: 'User',
           userRole: 'viewer'
-          // Missing tenantId
+          // Missing accountId
         },
         expectedStatus: 400
       },
@@ -57,7 +57,7 @@ async function testPasswordPolicyErrors() {
           password: 'ValidPassword123!',
           firstName: 'Test',
           lastName: 'User',
-          tenantId: 'test-tenant-123',
+          accountId: 'test-account-123',
           userRole: 'viewer'
         },
         expectedStatus: 201

@@ -37,17 +37,17 @@ lambda_function_url_cors = {
 }
 
 # External Dependencies (using bootstrap created tables)
-tenant_registry_table_name = ""  # Will be auto-generated as admin-portal-prod-tenant-registry
+account_registry_table_name = ""  # Auto-generated as systiva-admin-prod from bootstrap
 step_functions_arn         = ""  # Optional - legacy
 
-# Step Functions Configuration for Tenant Lifecycle Management
-create_tenant_step_function_arn = ""  # To be updated after deployment
-delete_tenant_step_function_arn = ""  # To be updated after deployment
+# Step Functions Configuration for Account Lifecycle Management
+create_account_step_function_arn = ""  # To be updated after deployment
+delete_account_step_function_arn = ""  # To be updated after deployment
 
 # VPC Endpoints Configuration
 vpc_endpoint_services = [
   "s3",
-  "dynamodb", 
+  "dynamodb",
   "lambda",
   "states",  # Step Functions
   "sts",     # Security Token Service for cross-account role assumption
@@ -56,9 +56,9 @@ vpc_endpoint_services = [
 ]
 
 # Cross-Account Access
-tenant_public_table_name = "TENANT_PUBLIC"  # Table name in tenant account for public tenant data
-trusted_tenant_account_ids = [
-  # Add tenant account IDs here when available
+account_public_table_name = ""  # Auto-generated as account-admin-public-prod
+trusted_account_account_ids = [
+  # Add account account IDs here when available
 ]
 
 # Monitoring and Logging
@@ -107,3 +107,18 @@ enable_ims_service        = true
 ims_lambda_timeout        = 30
 ims_lambda_memory_size    = 512
 ims_log_level            = "INFO"
+
+# ==============================================
+# Sys App Frontend Configuration (Workflow 09)
+# ==============================================
+enable_app_frontend = true
+
+# ==============================================
+# Sys App Backend Configuration (Workflow 10)
+# Source: https://github.com/tripleh1701-dev/ppp-be
+# ==============================================
+enable_app_backend       = true
+app_backend_timeout      = 30
+app_backend_memory_size  = 1024  # Higher memory for production
+app_backend_log_level    = "warn"
+# Note: IMS_API_URL is automatically set by Terraform null_resource after API Gateway is created

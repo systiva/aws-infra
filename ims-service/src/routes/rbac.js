@@ -5,10 +5,10 @@ const logger = require('../../logger');
 
 const rbacService = new RBACService();
 
-// Helper function to get tenant ID from request
-const getTenantId = (req) => {
-  // Get tenant ID from user context or params
-  return req.user?.tenantId || req.params.tenantId || req.query.tenantId;
+// Helper function to get account ID from request
+const getAccountId = (req) => {
+  // Get account ID from user context or params
+  return req.user?.accountId || req.params.accountId || req.query.accountId;
 };
 
 const getCurrentUser = (req) => {
@@ -23,15 +23,15 @@ const getCurrentUser = (req) => {
 
 // ===== GROUP ROUTES =====
 
-// GET /rbac/groups - Get all groups in tenant
+// GET /rbac/groups - Get all groups in account
 router.get('/groups', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    const accountId = getAccountId(req);
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const groups = await rbacService.getAllGroupsInTenant(tenantId);
+    const groups = await rbacService.getAllGroupsInAccount(accountId);
     res.json({ success: true, data: groups });
   } catch (error) {
     logger.error(`Error getting groups: ${error.message}`);
@@ -42,14 +42,14 @@ router.get('/groups', async (req, res) => {
 // GET /rbac/groups/:groupId - Get specific group
 router.get('/groups/:groupId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { groupId } = req.params;
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const group = await rbacService.getGroup(tenantId, groupId);
+    const group = await rbacService.getGroup(accountId, groupId);
     if (!group) {
       return res.status(404).json({ error: 'Group not found' });
     }
@@ -64,11 +64,11 @@ router.get('/groups/:groupId', async (req, res) => {
 // POST /rbac/groups - Create new group
 router.post('/groups', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
     const groupData = {
@@ -76,7 +76,7 @@ router.post('/groups', async (req, res) => {
       created_by: currentUser
     };
 
-    const group = await rbacService.createGroup(tenantId, groupData);
+    const group = await rbacService.createGroup(accountId, groupData);
     res.status(201).json({ success: true, data: group });
   } catch (error) {
     logger.error(`Error creating group: ${error.message}`);
@@ -87,12 +87,12 @@ router.post('/groups', async (req, res) => {
 // PUT /rbac/groups/:groupId - Update group
 router.put('/groups/:groupId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { groupId } = req.params;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
     const updateData = {
@@ -100,7 +100,7 @@ router.put('/groups/:groupId', async (req, res) => {
       updated_by: currentUser
     };
 
-    const group = await rbacService.updateGroup(tenantId, groupId, updateData);
+    const group = await rbacService.updateGroup(accountId, groupId, updateData);
     res.json({ success: true, data: group });
   } catch (error) {
     logger.error(`Error updating group: ${error.message}`);
@@ -111,15 +111,15 @@ router.put('/groups/:groupId', async (req, res) => {
 // DELETE /rbac/groups/:groupId - Delete group
 router.delete('/groups/:groupId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { groupId } = req.params;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const result = await rbacService.deleteGroup(tenantId, groupId, currentUser);
+    const result = await rbacService.deleteGroup(accountId, groupId, currentUser);
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`Error deleting group: ${error.message}`);
@@ -129,15 +129,15 @@ router.delete('/groups/:groupId', async (req, res) => {
 
 // ===== ROLE ROUTES =====
 
-// GET /rbac/roles - Get all roles in tenant
+// GET /rbac/roles - Get all roles in account
 router.get('/roles', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    const accountId = getAccountId(req);
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const roles = await rbacService.getAllRolesInTenant(tenantId);
+    const roles = await rbacService.getAllRolesInAccount(accountId);
     res.json({ success: true, data: roles });
   } catch (error) {
     logger.error(`Error getting roles: ${error.message}`);
@@ -148,14 +148,14 @@ router.get('/roles', async (req, res) => {
 // GET /rbac/roles/:roleId - Get specific role
 router.get('/roles/:roleId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { roleId } = req.params;
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const role = await rbacService.getRole(tenantId, roleId);
+    const role = await rbacService.getRole(accountId, roleId);
     if (!role) {
       return res.status(404).json({ error: 'Role not found' });
     }
@@ -170,11 +170,11 @@ router.get('/roles/:roleId', async (req, res) => {
 // POST /rbac/roles - Create new role
 router.post('/roles', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
     const roleData = {
@@ -182,7 +182,7 @@ router.post('/roles', async (req, res) => {
       created_by: currentUser
     };
 
-    const role = await rbacService.createRole(tenantId, roleData);
+    const role = await rbacService.createRole(accountId, roleData);
     res.status(201).json({ success: true, data: role });
   } catch (error) {
     logger.error(`Error creating role: ${error.message}`);
@@ -193,12 +193,12 @@ router.post('/roles', async (req, res) => {
 // PUT /rbac/roles/:roleId - Update role
 router.put('/roles/:roleId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { roleId } = req.params;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
     const updateData = {
@@ -206,7 +206,7 @@ router.put('/roles/:roleId', async (req, res) => {
       updated_by: currentUser
     };
 
-    const role = await rbacService.updateRole(tenantId, roleId, updateData);
+    const role = await rbacService.updateRole(accountId, roleId, updateData);
     res.json({ success: true, data: role });
   } catch (error) {
     logger.error(`Error updating role: ${error.message}`);
@@ -217,15 +217,15 @@ router.put('/roles/:roleId', async (req, res) => {
 // DELETE /rbac/roles/:roleId - Delete role
 router.delete('/roles/:roleId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { roleId } = req.params;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const result = await rbacService.deleteRole(tenantId, roleId, currentUser);
+    const result = await rbacService.deleteRole(accountId, roleId, currentUser);
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`Error deleting role: ${error.message}`);
@@ -235,15 +235,15 @@ router.delete('/roles/:roleId', async (req, res) => {
 
 // ===== PERMISSION ROUTES =====
 
-// GET /rbac/permissions - Get all permissions in tenant
+// GET /rbac/permissions - Get all permissions in account
 router.get('/permissions', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    const accountId = getAccountId(req);
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const permissions = await rbacService.getAllPermissionsInTenant(tenantId);
+    const permissions = await rbacService.getAllPermissionsInAccount(accountId);
     res.json({ success: true, data: permissions });
   } catch (error) {
     logger.error(`Error getting permissions: ${error.message}`);
@@ -254,14 +254,14 @@ router.get('/permissions', async (req, res) => {
 // GET /rbac/permissions/:permissionId - Get specific permission
 router.get('/permissions/:permissionId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { permissionId } = req.params;
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const permission = await rbacService.getPermission(tenantId, permissionId);
+    const permission = await rbacService.getPermission(accountId, permissionId);
     if (!permission) {
       return res.status(404).json({ error: 'Permission not found' });
     }
@@ -276,11 +276,11 @@ router.get('/permissions/:permissionId', async (req, res) => {
 // POST /rbac/permissions - Create new permission
 router.post('/permissions', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
     const permissionData = {
@@ -288,7 +288,7 @@ router.post('/permissions', async (req, res) => {
       created_by: currentUser
     };
 
-    const permission = await rbacService.createPermission(tenantId, permissionData);
+    const permission = await rbacService.createPermission(accountId, permissionData);
     res.status(201).json({ success: true, data: permission });
   } catch (error) {
     logger.error(`Error creating permission: ${error.message}`);
@@ -299,12 +299,12 @@ router.post('/permissions', async (req, res) => {
 // PUT /rbac/permissions/:permissionId - Update permission
 router.put('/permissions/:permissionId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { permissionId } = req.params;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
     const updateData = {
@@ -312,7 +312,7 @@ router.put('/permissions/:permissionId', async (req, res) => {
       updated_by: currentUser
     };
 
-    const permission = await rbacService.updatePermission(tenantId, permissionId, updateData);
+    const permission = await rbacService.updatePermission(accountId, permissionId, updateData);
     res.json({ success: true, data: permission });
   } catch (error) {
     logger.error(`Error updating permission: ${error.message}`);
@@ -323,15 +323,15 @@ router.put('/permissions/:permissionId', async (req, res) => {
 // DELETE /rbac/permissions/:permissionId - Delete permission
 router.delete('/permissions/:permissionId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { permissionId } = req.params;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const result = await rbacService.deletePermission(tenantId, permissionId, currentUser);
+    const result = await rbacService.deletePermission(accountId, permissionId, currentUser);
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`Error deleting permission: ${error.message}`);
@@ -345,22 +345,22 @@ router.delete('/permissions/:permissionId', async (req, res) => {
 router.post('/users/:userId/groups', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { groupId, tenantId } = req.body;
+    const { groupId, accountId } = req.body;
     const currentUser = getCurrentUser(req);
     
-    // Prefer tenantId from request body (for worker calls) over context (for API Gateway calls)
-    const effectiveTenantId = tenantId || getTenantId(req);
+    // Prefer accountId from request body (for worker calls) over context (for API Gateway calls)
+    const effectiveAccountId = accountId || getAccountId(req);
 
-    if (!effectiveTenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!effectiveAccountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
     if (!groupId) {
       return res.status(400).json({ error: 'Group ID is required' });
     }
 
-    logger.info('Adding user to group', { userId, groupId, tenantId: effectiveTenantId });
+    logger.info('Adding user to group', { userId, groupId, accountId: effectiveAccountId });
 
-    const result = await rbacService.addUserToGroup(effectiveTenantId, userId, groupId, currentUser);
+    const result = await rbacService.addUserToGroup(effectiveAccountId, userId, groupId, currentUser);
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`Error adding user to group: ${error.message}`);
@@ -371,15 +371,15 @@ router.post('/users/:userId/groups', async (req, res) => {
 // DELETE /rbac/users/:userId/groups/:groupId - Remove user from group
 router.delete('/users/:userId/groups/:groupId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { userId, groupId } = req.params;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const result = await rbacService.removeUserFromGroup(tenantId, userId, groupId, currentUser);
+    const result = await rbacService.removeUserFromGroup(accountId, userId, groupId, currentUser);
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`Error removing user from group: ${error.message}`);
@@ -390,19 +390,19 @@ router.delete('/users/:userId/groups/:groupId', async (req, res) => {
 // POST /rbac/groups/:groupId/roles - Assign role to group
 router.post('/groups/:groupId/roles', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { groupId } = req.params;
     const { roleId } = req.body;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
     if (!roleId) {
       return res.status(400).json({ error: 'Role ID is required' });
     }
 
-    const result = await rbacService.assignRoleToGroup(tenantId, groupId, roleId, currentUser);
+    const result = await rbacService.assignRoleToGroup(accountId, groupId, roleId, currentUser);
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`Error assigning role to group: ${error.message}`);
@@ -413,15 +413,15 @@ router.post('/groups/:groupId/roles', async (req, res) => {
 // DELETE /rbac/groups/:groupId/roles/:roleId - Remove role from group
 router.delete('/groups/:groupId/roles/:roleId', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { groupId, roleId } = req.params;
     const currentUser = getCurrentUser(req);
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const result = await rbacService.removeRoleFromGroup(tenantId, groupId, roleId, currentUser);
+    const result = await rbacService.removeRoleFromGroup(accountId, groupId, roleId, currentUser);
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`Error removing role from group: ${error.message}`);
@@ -434,14 +434,14 @@ router.delete('/groups/:groupId/roles/:roleId', async (req, res) => {
 // GET /rbac/users/:userId/groups - Get user's groups
 router.get('/users/:userId/groups', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { userId } = req.params;
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const groups = await rbacService.getUserGroups(tenantId, userId);
+    const groups = await rbacService.getUserGroups(accountId, userId);
     res.json({ success: true, data: groups });
   } catch (error) {
     logger.error(`Error getting user groups: ${error.message}`);
@@ -452,14 +452,14 @@ router.get('/users/:userId/groups', async (req, res) => {
 // GET /rbac/groups/:groupId/members - Get group members
 router.get('/groups/:groupId/members', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { groupId } = req.params;
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const members = await rbacService.getGroupMembers(tenantId, groupId);
+    const members = await rbacService.getGroupMembers(accountId, groupId);
     res.json({ success: true, data: members });
   } catch (error) {
     logger.error(`Error getting group members: ${error.message}`);
@@ -470,14 +470,14 @@ router.get('/groups/:groupId/members', async (req, res) => {
 // GET /rbac/groups/:groupId/roles - Get group roles
 router.get('/groups/:groupId/roles', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { groupId } = req.params;
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const roles = await rbacService.getGroupRoles(tenantId, groupId);
+    const roles = await rbacService.getGroupRoles(accountId, groupId);
     res.json({ success: true, data: roles });
   } catch (error) {
     logger.error(`Error getting group roles: ${error.message}`);
@@ -488,14 +488,14 @@ router.get('/groups/:groupId/roles', async (req, res) => {
 // GET /rbac/roles/:roleId/groups - Get role groups
 router.get('/roles/:roleId/groups', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const { roleId } = req.params;
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const groups = await rbacService.getRoleGroups(tenantId, roleId);
+    const groups = await rbacService.getRoleGroups(accountId, roleId);
     res.json({ success: true, data: groups });
   } catch (error) {
     logger.error(`Error getting role groups: ${error.message}`);
@@ -506,14 +506,14 @@ router.get('/roles/:roleId/groups', async (req, res) => {
 // GET /rbac/audit - Get audit trail
 router.get('/audit', async (req, res) => {
   try {
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
     const limit = parseInt(req.query.limit) || 50;
 
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    const auditTrail = await rbacService.getAuditTrail(tenantId, limit);
+    const auditTrail = await rbacService.getAuditTrail(accountId, limit);
     res.json({ success: true, data: auditTrail });
   } catch (error) {
     logger.error(`Error getting audit trail: ${error.message}`);

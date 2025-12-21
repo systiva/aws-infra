@@ -3,8 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { NavigationPanel } from './components/NavigationPanel';
 import { Overview } from './views/Overview';
-import { TenantRegistration } from './views/TenantRegistration';
-import { TenantDirectory } from './views/TenantDirectory';
+import { AccountRegistration } from './views/AccountRegistration';
+import { AccountDirectory } from './views/AccountDirectory';
 import { SuperAdminManagement } from './views/SuperAdminManagement';
 import { UserManagement } from './views/UserManagement';
 import { RoleManagement } from './views/RoleManagement';
@@ -48,15 +48,15 @@ function AppContent() {
             } 
           />
           
-          {/* Tenant Gov Routes - Platform Admin Only */}
+          {/* Account Gov Routes - Platform Admin Only */}
           <Route 
             path="/register" 
             element={
               <GroupGuard 
                 allowedGroups={['platform-admin']}
-                fallback={<div className="access-denied">Access Denied: You don't have permission to register tenants.</div>}
+                fallback={<div className="access-denied">Access Denied: You don't have permission to register accounts.</div>}
               >
-                <TenantRegistration />
+                <AccountRegistration />
               </GroupGuard>
             } 
           />
@@ -66,9 +66,9 @@ function AppContent() {
             element={
               <GroupGuard 
                 allowedGroups={['platform-admin']}
-                fallback={<div className="access-denied">Access Denied: You don't have permission to view the tenant directory.</div>}
+                fallback={<div className="access-denied">Access Denied: You don't have permission to view the account directory.</div>}
               >
-                <TenantDirectory />
+                <AccountDirectory />
               </GroupGuard>
             } 
           />
@@ -86,12 +86,12 @@ function AppContent() {
             } 
           />
           
-          {/* RBAC Management Routes - Tenant Admin Only */}
+          {/* RBAC Management Routes - Account Admin Only */}
           <Route 
             path="/user-management" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-admin']}
+                allowedGroups={['account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage users.</div>}
               >
                 <UserManagement />
@@ -103,7 +103,7 @@ function AppContent() {
             path="/role-management" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-admin']}
+                allowedGroups={['account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage roles.</div>}
               >
                 <RoleManagement />
@@ -115,7 +115,7 @@ function AppContent() {
             path="/group-management" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-admin']}
+                allowedGroups={['account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage groups.</div>}
               >
                 <GroupManagement />
@@ -127,7 +127,7 @@ function AppContent() {
             path="/permission-management" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-admin']}
+                allowedGroups={['account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage permissions.</div>}
               >
                 <PermissionManagement />
@@ -135,12 +135,12 @@ function AppContent() {
             } 
           />
 
-          {/* OMS Routes - All tenant users + platform admin */}
+          {/* OMS Routes - All account users + platform admin */}
           <Route 
             path="/oms" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                allowedGroups={['account-user-ro', 'account-user-rw', 'account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to access Order Management.</div>}
               >
                 <OMSDashboard />
@@ -152,7 +152,7 @@ function AppContent() {
             path="/oms/customers" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                allowedGroups={['account-user-ro', 'account-user-rw', 'account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage customers.</div>}
               >
                 <CustomerManagement />
@@ -164,7 +164,7 @@ function AppContent() {
             path="/oms/products" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                allowedGroups={['account-user-ro', 'account-user-rw', 'account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage products.</div>}
               >
                 <ProductManagement />
@@ -176,7 +176,7 @@ function AppContent() {
             path="/oms/orders" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                allowedGroups={['account-user-ro', 'account-user-rw', 'account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage orders.</div>}
               >
                 <OrderManagement />
@@ -188,7 +188,7 @@ function AppContent() {
             path="/oms/inventory" 
             element={
               <GroupGuard 
-                allowedGroups={['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']}
+                allowedGroups={['account-user-ro', 'account-user-rw', 'account-admin']}
                 fallback={<div className="access-denied">Access Denied: You don't have permission to manage inventory.</div>}
               >
                 <InventoryManagement />

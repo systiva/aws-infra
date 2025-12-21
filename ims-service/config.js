@@ -27,10 +27,10 @@ const config = {
   USER_POOL_CLIENT_SECRET: process.env.USER_POOL_CLIENT_SECRET,
   
   // DynamoDB Configuration
-  TENANT_REGISTRY_TABLE_NAME: process.env.TENANT_REGISTRY_TABLE_NAME,
+  ACCOUNT_REGISTRY_TABLE_NAME: process.env.ACCOUNT_REGISTRY_TABLE_NAME,
   
   // Platform Configuration
-  PLATFORM_TENANT_ID: process.env.PLATFORM_TENANT_ID || 'platform',
+  PLATFORM_ACCOUNT_ID: process.env.PLATFORM_ACCOUNT_ID || 'platform',
   
   // API Configuration
   API_VERSION: 'v1',

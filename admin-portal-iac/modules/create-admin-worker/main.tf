@@ -154,8 +154,8 @@ resource "aws_lambda_function" "create_admin_worker" {
   tags = merge(var.common_tags, {
     Name      = local.function_name
     Type      = "Lambda"
-    Purpose   = "CreateTenantAdmin"
-    Component = "TenantProvisioning"
+    Purpose   = "CreateAccountAdmin"
+    Component = "AccountProvisioning"
   })
 }
 

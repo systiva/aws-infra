@@ -100,8 +100,8 @@ resource "aws_iam_role_policy" "ims_service_dynamodb" {
           "dynamodb:*"
         ]
         Resource = [
-          var.tenant_registry_table_arn,
-          "${var.tenant_registry_table_arn}/index/*"
+          var.account_registry_table_arn,
+          "${var.account_registry_table_arn}/index/*"
         ]
       }
     ]
@@ -139,7 +139,7 @@ resource "aws_lambda_function" "ims_service" {
       USER_POOL_CLIENT_SECRET     = var.user_pool_client_secret
       JWT_SIGNING_KEY             = var.jwt_signing_key
       REGION                      = data.aws_region.current.name
-      TENANT_REGISTRY_TABLE_NAME  = var.tenant_registry_table_name
+      ACCOUNT_REGISTRY_TABLE_NAME  = var.account_registry_table_name
     }, var.environment_variables)
   }
 

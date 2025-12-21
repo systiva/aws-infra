@@ -9,18 +9,18 @@ class GroupManagement {
     /**
      * Create a new group
      */
-    static async createGroup(tenantId, groupData) {
+    static async createGroup(accountId, groupData) {
         try {
 
             
-            const groupPK = `TENANT#${tenantId}`;
+            const groupPK = `ACCOUNT#${accountId}`;
             const groupSK = `GROUP#${groupData.groupId}`;
             
             const groupItem = {
                 PK: groupPK,
                 SK: groupSK,
                 entityType: 'GROUP',
-                tenantId,
+                accountId,
                 groupId: groupData.groupId,
                 name: groupData.name,
                 description: groupData.description,
@@ -39,11 +39,11 @@ class GroupManagement {
     /**
      * Get group by ID
      */
-    static async getGroup(tenantId, groupId) {
+    static async getGroup(accountId, groupId) {
         try {
 
             
-            const groupPK = `TENANT#${tenantId}`;
+            const groupPK = `ACCOUNT#${accountId}`;
             const groupSK = `GROUP#${groupId}`;
             const result = await RBACModel.get({
                 PK: groupPK,
@@ -63,11 +63,11 @@ class GroupManagement {
     /**
      * Update group
      */
-    static async updateGroup(tenantId, groupId, updateData) {
+    static async updateGroup(accountId, groupId, updateData) {
         try {
 
             
-            const groupPK = `TENANT#${tenantId}`;
+            const groupPK = `ACCOUNT#${accountId}`;
             const groupSK = `GROUP#${groupId}`;
             
             const updateItem = {
@@ -89,11 +89,11 @@ class GroupManagement {
     /**
      * Delete group
      */
-    static async deleteGroup(tenantId, groupId) {
+    static async deleteGroup(accountId, groupId) {
         try {
 
             
-            const groupPK = `TENANT#${tenantId}`;
+            const groupPK = `ACCOUNT#${accountId}`;
             const groupSK = `GROUP#${groupId}`;
             return await RBACModel.delete({
                 PK: groupPK,
@@ -106,20 +106,20 @@ class GroupManagement {
     }
 
     /**
-     * Get all groups in a tenant
+     * Get all groups in a account
      */
-    static async getAllGroupsInTenant(tenantId) {
+    static async getAllGroupsInAccount(accountId) {
         try {
 
             
-            const groupPK = `TENANT#${tenantId}`;
+            const groupPK = `ACCOUNT#${accountId}`;
             const groups = await RBACModel.query("PK").eq(groupPK)
                 .where('SK').beginsWith('GROUP#')
                 .exec();
             
             return groups.map(group => this.cleanGroupResponse(group));
         } catch (error) {
-            logger.error('Error getting all groups in tenant:', error);
+            logger.error('Error getting all groups in account:', error);
             throw error;
         }
     }
@@ -127,31 +127,31 @@ class GroupManagement {
     /**
      * Add role to group
      */
-    static async addRoleToGroup(tenantId, groupId, roleId) {
+    static async addRoleToGroup(accountId, groupId, roleId) {
         try {
-            // Group's Role mapping: PK: GROUP#<tenant_id>#<group_id>#ROLES, SK: ROLE#<roleID>
-            const groupRolePK = `GROUP#${tenantId}#${groupId}#ROLES`;
+            // Group's Role mapping: PK: GROUP#<account_id>#<group_id>#ROLES, SK: ROLE#<roleID>
+            const groupRolePK = `GROUP#${accountId}#${groupId}#ROLES`;
             const groupRoleSK = `ROLE#${roleId}`;
             
             const groupRoleItem = {
                 PK: groupRolePK,
                 SK: groupRoleSK,
                 entityType: 'GROUP_ROLE_ASSIGNMENT',
-                tenantId,
+                accountId,
                 groupId,
                 roleId,
                 createdAt: new Date().toISOString()
             };
 
-            // Role's Group mapping: PK: ROLE#<tenant_id>#<role_id>#GROUPS, SK: GROUP#<groupID>
-            const roleGroupPK = `ROLE#${tenantId}#${roleId}#GROUPS`;
+            // Role's Group mapping: PK: ROLE#<account_id>#<role_id>#GROUPS, SK: GROUP#<groupID>
+            const roleGroupPK = `ROLE#${accountId}#${roleId}#GROUPS`;
             const roleGroupSK = `GROUP#${groupId}`;
             
             const roleGroupItem = {
                 PK: roleGroupPK,
                 SK: roleGroupSK,
                 entityType: 'ROLE_GROUP_ASSIGNMENT',
-                tenantId,
+                accountId,
                 groupId,
                 roleId,
                 createdAt: new Date().toISOString()
@@ -173,13 +173,13 @@ class GroupManagement {
     /**
      * Remove role from group
      */
-    static async removeRoleFromGroup(tenantId, groupId, roleId) {
+    static async removeRoleFromGroup(accountId, groupId, roleId) {
         try {
             // Remove both mappings in parallel
-            const groupRolePK = `GROUP#${tenantId}#${groupId}#ROLES`;
+            const groupRolePK = `GROUP#${accountId}#${groupId}#ROLES`;
             const groupRoleSK = `ROLE#${roleId}`;
             
-            const roleGroupPK = `ROLE#${tenantId}#${roleId}#GROUPS`;
+            const roleGroupPK = `ROLE#${accountId}#${roleId}#GROUPS`;
             const roleGroupSK = `GROUP#${groupId}`;
             
             await Promise.all([
@@ -197,10 +197,10 @@ class GroupManagement {
     /**
      * Get group roles
      */
-    static async getGroupRoles(tenantId, groupId) {
+    static async getGroupRoles(accountId, groupId) {
         try {
-            // PK: GROUP#<tenant_id>#<group_id>#ROLES, SK: ROLE#<roleID>
-            const groupRolesPK = `GROUP#${tenantId}#${groupId}#ROLES`;
+            // PK: GROUP#<account_id>#<group_id>#ROLES, SK: ROLE#<roleID>
+            const groupRolesPK = `GROUP#${accountId}#${groupId}#ROLES`;
             const assignments = await RBACModel.query("PK").eq(groupRolesPK).exec();
             
             return assignments.map(assignment => this.cleanGroupResponse(assignment));
@@ -213,10 +213,10 @@ class GroupManagement {
     /**
      * Get group members (users)
      */
-    static async getGroupMembers(tenantId, groupId) {
+    static async getGroupMembers(accountId, groupId) {
         try {
-            // PK: GROUP#<tenant_id>#<group_id>#USERS, SK: USER#<userID>
-            const groupUsersPK = `GROUP#${tenantId}#${groupId}#USERS`;
+            // PK: GROUP#<account_id>#<group_id>#USERS, SK: USER#<userID>
+            const groupUsersPK = `GROUP#${accountId}#${groupId}#USERS`;
             const memberships = await RBACModel.query("PK").eq(groupUsersPK).exec();
             
             return memberships.map(membership => this.cleanGroupResponse(membership));
@@ -229,13 +229,13 @@ class GroupManagement {
     /**
      * Check if user is member of group
      */
-    static async isUserInGroup(tenantId, userId, groupId) {
+    static async isUserInGroup(accountId, userId, groupId) {
         try {
-            // Check using User's group mapping: PK: USER#<tenant_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
-            const userGroupPK = `USER#${tenantId}#${userId}#GROUPS`;
+            // Check using User's group mapping: PK: USER#<account_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
+            const userGroupPK = `USER#${accountId}#${userId}#GROUPS`;
             const userGroupSK = `GROUP#${groupId}`;
             
-            logger.info(`Checking if user: ${userId} is in group: ${groupId} in tenant: ${tenantId}`);
+            logger.info(`Checking if user: ${userId} is in group: ${groupId} in account: ${accountId}`);
             const result = await RBACModel.get({
                 PK: userGroupPK,
                 SK: userGroupSK
@@ -254,14 +254,14 @@ class GroupManagement {
     /**
      * Get groups by user ID (reverse lookup)
      */
-    static async getGroupsByUser(tenantId, userId) {
+    static async getGroupsByUser(accountId, userId) {
         try {
-            // PK: USER#<tenant_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
-            const userGroupsPK = `USER#${tenantId}#${userId}#GROUPS`;
+            // PK: USER#<account_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
+            const userGroupsPK = `USER#${accountId}#${userId}#GROUPS`;
             const memberships = await RBACModel.query("PK").eq(userGroupsPK).exec();
             
             if (!memberships || memberships.length === 0) {
-                logger.info(`No groups found for user: ${userId} in tenant: ${tenantId}`);
+                logger.info(`No groups found for user: ${userId} in account: ${accountId}`);
                 return [];
             }
             
@@ -271,7 +271,7 @@ class GroupManagement {
                 const groupId = membership.SK.replace('GROUP#', '');
                 
                 try {
-                    const group = await this.getGroup(tenantId, groupId);
+                    const group = await this.getGroup(accountId, groupId);
                     return group;
                 } catch (error) {
                     logger.warn(`Error getting group details for ${groupId}:`, error);
@@ -284,7 +284,7 @@ class GroupManagement {
             // Filter out null groups
             const validGroups = groupDetails.filter(group => group !== null);
             
-            logger.info(`Found ${validGroups.length} groups for user: ${userId} in tenant: ${tenantId}`);
+            logger.info(`Found ${validGroups.length} groups for user: ${userId} in account: ${accountId}`);
             return validGroups;
         } catch (error) {
             logger.error('Error getting groups by user:', error);
@@ -294,20 +294,20 @@ class GroupManagement {
 
     /**
      * Get group members (users in a group)
-     * Query pattern: PK = GROUP#<tenant_id>#<group_id>#USERS, SK = USER#<userID>
+     * Query pattern: PK = GROUP#<account_id>#<group_id>#USERS, SK = USER#<userID>
      */
-    static async getGroupMembers(tenantId, groupId) {
+    static async getGroupMembers(accountId, groupId) {
         try {
             // Query for group members using the documented access pattern
-            const groupMembersPK = `GROUP#${tenantId}#${groupId}#USERS`;
+            const groupMembersPK = `GROUP#${accountId}#${groupId}#USERS`;
             const members = await RBACModel.query("PK").eq(groupMembersPK).exec();
             
             if (!members || members.length === 0) {
-                logger.info(`No members found for group: ${groupId} in tenant: ${tenantId}`);
+                logger.info(`No members found for group: ${groupId} in account: ${accountId}`);
                 return [];
             }
             
-            logger.info(`Found ${members.length} members for group: ${groupId} in tenant: ${tenantId}`);
+            logger.info(`Found ${members.length} members for group: ${groupId} in account: ${accountId}`);
             return members;
         } catch (error) {
             logger.error('Error getting group members:', error);

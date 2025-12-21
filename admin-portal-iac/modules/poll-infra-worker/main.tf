@@ -1,5 +1,5 @@
 # Poll Infrastructure Worker Lambda Function
-# Handles polling tenant infrastructure status
+# Handles polling account infrastructure status
 
 # Data sources
 data "aws_caller_identity" "current" {}
@@ -15,7 +15,7 @@ locals {
   
   common_tags = merge(var.common_tags, {
     Name    = local.function_name
-    Purpose = "TenantInfrastructurePolling"
+    Purpose = "AccountInfrastructurePolling"
     Type    = "Lambda"
     Component = "Worker"
   })
@@ -46,10 +46,10 @@ resource "aws_lambda_function" "poll_infra_worker" {
     variables = {
       NODE_ENV                   = var.environment
       LOG_LEVEL                 = var.log_level
-      TENANT_REGISTRY_TABLE_NAME = var.tenant_registry_table_name
-      TENANT_PUBLIC_DYNAMO_DB    = var.tenant_public_table_name
+      ACCOUNT_REGISTRY_TABLE_NAME = var.account_registry_table_name
+      ACCOUNT_PUBLIC_DYNAMO_DB    = var.account_public_table_name
       ADMIN_ACCOUNT_ID          = var.admin_account_id
-      TENANT_ACCOUNT_ID         = var.tenant_account_id
+      ACCOUNT_ACCOUNT_ID         = var.account_account_id
       CROSS_ACCOUNT_ROLE_NAME   = var.cross_account_role_name
       WORKSPACE                 = var.workspace_prefix
     }
@@ -110,8 +110,8 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
           "dynamodb:*"  # Full DynamoDB access for all operations
         ]
         Resource = [
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.tenant_registry_table_name}",
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.tenant_registry_table_name}/index/*"
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}/index/*"
         ]
       },
       {
@@ -128,7 +128,7 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
         Action = [
           "sts:AssumeRole"
         ]
-        Resource = "arn:aws:iam::${var.tenant_account_id}:role/${var.cross_account_role_name}"
+        Resource = "arn:aws:iam::${var.account_account_id}:role/${var.cross_account_role_name}"
       }
     ], var.additional_permissions)
   })

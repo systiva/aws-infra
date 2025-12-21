@@ -77,7 +77,7 @@ const jwtAuthorizerMiddleware = async (req, res, next) => {
 
     logger.info('Token verified successfully for user', { 
       userId: userInfo.userId,
-      tenantId: userInfo.tenantId,
+      accountId: userInfo.accountId,
       tokenType: userInfo.tokenType
     });
 
@@ -89,7 +89,7 @@ const jwtAuthorizerMiddleware = async (req, res, next) => {
       sub: userInfo.userId,
       username: userInfo.username,
       email: userInfo.email,
-      tenantId: userInfo.tenantId,
+      accountId: userInfo.accountId,
       userRole: userInfo.userRole,
       roles: userInfo.groups || [],
       groups: userInfo.groups || [],
@@ -159,7 +159,7 @@ async function verifyEnhancedToken(token) {
       userId: decoded.sub,
       email: decoded.email,
       username: decoded.username,
-      tenantId: decoded.tenant_id || decoded['custom:tenant_id'],
+      accountId: decoded.account_id || decoded['custom:account_id'],
       userRole: decoded.user_role || decoded['custom:user_role'],
       permissions: decoded.permissions || (decoded['custom:permissions'] ? JSON.parse(decoded['custom:permissions']) : []),
       groups: decoded.groups || (decoded['custom:groups'] ? JSON.parse(decoded['custom:groups']) : []),
@@ -196,7 +196,7 @@ async function verifyCognitoToken(token, decodedHeader) {
       userId: decoded.sub,
       email: decoded.email,
       username: decoded['cognito:username'] || decoded.username,
-      tenantId: decoded['custom:tenant_id'] || null,
+      accountId: decoded['custom:account_id'] || null,
       userRole: decoded['custom:user_role'] || null,
       permissions: decoded['custom:permissions'] ? JSON.parse(decoded['custom:permissions']) : [],
       groups: decoded['custom:groups'] ? JSON.parse(decoded['custom:groups']) : [],
@@ -251,7 +251,7 @@ function setUserContextHeaders(req, userInfo) {
   req.headers['x-user-id'] = userInfo.userId;
   req.headers['x-user-name'] = userInfo.username || '';
   req.headers['x-user-email'] = userInfo.email || '';
-  req.headers['x-tenant-id'] = userInfo.tenantId || '';
+  req.headers['x-account-id'] = userInfo.accountId || '';
   req.headers['x-user-role'] = userInfo.userRole || '';
   req.headers['x-user-groups'] = Array.isArray(userInfo.groups) ? userInfo.groups.join(',') : '';
   req.headers['x-user-permissions'] = Array.isArray(userInfo.permissions) ? JSON.stringify(userInfo.permissions) : '[]';

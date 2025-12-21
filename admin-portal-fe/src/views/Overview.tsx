@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { TenantApiClient } from '../api/TenantApiClient';
-import { TenantData } from '../models/TenantModel';
+import { AccountApiClient } from '../api/AccountApiClient';
+import { AccountData } from '../models/AccountModel';
 import './Overview.css';
 
-interface TenantStats {
+interface AccountStats {
   total: number;
   active: number;
   inactive: number;
@@ -14,8 +14,8 @@ interface TenantStats {
 }
 
 export const Overview: React.FC = () => {
-  const [tenants, setTenants] = useState<TenantData[]>([]);
-  const [stats, setStats] = useState<TenantStats>({
+  const [accounts, setAccounts] = useState<AccountData[]>([]);
+  const [stats, setStats] = useState<AccountStats>({
     total: 0,
     active: 0,
     inactive: 0,
@@ -28,20 +28,20 @@ export const Overview: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadTenantsAndCalculateStats();
+    loadAccountsAndCalculateStats();
   }, []);
 
-  const loadTenantsAndCalculateStats = async () => {
+  const loadAccountsAndCalculateStats = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const apiClient = TenantApiClient.getInstance();
-      const data = await apiClient.fetchTenants();
-      setTenants(data);
+      const apiClient = AccountApiClient.getInstance();
+      const data = await apiClient.fetchAccounts();
+      setAccounts(data);
       
       // Calculate statistics
-      const newStats: TenantStats = {
+      const newStats: AccountStats = {
         total: data.length,
         active: data.filter(t => t.provisioningState === 'active').length,
         inactive: data.filter(t => t.provisioningState === 'inactive').length,
@@ -53,37 +53,37 @@ export const Overview: React.FC = () => {
       
       setStats(newStats);
     } catch (err) {
-      console.error('Failed to load tenants:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load tenant data');
+      console.error('Failed to load accounts:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load account data');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSuspendTenant = async (tenantId: string) => {
-    if (!window.confirm(`Are you sure you want to suspend tenant ${tenantId}?`)) {
+  const handleSuspendAccount = async (accountId: string) => {
+    if (!window.confirm(`Are you sure you want to suspend account ${accountId}?`)) {
       return;
     }
 
     try {
-      const apiClient = TenantApiClient.getInstance();
-      await apiClient.suspendTenant(tenantId);
+      const apiClient = AccountApiClient.getInstance();
+      await apiClient.suspendAccount(accountId);
       
-      // Refresh the tenant list
-      await loadTenantsAndCalculateStats();
+      // Refresh the account list
+      await loadAccountsAndCalculateStats();
       
-      alert('Tenant suspended successfully!');
+      alert('Account suspended successfully!');
     } catch (err) {
-      console.error('Failed to suspend tenant:', err);
-      alert('Failed to suspend tenant: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      console.error('Failed to suspend account:', err);
+      alert('Failed to suspend account: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 
   if (isLoading) {
     return (
       <div className="overview-view">
-        <h1>Tenant Management Overview</h1>
-        <div className="loading-state">Loading tenant statistics...</div>
+        <h1>Account Management Overview</h1>
+        <div className="loading-state">Loading account statistics...</div>
       </div>
     );
   }
@@ -91,10 +91,10 @@ export const Overview: React.FC = () => {
   if (error) {
     return (
       <div className="overview-view">
-        <h1>Tenant Management Overview</h1>
+        <h1>Account Management Overview</h1>
         <div className="error-state">
           <p>Error loading data: {error}</p>
-          <button onClick={loadTenantsAndCalculateStats}>Retry</button>
+          <button onClick={loadAccountsAndCalculateStats}>Retry</button>
         </div>
       </div>
     );
@@ -102,12 +102,12 @@ export const Overview: React.FC = () => {
 
   return (
     <div className="overview-view">
-      <h1>Tenant Management Overview</h1>
+      <h1>Account Management Overview</h1>
       
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-value">{stats.total}</div>
-          <div className="stat-label">Total Tenants</div>
+          <div className="stat-label">Total Accounts</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{stats.active}</div>
@@ -149,14 +149,14 @@ export const Overview: React.FC = () => {
       </div>
 
       {stats.total > 0 && (
-        <div className="recent-tenants">
-          <h2>Recent Tenants</h2>
-          <div className="tenant-table">
+        <div className="recent-accounts">
+          <h2>Recent Accounts</h2>
+          <div className="account-table">
             <table>
               <thead>
                 <tr>
-                  <th>Tenant ID</th>
-                  <th>Tenant Name</th>
+                  <th>Account ID</th>
+                  <th>Account Name</th>
                   <th>Email</th>
                   <th>Subscription Tier</th>
                   <th>Status</th>
@@ -165,41 +165,41 @@ export const Overview: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {tenants
+                {accounts
                   .sort((a, b) => new Date(b.registeredOn).getTime() - new Date(a.registeredOn).getTime())
                   .slice(0, 10)
-                  .map(tenant => (
-                    <tr key={tenant.tenantId}>
-                      <td className="tenant-id">{tenant.tenantId}</td>
-                      <td className="tenant-name">{tenant.tenantName}</td>
-                      <td className="tenant-email">{tenant.email}</td>
+                  .map(account => (
+                    <tr key={account.accountId}>
+                      <td className="account-id">{account.accountId}</td>
+                      <td className="account-name">{account.accountName}</td>
+                      <td className="account-email">{account.email}</td>
                       <td>
-                        <span className={`tier-badge ${tenant.subscriptionTier}`}>
-                          {tenant.subscriptionTier}
+                        <span className={`tier-badge ${account.subscriptionTier}`}>
+                          {account.subscriptionTier}
                         </span>
                       </td>
                       <td>
-                        <span className={`status-badge ${tenant.provisioningState}`}>
-                          {tenant.provisioningState}
+                        <span className={`status-badge ${account.provisioningState}`}>
+                          {account.provisioningState}
                         </span>
                       </td>
                       <td className="created-date">
-                        {new Date(tenant.registeredOn).toLocaleDateString()}
+                        {new Date(account.registeredOn).toLocaleDateString()}
                       </td>
                       <td className="actions-cell">
-                        {tenant.provisioningState === 'active' && (
+                        {account.provisioningState === 'active' && (
                           <button 
                             className="suspend-button"
-                            onClick={() => handleSuspendTenant(tenant.tenantId)}
-                            title="Suspend tenant"
+                            onClick={() => handleSuspendAccount(account.accountId)}
+                            title="Suspend account"
                           >
                             Suspend
                           </button>
                         )}
-                        {tenant.provisioningState === 'inactive' && (
+                        {account.provisioningState === 'inactive' && (
                           <span className="status-text inactive">Suspended</span>
                         )}
-                        {!['active', 'inactive'].includes(tenant.provisioningState) && (
+                        {!['active', 'inactive'].includes(account.provisioningState) && (
                           <span className="status-text">-</span>
                         )}
                       </td>

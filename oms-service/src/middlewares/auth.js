@@ -17,13 +17,13 @@ const extractUserFromApiGateway = (req) => {
                 logger.debug({ 
                     authorizerKeys: Object.keys(authorizer),
                     userId: authorizer.userId,
-                    tenantId: authorizer.tenantId
+                    accountId: authorizer.accountId
                 }, 'JWT claims from API Gateway authorizer');
                 
                 return {
                     userId: authorizer.userId || authorizer.sub,
                     email: authorizer.email,
-                    tenantId: authorizer.tenantId || authorizer['custom:tenant_id'],
+                    accountId: authorizer.accountId || authorizer['custom:account_id'],
                     groups: authorizer.groups ? (typeof authorizer.groups === 'string' ? JSON.parse(authorizer.groups) : authorizer.groups) : [],
                     roles: authorizer.roles ? (typeof authorizer.roles === 'string' ? JSON.parse(authorizer.roles) : authorizer.roles) : [],
                     permissions: authorizer.permissions ? (typeof authorizer.permissions === 'string' ? JSON.parse(authorizer.permissions) : authorizer.permissions) : []
@@ -38,7 +38,7 @@ const extractUserFromApiGateway = (req) => {
             return {
                 userId: 'local-dev-user',
                 email: 'dev@example.com',
-                tenantId: 'local-tenant',
+                accountId: 'local-account',
                 groups: [],
                 roles: [],
                 permissions: []
@@ -78,11 +78,11 @@ const authMiddleware = (req, res, next) => {
         }
         
         // Ensure user has required fields
-        if (!user.userId || !user.tenantId) {
+        if (!user.userId || !user.accountId) {
             logger.error({ 
                 userId: user.userId,
-                tenantId: user.tenantId
-            }, 'Invalid user context - missing userId or tenantId');
+                accountId: user.accountId
+            }, 'Invalid user context - missing userId or accountId');
             return res.status(401).json({ 
                 error: 'Unauthorized', 
                 message: 'Invalid authentication token' 
@@ -94,7 +94,7 @@ const authMiddleware = (req, res, next) => {
         
         logger.debug({ 
             userId: req.user.userId, 
-            tenantId: req.user.tenantId,
+            accountId: req.user.accountId,
             groupsCount: req.user.groups.length,
             groupsRaw: JSON.stringify(req.user.groups),
             groupNames: JSON.stringify(req.user.groups.map(g => g.name || g))

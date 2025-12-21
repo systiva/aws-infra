@@ -1,7 +1,7 @@
 {
   "name": "poll-infra-worker",
   "version": "1.0.0",
-  "description": "AWS Lambda worker for polling tenant infrastructure status",
+  "description": "AWS Lambda worker for polling account infrastructure status",
   "main": "index.js",
   "scripts": {
     "lint": "eslint src/",

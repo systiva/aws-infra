@@ -1,4 +1,4 @@
-# Multi-Tenant SaaS Platform - Deployment Guide
+# Multi-Account SaaS Platform - Deployment Guide
 
 ## Prerequisites
 
@@ -12,14 +12,14 @@
 
 ### AWS Account Setup
 1. **Admin Account**: Central account for admin portal and cross-account management
-2. **Tenant Account(s)**: Separate accounts for tenant-specific resources
-3. **IAM Roles**: Cross-account roles configured for admin access to tenant accounts
+2. **Account Account(s)**: Separate accounts for account-specific resources
+3. **IAM Roles**: Cross-account roles configured for admin access to account accounts
 
 ### Environment Variables
 ```bash
 export AWS_REGION=us-east-1
 export AWS_ADMIN_PROFILE=admin-profile-name
-export AWS_TENANT_PROFILE=tenant-profile-name
+export AWS_ACCOUNT_PROFILE=account-profile-name
 export TERRAFORM_WORKSPACE=dev
 ```
 
@@ -27,7 +27,7 @@ export TERRAFORM_WORKSPACE=dev
 
 ### Step 1: Configure AWS Profiles
 
-Configure separate AWS profiles for admin and tenant accounts:
+Configure separate AWS profiles for admin and account accounts:
 
 ```bash
 # Configure admin profile
@@ -37,10 +37,10 @@ AWS Secret Access Key: [Admin Account Secret Key]
 Default region name: us-east-1
 Default output format: json
 
-# Configure tenant profile  
-aws configure --profile tenant-profile-name
-AWS Access Key ID: [Tenant Account Access Key]
-AWS Secret Access Key: [Tenant Account Secret Key]
+# Configure account profile  
+aws configure --profile account-profile-name
+AWS Access Key ID: [Account Account Access Key]
+AWS Secret Access Key: [Account Account Secret Key]
 Default region name: us-east-1
 Default output format: json
 ```
@@ -71,33 +71,33 @@ Default output format: json
   --admin-profile=admin
 ```
 
-### Step 3: Deploy Tenant Infrastructure
+### Step 3: Deploy Account Infrastructure
 
-#### 3.1 Bootstrap Tenant Infrastructure
+#### 3.1 Bootstrap Account Infrastructure
 ```bash
-./cicd.sh tenant-bootstrap \
+./cicd.sh account-bootstrap \
   --workspace=dev \
   --aws-account=560261045252 \
   --admin-account=583122682394 \
-  --tenant-profile=tenant
+  --account-profile=account
 ```
 
-#### 3.2 Plan Tenant Infrastructure
+#### 3.2 Plan Account Infrastructure
 ```bash
-./cicd.sh tenant-plan \
+./cicd.sh account-plan \
   --workspace=dev \
   --aws-account=560261045252 \
   --admin-account=583122682394 \
-  --tenant-profile=tenant
+  --account-profile=account
 ```
 
-#### 3.3 Apply Tenant Infrastructure
+#### 3.3 Apply Account Infrastructure
 ```bash
-./cicd.sh tenant-apply \
+./cicd.sh account-apply \
   --workspace=dev \
   --aws-account=560261045252 \
   --admin-account=583122682394 \
-  --tenant-profile=tenant
+  --account-profile=account
 ```
 
 ### Step 4: Deploy Services

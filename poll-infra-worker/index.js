@@ -5,18 +5,18 @@ const StackPollingService = require('./src/stack-polling-service');
 const DynamoDBService = require('./src/dynamodb-service');
 
 /**
- * AWS Lambda handler for polling tenant infrastructure status
+ * AWS Lambda handler for polling account infrastructure status
  * Expected input from Step Functions:
  * {
- *   "tenant": {
- *     "id": "tenant-12345",
+ *   "account": {
+ *     "id": "account-12345",
  *     "name": "company-xyz",
  *     "region": "us-east-1"
  *   },
  *   "infrastructure": {
  *     "targetAccountId": "949642303066",
- *     "stackId": "arn:aws:cloudformation:us-east-1:949642303066:stack/tenant-infra-tenant-12345/...",
- *     "stackName": "tenant-infra-tenant-12345",
+ *     "stackId": "arn:aws:cloudformation:us-east-1:949642303066:stack/account-infra-account-12345/...",
+ *     "stackName": "account-infra-account-12345",
  *     "status": "CREATE_IN_PROGRESS"
  *   },
  *   "metadata": {
@@ -41,9 +41,9 @@ exports.handler = async (event, context) => {
 
   try {
     // Extract and validate input - flat structure from Step Functions
-    const tenant = {
-      id: event.tenantId,
-      name: event.tenantName,
+    const account = {
+      id: event.accountId,
+      name: event.accountName,
       subscriptionTier: event.subscriptionTier,
       email: event.email
     };
@@ -51,7 +51,7 @@ exports.handler = async (event, context) => {
     const infrastructure = {
       stackId: event.infrastructure?.stackId || event.stackId,
       stackName: event.infrastructure?.stackName || event.tableName,
-      targetAccountId: event.infrastructure?.targetAccountId || event.tenantAccountId,
+      targetAccountId: event.infrastructure?.targetAccountId || event.accountAccountId,
       status: event.infrastructure?.status
     };
     
@@ -62,35 +62,35 @@ exports.handler = async (event, context) => {
       attempts: event.metadata?.attempts || event.attempts || 0
     };
     
-    if (!tenant || !tenant.id) {
-      throw new Error('Invalid input: tenant ID is required');
+    if (!account || !account.id) {
+      throw new Error('Invalid input: account ID is required');
     }
 
-    if (!tenant.subscriptionTier) {
-      throw new Error('Invalid input: tenant.subscriptionTier is required');
+    if (!account.subscriptionTier) {
+      throw new Error('Invalid input: account.subscriptionTier is required');
     }
 
     // Determine operation type from event data (operation is directly in flat structure)
     const operation = event.operation || 'CREATE'; // Default to CREATE if not specified
     
     logger.info({
-      tenantId: tenant.id,
+      accountId: account.id,
       operation,
       infrastructureStatus: infrastructure.status,
       hasInfrastructureObject: !!event.infrastructure
     }, 'Detected operation type from flat structure');
 
-    // For public tenants, no CloudFormation polling needed - just return the result from create-infra/delete-infra
-    if (tenant.subscriptionTier === 'public') {
+    // For public accounts, no CloudFormation polling needed - just return the result from create-infra/delete-infra
+    if (account.subscriptionTier === 'public') {
       logger.info({
-        tenantId: tenant.id,
+        accountId: account.id,
         subscriptionTier: 'public',
         operation
-      }, 'Public tenant detected - no CloudFormation polling needed');
+      }, 'Public account detected - no CloudFormation polling needed');
 
-      // For public tenants, use the actual status from the create-infra/delete-infra result
+      // For public accounts, use the actual status from the create-infra/delete-infra result
       const operationStatus = infrastructure.status || (operation === 'DELETE' ? 'DELETE_COMPLETE' : 'CREATE_COMPLETE');
-      const operationMessage = infrastructure.statusReason || `Public tenant ${operation.toLowerCase()} operation completed`;
+      const operationMessage = infrastructure.statusReason || `Public account ${operation.toLowerCase()} operation completed`;
       const operationReason = operationMessage;
       
       const response = {
@@ -110,13 +110,13 @@ exports.handler = async (event, context) => {
           success: true,
           operation: 'POLL_INFRASTRUCTURE',
           status: 'COMPLETED',
-          message: `Public tenant infrastructure ${operation === 'DELETE' ? 'deleted' : 'ready'} (no CloudFormation stack needed)`,
+          message: `Public account infrastructure ${operation === 'DELETE' ? 'deleted' : 'ready'} (no CloudFormation stack needed)`,
           executionTime: Date.now() - startTime
         }
       };
 
-      // Update tenant registry based on operation type
-      await dynamoDBService.updateTenantInfrastructureStatus(tenant.id, {
+      // Update account registry based on operation type
+      await dynamoDBService.updateAccountInfrastructureStatus(account.id, {
         status: operationStatus,
         isComplete: true,
         isFailed: false,
@@ -124,73 +124,73 @@ exports.handler = async (event, context) => {
       }, operation);
 
       logger.info({
-        tenantId: tenant.id,
+        accountId: account.id,
         subscriptionTier: 'public',
         operation,
         finalStatus: operationStatus
-      }, 'Poll Infrastructure Worker - Public tenant completed immediately');
+      }, 'Poll Infrastructure Worker - Public account completed immediately');
 
       return response;
     }
 
-    // For private tenants, continue with CloudFormation polling
+    // For private accounts, continue with CloudFormation polling
     logger.info({
-      tenantId: tenant.id,
+      accountId: account.id,
       subscriptionTier: 'private',
       operation
-    }, 'Private tenant detected - proceeding with CloudFormation polling');
+    }, 'Private account detected - proceeding with CloudFormation polling');
 
-    // For private tenants, stackId is required for CloudFormation polling
+    // For private accounts, stackId is required for CloudFormation polling
     const attempts = (metadata?.attempts || 0) + 1;
-    const tenantId = tenant.id;
+    const accountId = account.id;
     const stackId = infrastructure.stackId;
 
     if (!stackId) {
-      throw new Error('Invalid input: stackId is required for private tenant CloudFormation polling');
+      throw new Error('Invalid input: stackId is required for private account CloudFormation polling');
     }
 
     logger.info({
-      tenantId,
+      accountId,
       stackId,
       attempts,
       maxAttempts: config.CLOUDFORMATION.MAX_POLL_ATTEMPTS
     }, 'Processing infrastructure status polling request');
 
     // Record polling attempt
-    await dynamoDBService.recordPollingAttempt(tenantId, attempts);
+    await dynamoDBService.recordPollingAttempt(accountId, attempts);
 
     // Step 1: Assume cross-account role
-    logger.info({ tenantId, attempts }, 'Step 1: Assuming cross-account role');
-    const credentials = await crossAccountService.assumeTenantRole(
+    logger.info({ accountId, attempts }, 'Step 1: Assuming cross-account role');
+    const credentials = await crossAccountService.assumeAccountRole(
       infrastructure.targetAccountId,
-      tenantId
+      accountId
     );
 
     // Step 2: Create CloudFormation client
-    logger.info({ tenantId, attempts }, 'Step 2: Creating CloudFormation client');
+    logger.info({ accountId, attempts }, 'Step 2: Creating CloudFormation client');
     const cloudFormationClient = crossAccountService.createCloudFormationClient(
       credentials,
-      tenant.region
+      account.region
     );
     const stackPollingService = new StackPollingService(cloudFormationClient);
 
     // Step 3: Poll stack status
-    logger.info({ tenantId, stackId, attempts }, 'Step 3: Polling stack status');
-    const stackData = await stackPollingService.pollStackStatus(stackId, tenantId);
+    logger.info({ accountId, stackId, attempts }, 'Step 3: Polling stack status');
+    const stackData = await stackPollingService.pollStackStatus(stackId, accountId);
 
     // Step 4: Check polling decision
     const pollingDecision = stackPollingService.shouldContinuePolling(stackData.status, attempts);
     
     logger.info({
-      tenantId,
+      accountId,
       stackId,
       stackStatus: stackData.status,
       pollingDecision
     }, 'Step 4: Evaluated polling decision');
 
-    // Step 5: Update tenant registry
-    logger.info({ tenantId, stackStatus: stackData.status }, 'Step 5: Updating tenant registry');
-    await dynamoDBService.updateTenantInfrastructureStatus(tenantId, stackData, operation);
+    // Step 5: Update account registry
+    logger.info({ accountId, stackStatus: stackData.status }, 'Step 5: Updating account registry');
+    await dynamoDBService.updateAccountInfrastructureStatus(accountId, stackData, operation);
 
     // Prepare response based on polling decision
     if (pollingDecision.shouldContinue) {
@@ -218,7 +218,7 @@ exports.handler = async (event, context) => {
       };
 
       logger.info({
-        tenantId,
+        accountId,
         stackId,
         attempts,
         nextPollIn: `${config.CLOUDFORMATION.POLL_INTERVAL_SECONDS}s`
@@ -254,7 +254,7 @@ exports.handler = async (event, context) => {
       };
 
       logger.info({
-        tenantId,
+        accountId,
         stackId,
         attempts,
         outputs: Object.keys(stackData.outputs)
@@ -264,7 +264,7 @@ exports.handler = async (event, context) => {
 
     } else if (pollingDecision.finalStatus === 'TIMEOUT') {
       // Polling timeout reached
-      await dynamoDBService.recordPollingTimeout(tenantId, attempts);
+      await dynamoDBService.recordPollingTimeout(accountId, attempts);
 
       const response = {
         ...event,
@@ -289,7 +289,7 @@ exports.handler = async (event, context) => {
       };
 
       logger.warn({
-        tenantId,
+        accountId,
         stackId,
         attempts,
         maxAttempts: config.CLOUDFORMATION.MAX_POLL_ATTEMPTS
@@ -299,7 +299,7 @@ exports.handler = async (event, context) => {
 
     } else {
       // Stack failed or unknown status
-      const stackEvents = await stackPollingService.getStackEvents(stackId, tenantId);
+      const stackEvents = await stackPollingService.getStackEvents(stackId, accountId);
       
       const response = {
         ...event,
@@ -325,7 +325,7 @@ exports.handler = async (event, context) => {
       };
 
       logger.error({
-        tenantId,
+        accountId,
         stackId,
         stackStatus: stackData.status,
         statusReason: stackData.statusReason,
@@ -363,31 +363,31 @@ exports.handler = async (event, context) => {
 if (require.main === module) {
   const testEventPublic = {
     operation: 'CREATE',
-    tenantId: 'tenant-test-123',
-    tenantName: 'test-company-public',
+    accountId: 'account-test-123',
+    accountName: 'test-company-public',
     subscriptionTier: 'public',
     email: 'test@example.com',
     createdBy: 'admin',
     registeredOn: new Date().toISOString(),
     infrastructure: {
-      targetAccountId: process.env.TENANT_ACCOUNT_ID || '949642303066',
-      stackName: 'TENANT_PUBLIC',
+      targetAccountId: process.env.ACCOUNT_ACCOUNT_ID || '949642303066',
+      stackName: 'ACCOUNT_PUBLIC',
       status: 'CREATE_COMPLETE'
     }
   };
 
   const testEventPrivate = {
     operation: 'CREATE',
-    tenantId: 'tenant-test-456',
-    tenantName: 'test-company-private',
+    accountId: 'account-test-456',
+    accountName: 'test-company-private',
     subscriptionTier: 'private',
     email: 'test-private@example.com',
     createdBy: 'admin',
     registeredOn: new Date().toISOString(),
     infrastructure: {
-      targetAccountId: process.env.TENANT_ACCOUNT_ID || '949642303066',
-      stackId: 'arn:aws:cloudformation:us-east-1:949642303066:stack/tenant-test-456-dynamodb/12345678-1234-1234-1234-123456789012',
-      stackName: 'tenant-test-456-dynamodb',
+      targetAccountId: process.env.ACCOUNT_ACCOUNT_ID || '949642303066',
+      stackId: 'arn:aws:cloudformation:us-east-1:949642303066:stack/account-test-456-dynamodb/12345678-1234-1234-1234-123456789012',
+      stackName: 'account-test-456-dynamodb',
       status: 'CREATE_IN_PROGRESS'
     }
   };
@@ -399,18 +399,18 @@ if (require.main === module) {
     getRemainingTimeInMillis: () => 300000 // 5 minutes
   };
 
-  // Test public tenant (should complete immediately)
-  console.log('Testing PUBLIC tenant polling...');
+  // Test public account (should complete immediately)
+  console.log('Testing PUBLIC account polling...');
   exports.handler(testEventPublic, testContext)
     .then(result => {
-      console.log('Public tenant success:', JSON.stringify(result, null, 2));
+      console.log('Public account success:', JSON.stringify(result, null, 2));
       
-      // Test private tenant (should poll CloudFormation)
-      console.log('\nTesting PRIVATE tenant polling...');
+      // Test private account (should poll CloudFormation)
+      console.log('\nTesting PRIVATE account polling...');
       return exports.handler(testEventPrivate, testContext);
     })
     .then(result => {
-      console.log('Private tenant success:', JSON.stringify(result, null, 2));
+      console.log('Private account success:', JSON.stringify(result, null, 2));
     })
     .catch(error => {
       console.error('Error:', error.message);

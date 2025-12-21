@@ -56,7 +56,7 @@ variable "enable_session_storage" {
 }
 
 variable "enable_step_functions" {
-  description = "Enable Step Functions for tenant operations"
+  description = "Enable Step Functions for account operations"
   type        = bool
   default     = false
 }

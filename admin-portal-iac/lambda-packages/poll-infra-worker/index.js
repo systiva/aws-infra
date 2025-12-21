@@ -4,19 +4,19 @@ exports.handler = async (event, context) => {
     console.log('Poll Infrastructure Worker - Event:', JSON.stringify(event, null, 2));
     
     try {
-        const { tenantId, operation, stackName } = event;
+        const { accountId, operation, stackName } = event;
         
-        if (!tenantId) {
-            throw new Error('Invalid input: tenantId required');
+        if (!accountId) {
+            throw new Error('Invalid input: accountId required');
         }
         
         // TODO: Implement infrastructure polling logic
-        // 1. Assume role in target tenant account
+        // 1. Assume role in target account account
         // 2. Check CloudFormation stack status
-        // 3. Update tenant registry with current status
+        // 3. Update account registry with current status
         // 4. Return status for Step Functions decision
         
-        console.log(`Polling infrastructure status for tenant: ${tenantId}`);
+        console.log(`Polling infrastructure status for account: ${accountId}`);
         
         // Simulate different statuses for testing
         const statuses = ['IN_PROGRESS', 'COMPLETE', 'FAILED'];
@@ -25,12 +25,12 @@ exports.handler = async (event, context) => {
         // Placeholder response
         return {
             statusCode: 200,
-            tenantId: tenantId,
+            accountId: accountId,
             operation: operation,
             status: randomStatus, // Will be actual CloudFormation status
             message: `Infrastructure status check completed: ${randomStatus}`,
             timestamp: new Date().toISOString(),
-            stackName: stackName || `${tenantId}-infrastructure`,
+            stackName: stackName || `${accountId}-infrastructure`,
             resources: [] // Will contain actual resource information
         };
         

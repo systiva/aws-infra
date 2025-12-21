@@ -38,11 +38,11 @@ output "api_endpoints" {
     web_app_proxy     = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/{proxy+}"
     
     # Backend API endpoints
-    tenants_get       = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/tenants"
-    tenant_by_id      = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/tenants/{tenantId}"
-    onboard           = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/tenants/onboard"
-    offboard          = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/tenants/offboard"
-    suspend           = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/tenants/suspend"
+    accounts_get       = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/accounts"
+    account_by_id      = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/accounts/{accountId}"
+    onboard           = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/accounts/onboard"
+    offboard          = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/accounts/offboard"
+    suspend           = "https://${aws_api_gateway_rest_api.admin_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.admin_api.stage_name}/api/v1/accounts/suspend"
   }
 }
 

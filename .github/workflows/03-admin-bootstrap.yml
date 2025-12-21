@@ -145,5 +145,5 @@ jobs:
           echo "/admin-portal/${{ inputs.workspace }}/admin/bootstrap/*"
           echo ""
           echo "Next Steps:"
-          echo "1. Run '04 - Admin Infrastructure' workflow (requires Tenant Infrastructure to be deployed first)"
+          echo "1. Run '04 - Admin Infrastructure' workflow (requires Account Infrastructure to be deployed first)"
           echo "=========================================="

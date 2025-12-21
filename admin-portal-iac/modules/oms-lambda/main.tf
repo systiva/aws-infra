@@ -13,9 +13,9 @@ resource "aws_lambda_function" "oms_service" {
     variables = {
       NODE_ENV                          = var.environment
       AWS_ACCOUNT_ID                    = data.aws_caller_identity.current.account_id
-      TENANT_REGISTRY_TABLE             = var.tenant_registry_table_name
+      ACCOUNT_REGISTRY_TABLE             = var.account_registry_table_name
       CROSS_ACCOUNT_ROLE_NAME          = "${var.environment}-${var.cross_account_role_name}"
-      CROSS_ACCOUNT_EXTERNAL_ID        = "tenant-provisioning"
+      CROSS_ACCOUNT_EXTERNAL_ID        = "account-provisioning"
       CROSS_ACCOUNT_ROLE_SESSION_NAME  = "oms-service-session"
       LOG_LEVEL                        = var.log_level
       API_PREFIX                       = "/api/v1/oms"
@@ -86,7 +86,7 @@ resource "aws_iam_role_policy" "oms_lambda_policy" {
           "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/oms-service-${var.environment}:*"
         ]
       },
-      # Tenant Registry DynamoDB Access
+      # Account Registry DynamoDB Access
       {
         Effect = "Allow"
         Action = [
@@ -94,7 +94,7 @@ resource "aws_iam_role_policy" "oms_lambda_policy" {
           "dynamodb:Query"
         ]
         Resource = [
-          "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.tenant_registry_table_name}"
+          "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}"
         ]
       },
       # STS AssumeRole for cross-account access

@@ -10,10 +10,10 @@ const logger = require('../../logger');
 const cognitoService = new CognitoService();
 const rbacService = new RBACService();
 
-// Helper function to get tenant ID from request
-const getTenantId = (req) => {
-  // Get tenant ID from user context or params
-  return req.user?.tenantId || req.params.tenantId || req.query.tenantId;
+// Helper function to get account ID from request
+const getAccountId = (req) => {
+  // Get account ID from user context or params
+  return req.user?.accountId || req.params.accountId || req.query.accountId;
 };
 
 const getCurrentUser = (req) => {
@@ -27,21 +27,21 @@ const getCurrentUser = (req) => {
 };
 
 /**
- * GET /users - Get users based on strategy (tenantId, group, role) - Merged RBAC functionality
+ * GET /users - Get users based on strategy (accountId, group, role) - Merged RBAC functionality
  * 
  * Query Parameters:
- * - group: Filter by group membership using group ID (uses GROUP#<tenant_id>#<group_id>#USERS access pattern)
+ * - group: Filter by group membership using group ID (uses GROUP#<account_id>#<group_id>#USERS access pattern)
  * - role: Filter by role assignment using role ID (gets users through role-group-user relationships)
  * - limit: Pagination limit (default: 20)
  * - paginationToken: Pagination token for next page
  * 
  * Strategy Patterns:
- * 1. tenantId only: PK = TENANT#<tenantId>, SK begins with USER#
- * 2. group filter: PK = GROUP#<tenant_id>#<group_id>#USERS, SK = USER#<userID>
+ * 1. accountId only: PK = ACCOUNT#<accountId>, SK begins with USER#
+ * 2. group filter: PK = GROUP#<account_id>#<group_id>#USERS, SK = USER#<userID>
  * 3. role filter: Multi-step query through role->groups->users relationships
  * 
  * Examples:
- * - GET /users (all users in authenticated user's tenant)
+ * - GET /users (all users in authenticated user's account)
  * - GET /users?group=<group-uuid> (users in specific group)
  * - GET /users?role=<role-uuid> (users with specific role)
  */
@@ -49,14 +49,14 @@ router.get('/', async (req, res) => {
   try {
     const { group, role, limit = 20, paginationToken } = req.query;
     
-    // Get tenantId from user context (JWT token)
-    const tenantId = getTenantId(req);
+    // Get accountId from user context (JWT token)
+    const accountId = getAccountId(req);
     
-    // Validate that tenantId is available (should come from authenticated user's JWT token)
-    if (!tenantId) {
+    // Validate that accountId is available (should come from authenticated user's JWT token)
+    if (!accountId) {
       return res.status(401).json({
         error: 'Unauthorized',
-        message: 'Unable to determine tenant context. Please ensure you are properly authenticated.',
+        message: 'Unable to determine account context. Please ensure you are properly authenticated.',
         supportedFilters: ['group', 'role']
       });
     }
@@ -64,27 +64,27 @@ router.get('/', async (req, res) => {
     let users = [];
     let strategy = '';
 
-    // Strategy 1: Filter by tenantId only
-    if (tenantId && !group && !role) {
-      strategy = 'tenantId';
-      logger.info(`Using tenantId strategy for tenant: ${tenantId}`);
-      users = await rbacService.getAllUsersInTenant(tenantId);
+    // Strategy 1: Filter by accountId only
+    if (accountId && !group && !role) {
+      strategy = 'accountId';
+      logger.info(`Using accountId strategy for account: ${accountId}`);
+      users = await rbacService.getAllUsersInAccount(accountId);
     }
     // Strategy 2: Filter by group
     else if (group) {
       strategy = 'group';
       
-      logger.info(`Using group strategy for group ID: ${group} in tenant: ${tenantId}`);
+      logger.info(`Using group strategy for group ID: ${group} in account: ${accountId}`);
       
       // Get group members using the group ID
-      const groupMembers = await rbacService.getGroupMembers(tenantId, group);
+      const groupMembers = await rbacService.getGroupMembers(accountId, group);
       
       // Extract user IDs from group members and fetch user details
       const userIds = groupMembers.map(member => member.SK.replace('USER#', ''));
       
       // Fetch user details for each user ID in parallel
       const userPromises = userIds.map(userId => 
-        rbacService.getUser(tenantId, userId)
+        rbacService.getUser(accountId, userId)
       );
       
       const userResults = await Promise.all(userPromises);
@@ -94,16 +94,16 @@ router.get('/', async (req, res) => {
     else if (role) {
       strategy = 'role';
       
-      logger.info(`Using role strategy for role ID: ${role} in tenant: ${tenantId}`);
+      logger.info(`Using role strategy for role ID: ${role} in account: ${accountId}`);
       
       // Get groups that have this role (using role ID)
-      const roleGroups = await rbacService.getRoleGroups(tenantId, role);
+      const roleGroups = await rbacService.getRoleGroups(accountId, role);
       
       // For each group, get its members
       const allUserIds = new Set();
       for (const roleGroup of roleGroups) {
         const groupId = roleGroup.SK.replace('GROUP#', '');
-        const groupMembers = await rbacService.getGroupMembers(tenantId, groupId);
+        const groupMembers = await rbacService.getGroupMembers(accountId, groupId);
         groupMembers.forEach(member => {
           const userId = member.SK.replace('USER#', '');
           allUserIds.add(userId);
@@ -112,7 +112,7 @@ router.get('/', async (req, res) => {
       
       // Fetch user details for all unique user IDs in parallel
       const userPromises = Array.from(allUserIds).map(userId => 
-        rbacService.getUser(tenantId, userId)
+        rbacService.getUser(accountId, userId)
       );
       
       const userResults = await Promise.all(userPromises);
@@ -121,8 +121,8 @@ router.get('/', async (req, res) => {
     else {
       return res.status(400).json({ 
         error: 'Invalid filter combination',
-        message: 'Use either tenantId alone, or tenantId with group, or tenantId with role',
-        supportedFilters: ['tenantId', 'group', 'role']
+        message: 'Use either accountId alone, or accountId with group, or accountId with role',
+        supportedFilters: ['accountId', 'group', 'role']
       });
     }
 
@@ -131,7 +131,7 @@ router.get('/', async (req, res) => {
       data: users,
       users: users, // Keep for backward compatibility
       strategy: strategy,
-      filters: { tenantId, group, role },
+      filters: { accountId, group, role },
       count: users.length,
       paginationToken: paginationToken // For future pagination implementation
     });
@@ -147,14 +147,14 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /users/:userId
- * Get specific user details - Updated to use TenantRBACService
+ * Get specific user details - Updated to use AccountRBACService
  */
 router.get('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const tenantId = getTenantId(req);
+    const accountId = getAccountId(req);
 
-    logger.info('Getting user details', { userId, tenantId });
+    logger.info('Getting user details', { userId, accountId });
 
     // First try to get from Cognito
     let user;
@@ -167,10 +167,10 @@ router.get('/:userId', async (req, res) => {
 
     // Try to get user from RBAC system
     let rbacUser;
-    if (tenantId) {
-      rbacUser = await rbacService.getUser(tenantId, userId);
+    if (accountId) {
+      rbacUser = await rbacService.getUser(accountId, userId);
     } else {
-      // Try platform tenant if no tenantId specified
+      // Try platform account if no accountId specified
       rbacUser = await rbacService.getUser('platform', userId);
     }
     
@@ -205,11 +205,11 @@ router.get('/:userId', async (req, res) => {
 
 /**
  * POST /users
- * Create a new user - Updated to use TenantRBACService and Cognito
+ * Create a new user - Updated to use AccountRBACService and Cognito
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, email, status = 'ACTIVE', created_by, userId, password, tenantId } = req.body;
+    const { name, email, status = 'ACTIVE', created_by, userId, password, accountId } = req.body;
     const currentUser = getCurrentUser(req);
 
     if (!name || !email) {
@@ -247,13 +247,13 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Prefer tenantId from request body (for worker calls) over context (for API Gateway calls)
-    const effectiveTenantId = tenantId || getTenantId(req);
-    if (!effectiveTenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    // Prefer accountId from request body (for worker calls) over context (for API Gateway calls)
+    const effectiveAccountId = accountId || getAccountId(req);
+    if (!effectiveAccountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    logger.info('Creating new user', { name, email, status, userId, tenantId: effectiveTenantId });
+    logger.info('Creating new user', { name, email, status, userId, accountId: effectiveAccountId });
 
     // Use provided password as temporary password for Cognito
     const temporaryPassword = password;
@@ -269,10 +269,10 @@ router.post('/', async (req, res) => {
         email: email,
         temporaryPassword: temporaryPassword,
         customAttributes: {
-          tenant_id: effectiveTenantId  // Set custom:tenant_id attribute
+          account_id: effectiveAccountId  // Set custom:account_id attribute
         }
       });
-      logger.info('User created in Cognito', { email, cognitoUsername: cognitoUser.Username, tenantId: effectiveTenantId });
+      logger.info('User created in Cognito', { email, cognitoUsername: cognitoUser.Username, accountId: effectiveAccountId });
     } catch (cognitoError) {
       logger.error('Cognito user creation failed', { email, error: cognitoError.message });
       
@@ -327,7 +327,7 @@ router.post('/', async (req, res) => {
 
     logger.info('Extracted Cognito sub for user', { email, cognitoUsername, cognitoSub });
 
-    // Create user entry in RBAC system using TenantRBACService
+    // Create user entry in RBAC system using AccountRBACService
     const userEntry = {
       userId: cognitoSub,  // Use Cognito sub as primary user ID for consistency
       name: name,
@@ -342,8 +342,8 @@ router.post('/', async (req, res) => {
 
     let createdUser;
     try {
-      createdUser = await rbacService.createUser(effectiveTenantId, userEntry);
-      logger.info('User entry created in DynamoDB', { userId: createdUser.user_id, tenantId: effectiveTenantId });
+      createdUser = await rbacService.createUser(effectiveAccountId, userEntry);
+      logger.info('User entry created in DynamoDB', { userId: createdUser.user_id, accountId: effectiveAccountId });
     } catch (rbacError) {
       // Rollback: Delete user from Cognito if RBAC creation fails
       logger.error('RBAC user creation failed, rolling back Cognito user', { email, cognitoUsername, error: rbacError.message });
@@ -383,20 +383,20 @@ router.post('/', async (req, res) => {
 
 /**
  * PUT /users/:userId
- * Update user - Updated to use TenantRBACService
+ * Update user - Updated to use AccountRBACService
  */
 router.put('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { firstName, lastName, userRole, tenantId, enabled } = req.body;
+    const { firstName, lastName, userRole, accountId, enabled } = req.body;
     const currentUser = getCurrentUser(req);
-    const effectiveTenantId = tenantId || getTenantId(req);
+    const effectiveAccountId = accountId || getAccountId(req);
     
-    if (!effectiveTenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!effectiveAccountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    logger.info('Updating user', { userId, tenantId: effectiveTenantId });
+    logger.info('Updating user', { userId, accountId: effectiveAccountId });
 
     // Update in Cognito first
     const updateData = {};
@@ -408,7 +408,7 @@ router.put('/:userId', async (req, res) => {
     // Update Cognito user
     await cognitoService.updateUser(userId, updateData);
     
-    // Update RBAC user using TenantRBACService
+    // Update RBAC user using AccountRBACService
     const rbacUpdateData = {
       firstName: firstName || '',
       lastName: lastName || '',
@@ -417,9 +417,9 @@ router.put('/:userId', async (req, res) => {
       updated_by: currentUser
     };
     
-    const updatedUser = await rbacService.updateUser(effectiveTenantId, userId, rbacUpdateData);
+    const updatedUser = await rbacService.updateUser(effectiveAccountId, userId, rbacUpdateData);
 
-    logger.info('User updated successfully', { userId, tenantId: effectiveTenantId });
+    logger.info('User updated successfully', { userId, accountId: effectiveAccountId });
 
     res.json({
       success: true,
@@ -439,24 +439,24 @@ router.put('/:userId', async (req, res) => {
 
 /**
  * DELETE /users/:userId
- * Delete user - Updated to use TenantRBACService
+ * Delete user - Updated to use AccountRBACService
  */
 router.delete('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { tenantId } = req.query;
-    const effectiveTenantId = tenantId || getTenantId(req);
+    const { accountId } = req.query;
+    const effectiveAccountId = accountId || getAccountId(req);
     
-    if (!effectiveTenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
+    if (!effectiveAccountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
     }
 
-    logger.info('Deleting user', { userId, tenantId: effectiveTenantId });
+    logger.info('Deleting user', { userId, accountId: effectiveAccountId });
 
     // First get user data from RBAC to find cognito_username
     let rbacUser;
     try {
-      rbacUser = await rbacService.getUser(effectiveTenantId, userId);
+      rbacUser = await rbacService.getUser(effectiveAccountId, userId);
     } catch (rbacError) {
       logger.warn('User not found in RBAC system', { userId, error: rbacError.message });
     }
@@ -478,10 +478,10 @@ router.delete('/:userId', async (req, res) => {
       logger.info('No Cognito username found for user, skipping Cognito deletion', { userId });
     }
     
-    // Delete from RBAC system using TenantRBACService
-    await rbacService.deleteUser(effectiveTenantId, userId, req.user?.email || 'system');
+    // Delete from RBAC system using AccountRBACService
+    await rbacService.deleteUser(effectiveAccountId, userId, req.user?.email || 'system');
 
-    logger.info('User deleted successfully', { userId, tenantId: effectiveTenantId });
+    logger.info('User deleted successfully', { userId, accountId: effectiveAccountId });
 
     res.json({
       success: true,

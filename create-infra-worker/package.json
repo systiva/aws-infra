@@ -1,7 +1,7 @@
 {
   "name": "create-infra-worker",
   "version": "1.0.0",
-  "description": "AWS Lambda worker for creating tenant infrastructure",
+  "description": "AWS Lambda worker for creating account infrastructure",
   "main": "index.js",
   "scripts": {
     "lint": "eslint src/",

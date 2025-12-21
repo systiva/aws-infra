@@ -5,7 +5,7 @@ echo Prerequisites:
 echo 1. AWS CLI configured with appropriate credentials
 echo 2. IAM permissions for DynamoDB access
 echo 3. Network connectivity to AWS
-echo 4. DynamoDB table 'admin-portal-dev-tenant-registry' exists in AWS
+echo 4. DynamoDB table 'admin-portal-dev-account-registry' exists in AWS
 echo.
 
 REM Check if AWS CLI is available
@@ -22,14 +22,14 @@ aws sts get-caller-identity
 echo.
 
 REM Check if DynamoDB table exists
-echo Checking if DynamoDB table 'admin-portal-dev-tenant-registry' exists...
-aws dynamodb describe-table --table-name admin-portal-dev-tenant-registry --region us-east-1 >nul 2>&1
+echo Checking if DynamoDB table 'admin-portal-dev-account-registry' exists...
+aws dynamodb describe-table --table-name admin-portal-dev-account-registry --region us-east-1 >nul 2>&1
 if errorlevel 1 (
-    echo WARNING: Table 'admin-portal-dev-tenant-registry' not found in DynamoDB
+    echo WARNING: Table 'admin-portal-dev-account-registry' not found in DynamoDB
     echo Please ensure the table exists in your AWS account
     echo.
 ) else (
-    echo Table 'admin-portal-dev-tenant-registry' found successfully
+    echo Table 'admin-portal-dev-account-registry' found successfully
     echo.
 )
 

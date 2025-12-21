@@ -11,8 +11,8 @@ on:
           - all
           - admin-bootstrap
           - admin-infrastructure
-          - tenant-bootstrap
-          - tenant-infrastructure
+          - account-bootstrap
+          - account-infrastructure
       workspace:
         description: 'Workspace (dev/qa/uat/prod)'
         required: true
@@ -45,7 +45,7 @@ jobs:
       is_bootstrap: ${{ steps.check.outputs.is_bootstrap }}
       is_infrastructure: ${{ steps.check.outputs.is_infrastructure }}
       is_admin: ${{ steps.check.outputs.is_admin }}
-      is_tenant: ${{ steps.check.outputs.is_tenant }}
+      is_account: ${{ steps.check.outputs.is_account }}
       is_all: ${{ steps.check.outputs.is_all }}
       account_type: ${{ steps.check.outputs.account_type }}
       resource_type: ${{ steps.check.outputs.resource_type }}
@@ -74,7 +74,7 @@ jobs:
           if [[ "$TARGET" == "all" ]]; then
             echo "is_all=true" >> $GITHUB_OUTPUT
             echo "is_admin=false" >> $GITHUB_OUTPUT
-            echo "is_tenant=false" >> $GITHUB_OUTPUT
+            echo "is_account=false" >> $GITHUB_OUTPUT
             echo "is_bootstrap=false" >> $GITHUB_OUTPUT
             echo "is_infrastructure=false" >> $GITHUB_OUTPUT
             echo "account_type=all" >> $GITHUB_OUTPUT
@@ -88,7 +88,7 @@ jobs:
               echo "account_type=admin" >> $GITHUB_OUTPUT
             else
               echo "is_admin=false" >> $GITHUB_OUTPUT
-              echo "account_type=tenant" >> $GITHUB_OUTPUT
+              echo "account_type=account" >> $GITHUB_OUTPUT
             fi
             
             if [[ "$TARGET" == *-bootstrap ]]; then
@@ -101,10 +101,10 @@ jobs:
               echo "resource_type=infrastructure" >> $GITHUB_OUTPUT
             fi
             
-            if [[ "$TARGET" == tenant-* ]]; then
-              echo "is_tenant=true" >> $GITHUB_OUTPUT
+            if [[ "$TARGET" == account-* ]]; then
+              echo "is_account=true" >> $GITHUB_OUTPUT
             else
-              echo "is_tenant=false" >> $GITHUB_OUTPUT
+              echo "is_account=false" >> $GITHUB_OUTPUT
             fi
           fi
           
@@ -117,9 +117,9 @@ jobs:
         if: steps.check.outputs.is_all != 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ (steps.check.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
+          aws-access-key-id: ${{ steps.check.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ steps.check.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ (steps.check.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Get Account ID
@@ -192,9 +192,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ (needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
+          aws-access-key-id: ${{ needs.validate.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.validate.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ (needs.validate.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Setup Terraform
@@ -252,7 +252,7 @@ jobs:
           echo "Step Functions ARN: ${STEP_FUNCTIONS_ARN}"
       
       - name: Terraform Init
-        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/account-iac' }}
         run: |
           if [[ "${{ needs.validate.outputs.account_type }}" == "admin" ]]; then
             terraform init \
@@ -264,28 +264,28 @@ jobs:
           else
             terraform init \
               -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
-              -backend-config="key=tenant-iac/terraform.tfstate" \
+              -backend-config="key=account-iac/terraform.tfstate" \
               -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
               -backend-config="region=${{ inputs.aws_region }}" \
               -backend-config="encrypt=true"
           fi
       
       - name: Terraform Workspace
-        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/account-iac' }}
         run: |
           terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
       
       - name: Terraform Destroy
-        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/tenant-iac' }}
+        working-directory: ${{ needs.validate.outputs.account_type == 'admin' && 'c20_prj/admin-portal-iac' || 'c20_prj/account-iac' }}
         run: |
           if [[ "${{ needs.validate.outputs.account_type }}" == "admin" ]]; then
             terraform destroy \
               -var="workspace_prefix=${{ inputs.workspace }}" \
               -var="aws_region=${{ inputs.aws_region }}" \
               -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
-              -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
-              -var="create_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
-              -var="delete_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+              -var="account_account_id=${{ steps.account.outputs.account_id }}" \
+              -var="create_account_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+              -var="delete_account_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
               -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \
               -var-file="environments/${{ inputs.workspace }}.tfvars" \
               -auto-approve
@@ -293,7 +293,7 @@ jobs:
             terraform destroy \
               -var="workspace_prefix=${{ inputs.workspace }}" \
               -var="aws_region=${{ inputs.aws_region }}" \
-              -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+              -var="account_account_id=${{ steps.account.outputs.account_id }}" \
               -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
               -var-file="environments/${{ inputs.workspace }}.tfvars" \
               -auto-approve
@@ -346,9 +346,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ (needs.validate.outputs.is_tenant == 'true' && secrets.AWS_TENANT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
+          aws-access-key-id: ${{ needs.validate.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_ACCESS_KEY_ID || secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.validate.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_SECRET_ACCESS_KEY || secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ (needs.validate.outputs.is_account == 'true' && secrets.AWS_ACCOUNT_SESSION_TOKEN || secrets.AWS_ADMIN_SESSION_TOKEN) || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Destroy Bootstrap Resources
@@ -560,9 +560,9 @@ jobs:
             -var="workspace_prefix=${{ inputs.workspace }}" \
             -var="aws_region=${{ inputs.aws_region }}" \
             -var="admin_account_id=${{ steps.account.outputs.account_id }}" \
-            -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
-            -var="create_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
-            -var="delete_tenant_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+            -var="account_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="create_account_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
+            -var="delete_account_step_function_arn=${{ steps.bootstrap_outputs.outputs.step_functions_arn }}" \
             -var="temporary_password=${{ secrets.TEMPORARY_PASSWORD }}" \
             -var-file="environments/${{ inputs.workspace }}.tfvars" \
             -auto-approve
@@ -659,8 +659,8 @@ jobs:
           
           echo "✅ Admin bootstrap destroyed"
 
-  destroy-all-tenant-infrastructure:
-    name: Destroy All - Tenant Infrastructure
+  destroy-all-account-infrastructure:
+    name: Destroy All - Account Infrastructure
     runs-on: ubuntu-latest
     needs: [validate, destroy-all-admin-bootstrap]
     if: needs.validate.outputs.is_all == 'true' && always()
@@ -675,12 +675,12 @@ jobs:
         with:
           path: c20_prj
       
-      - name: Configure AWS Credentials (Tenant)
+      - name: Configure AWS Credentials (Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN || '' }}
+          aws-access-key-id: ${{ secrets.AWS_ACCOUNT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCOUNT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ACCOUNT_SESSION_TOKEN || '' }}
           aws-region: ${{ inputs.aws_region }}
       
       - name: Setup Terraform
@@ -688,12 +688,12 @@ jobs:
         with:
           terraform_version: 1.5.0
       
-      - name: Check if Tenant Infrastructure Exists
+      - name: Check if Account Infrastructure Exists
         id: check
         run: |
           # Get bootstrap bucket from SSM (same as deploy workflow)
           BACKEND_BUCKET=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/backend-bucket" \
+            --name "/admin-portal/${{ inputs.workspace }}/account/bootstrap/backend-bucket" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' \
             --output text 2>/dev/null || echo "")
@@ -715,16 +715,16 @@ jobs:
           
           if [[ -z "$BACKEND_BUCKET" ]]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⏭️  Tenant bootstrap bucket not found, skipping tenant infrastructure destroy"
+            echo "⏭️  Account bootstrap bucket not found, skipping account infrastructure destroy"
           else
             # Check if Terraform state file exists in S3
-            if aws s3 ls "s3://${BACKEND_BUCKET}/env:/${{ inputs.workspace }}/tenant-iac/terraform.tfstate" 2>/dev/null; then
+            if aws s3 ls "s3://${BACKEND_BUCKET}/env:/${{ inputs.workspace }}/account-iac/terraform.tfstate" 2>/dev/null; then
               echo "exists=true" >> $GITHUB_OUTPUT
               echo "backend_bucket=${BACKEND_BUCKET}" >> $GITHUB_OUTPUT
-              echo "✅ Tenant infrastructure state found in bucket: ${BACKEND_BUCKET}"
+              echo "✅ Account infrastructure state found in bucket: ${BACKEND_BUCKET}"
             else
               echo "exists=false" >> $GITHUB_OUTPUT
-              echo "⏭️  Tenant infrastructure state not found, skipping"
+              echo "⏭️  Account infrastructure state not found, skipping"
             fi
           fi
       
@@ -736,7 +736,7 @@ jobs:
           BACKEND_BUCKET="${{ steps.check.outputs.backend_bucket }}"
           
           DYNAMODB_TABLE=$(aws ssm get-parameter \
-            --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/dynamodb-table" \
+            --name "/admin-portal/${{ inputs.workspace }}/account/bootstrap/dynamodb-table" \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameter.Value' \
             --output text)
@@ -757,8 +757,8 @@ jobs:
         id: admin_account
         run: |
           # We need to temporarily switch to admin credentials to get admin account ID
-          # But since we're in tenant context, we'll try to get it from SSM if available
-          # Otherwise use the tenant account ID as fallback
+          # But since we're in account context, we'll try to get it from SSM if available
+          # Otherwise use the account account ID as fallback
           ADMIN_ACCOUNT_ID=$(aws ssm get-parameter \
             --name "/admin-portal/${{ inputs.workspace }}/shared/admin-account-id" \
             --region "${{ inputs.aws_region }}" \
@@ -769,29 +769,29 @@ jobs:
       
       - name: Terraform Init
         if: steps.check.outputs.exists == 'true'
-        working-directory: c20_prj/tenant-iac
+        working-directory: c20_prj/account-iac
         run: |
           terraform init \
             -backend-config="bucket=${{ steps.bootstrap.outputs.backend_bucket }}" \
-            -backend-config="key=tenant-iac/terraform.tfstate" \
+            -backend-config="key=account-iac/terraform.tfstate" \
             -backend-config="dynamodb_table=${{ steps.bootstrap.outputs.dynamodb_table }}" \
             -backend-config="region=${{ inputs.aws_region }}" \
             -backend-config="encrypt=true"
       
       - name: Terraform Workspace
         if: steps.check.outputs.exists == 'true'
-        working-directory: c20_prj/tenant-iac
+        working-directory: c20_prj/account-iac
         run: |
           terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
       
       - name: Terraform Destroy
         if: steps.check.outputs.exists == 'true'
-        working-directory: c20_prj/tenant-iac
+        working-directory: c20_prj/account-iac
         run: |
           terraform destroy \
             -var="workspace_prefix=${{ inputs.workspace }}" \
             -var="aws_region=${{ inputs.aws_region }}" \
-            -var="tenant_account_id=${{ steps.account.outputs.account_id }}" \
+            -var="account_account_id=${{ steps.account.outputs.account_id }}" \
             -var="admin_account_id=${{ steps.admin_account.outputs.admin_account_id }}" \
             -var-file="environments/${{ inputs.workspace }}.tfvars" \
             -auto-approve
@@ -802,7 +802,7 @@ jobs:
           echo "🗑️  Cleaning up SSM Parameters"
           
           PARAMS=$(aws ssm get-parameters-by-path \
-            --path "/admin-portal/${{ inputs.workspace }}/tenant/infrastructure" \
+            --path "/admin-portal/${{ inputs.workspace }}/account/infrastructure" \
             --recursive \
             --region "${{ inputs.aws_region }}" \
             --query 'Parameters[*].Name' \
@@ -815,12 +815,12 @@ jobs:
             done
           fi
           
-          echo "✅ Tenant infrastructure destroyed"
+          echo "✅ Account infrastructure destroyed"
 
-  destroy-all-tenant-bootstrap:
-    name: Destroy All - Tenant Bootstrap
+  destroy-all-account-bootstrap:
+    name: Destroy All - Account Bootstrap
     runs-on: ubuntu-latest
-    needs: [validate, destroy-all-tenant-infrastructure]
+    needs: [validate, destroy-all-account-infrastructure]
     if: needs.validate.outputs.is_all == 'true' && always()
     
     steps:
@@ -829,37 +829,37 @@ jobs:
         with:
           path: c20_prj
       
-      - name: Configure AWS Credentials (Tenant)
+      - name: Configure AWS Credentials (Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_TENANT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_TENANT_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_TENANT_SESSION_TOKEN || '' }}
+          aws-access-key-id: ${{ secrets.AWS_ACCOUNT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCOUNT_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_ACCOUNT_SESSION_TOKEN || '' }}
           aws-region: ${{ inputs.aws_region }}
       
-      - name: Check if Tenant Bootstrap Exists
+      - name: Check if Account Bootstrap Exists
         id: check
         working-directory: c20_prj
         run: |
           if aws ssm get-parameter \
-              --name "/admin-portal/${{ inputs.workspace }}/tenant/bootstrap/status" \
+              --name "/admin-portal/${{ inputs.workspace }}/account/bootstrap/status" \
               --region "${{ inputs.aws_region }}" \
               --query 'Parameter.Value' \
               --output text 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Tenant bootstrap exists"
+            echo "✅ Account bootstrap exists"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⏭️  Tenant bootstrap not found, skipping"
+            echo "⏭️  Account bootstrap not found, skipping"
           fi
       
       - name: Destroy Bootstrap Resources
         if: steps.check.outputs.exists == 'true'
         working-directory: c20_prj
         run: |
-          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/tenant/bootstrap"
+          BOOTSTRAP_PATH="/admin-portal/${{ inputs.workspace }}/account/bootstrap"
           
-          echo "🔥 Destroying Tenant Bootstrap Resources"
+          echo "🔥 Destroying Account Bootstrap Resources"
           
           # Read bootstrap configuration and strip any quotes
           BACKEND_BUCKET=$(aws ssm get-parameter --name "${BOOTSTRAP_PATH}/backend-bucket" --region "${{ inputs.aws_region }}" --query 'Parameter.Value' --output text 2>/dev/null | tr -d '"' || echo "")
@@ -916,12 +916,12 @@ jobs:
             done
           fi
           
-          echo "✅ Tenant bootstrap destroyed"
+          echo "✅ Account bootstrap destroyed"
 
   summary:
     name: Destruction Summary
     runs-on: ubuntu-latest
-    needs: [validate, destroy-infrastructure, destroy-bootstrap, destroy-all-admin-infrastructure, destroy-all-admin-bootstrap, destroy-all-tenant-infrastructure, destroy-all-tenant-bootstrap]
+    needs: [validate, destroy-infrastructure, destroy-bootstrap, destroy-all-admin-infrastructure, destroy-all-admin-bootstrap, destroy-all-account-infrastructure, destroy-all-account-bootstrap]
     if: always()
     
     steps:
@@ -945,7 +945,7 @@ jobs:
           
           if [[ "${{ inputs.destroy_target }}" == "all" ]]; then
             # Summary for 'all' option
-            echo "Destruction Order: Admin Infra → Admin Bootstrap → Tenant Infra → Tenant Bootstrap"
+            echo "Destruction Order: Admin Infra → Admin Bootstrap → Account Infra → Account Bootstrap"
             echo ""
             
             if [[ "${{ needs.destroy-all-admin-infrastructure.result }}" == "success" ]]; then
@@ -964,20 +964,20 @@ jobs:
               echo "❌ Admin Bootstrap Failed"
             fi
             
-            if [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "success" ]]; then
-              echo "✅ Tenant Infrastructure Destroyed"
-            elif [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "skipped" ]]; then
-              echo "⏭️  Tenant Infrastructure Skipped"
+            if [[ "${{ needs.destroy-all-account-infrastructure.result }}" == "success" ]]; then
+              echo "✅ Account Infrastructure Destroyed"
+            elif [[ "${{ needs.destroy-all-account-infrastructure.result }}" == "skipped" ]]; then
+              echo "⏭️  Account Infrastructure Skipped"
             else
-              echo "❌ Tenant Infrastructure Failed"
+              echo "❌ Account Infrastructure Failed"
             fi
             
-            if [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "success" ]]; then
-              echo "✅ Tenant Bootstrap Destroyed"
-            elif [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "skipped" ]]; then
-              echo "⏭️  Tenant Bootstrap Skipped"
+            if [[ "${{ needs.destroy-all-account-bootstrap.result }}" == "success" ]]; then
+              echo "✅ Account Bootstrap Destroyed"
+            elif [[ "${{ needs.destroy-all-account-bootstrap.result }}" == "skipped" ]]; then
+              echo "⏭️  Account Bootstrap Skipped"
             else
-              echo "❌ Tenant Bootstrap Failed"
+              echo "❌ Account Bootstrap Failed"
             fi
           else
             # Summary for individual targets
@@ -1005,8 +1005,8 @@ jobs:
           if [[ "${{ inputs.destroy_target }}" == "all" ]]; then
             if [[ "${{ needs.destroy-all-admin-infrastructure.result }}" == "failure" ]] || \
                [[ "${{ needs.destroy-all-admin-bootstrap.result }}" == "failure" ]] || \
-               [[ "${{ needs.destroy-all-tenant-infrastructure.result }}" == "failure" ]] || \
-               [[ "${{ needs.destroy-all-tenant-bootstrap.result }}" == "failure" ]]; then
+               [[ "${{ needs.destroy-all-account-infrastructure.result }}" == "failure" ]] || \
+               [[ "${{ needs.destroy-all-account-bootstrap.result }}" == "failure" ]]; then
               echo "❌ Destruction completed with errors"
               exit 1
             fi

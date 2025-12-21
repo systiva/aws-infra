@@ -3,20 +3,20 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRBAC } from '../hooks/useRBAC';
 import { PermissionGuard } from './PermissionGuard';
-import { TenantInfoOverlay } from './TenantInfoOverlay';
+import { AccountInfoOverlay } from './AccountInfoOverlay';
 import './NavigationPanel.css';
 
 export const NavigationPanel: React.FC = () => {
   const { state, logout, setShowAuthOverlay } = useAuth();
   const rbac = useRBAC();
-  const [showTenantOverlay, setShowTenantOverlay] = useState(false);
+  const [showAccountOverlay, setShowAccountOverlay] = useState(false);
 
   const navigationItems = rbac.getVisibleNavigationItems();
 
   return (
     <aside className="navigation-panel">
       <div className="nav-header">
-        <h2>Tenant Portal</h2>
+        <h2>Account Portal</h2>
       </div>
       <nav className="nav-menu">
         {navigationItems.map((item) => (
@@ -43,11 +43,11 @@ export const NavigationPanel: React.FC = () => {
             <div className="user-details">
               <span className="username">{state.user?.username}</span>
               <span 
-                className="tenant-id clickable" 
-                onClick={() => setShowTenantOverlay(true)}
-                title="Click to view tenant details"
+                className="account-id clickable" 
+                onClick={() => setShowAccountOverlay(true)}
+                title="Click to view account details"
               >
-                Tenant: {state.user?.tenantId}
+                Account: {state.user?.accountId}
               </span>
               <span className="user-groups">
                 {state.user?.groups?.length || 0} groups
@@ -77,11 +77,11 @@ export const NavigationPanel: React.FC = () => {
         )}
       </div>
       
-      {showTenantOverlay && state.user?.tenantId && (
-        <TenantInfoOverlay 
-          tenantId={state.user.tenantId} 
-          isOpen={showTenantOverlay}
-          onClose={() => setShowTenantOverlay(false)}
+      {showAccountOverlay && state.user?.accountId && (
+        <AccountInfoOverlay 
+          accountId={state.user.accountId} 
+          isOpen={showAccountOverlay}
+          onClose={() => setShowAccountOverlay(false)}
         />
       )}
     </aside>

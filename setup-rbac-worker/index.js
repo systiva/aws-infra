@@ -4,25 +4,25 @@ const IMSLambdaClient = require('./src/lambda-client');
 const { DEFAULT_PERMISSIONS, DEFAULT_ROLES, DEFAULT_GROUPS } = require('./src/rbac-templates');
 
 /**
- * Lambda handler to setup default RBAC for a new tenant via IMS service APIs
+ * Lambda handler to setup default RBAC for a new account via IMS service APIs
  * Flow:
  * 1. Create all permissions via IMS
  * 2. Create all roles (with permissions embedded) via IMS
- * 3. Create tenant-admin group via IMS
- * 4. Assign all roles to tenant-admin group via IMS
- * 5. Return tenant-admin group ID to Step Functions
+ * 3. Create account-admin group via IMS
+ * 4. Assign all roles to account-admin group via IMS
+ * 5. Return account-admin group ID to Step Functions
  */
 exports.handler = async (event) => {
   try {
     logger.info({ event }, 'Setup RBAC handler invoked');
 
-    // Validate input - tenantId comes from Step Functions
-    const { tenantId } = event;
-    if (!tenantId) {
-      throw new Error('tenantId is required');
+    // Validate input - accountId comes from Step Functions
+    const { accountId } = event;
+    if (!accountId) {
+      throw new Error('accountId is required');
     }
 
-    logger.info({ tenantId }, 'Setting up default RBAC for tenant via IMS service');
+    logger.info({ accountId }, 'Setting up default RBAC for account via IMS service');
 
     // Initialize IMS Lambda client
     const imsClient = new IMSLambdaClient(config);
@@ -38,7 +38,7 @@ exports.handler = async (event) => {
           resource: permTemplate.resource,
           action: permTemplate.action,
           description: permTemplate.description
-        }, tenantId);
+        }, accountId);
         
         createdPermissions[permTemplate.name] = response.data.data.permissionId;
         logger.debug({ 
@@ -75,7 +75,7 @@ exports.handler = async (event) => {
           name: roleTemplate.name,
           description: roleTemplate.description,
           permissions: permissionIds  // IMS stores permissions array in role
-        }, tenantId);
+        }, accountId);
         
         createdRoles[roleTemplate.name] = response.data.data.roleId;
         logger.debug({ 
@@ -94,26 +94,26 @@ exports.handler = async (event) => {
     
     logger.info({ count: Object.keys(createdRoles).length }, 'Roles created via IMS');
 
-    // Step 3: Create tenant-admin group via IMS API
-    logger.info('Creating tenant-admin group via IMS');
-    const groupTemplate = DEFAULT_GROUPS[0]; // Only one group: tenant-admin
+    // Step 3: Create account-admin group via IMS API
+    logger.info('Creating account-admin group via IMS');
+    const groupTemplate = DEFAULT_GROUPS[0]; // Only one group: account-admin
     
-    let tenantAdminGroupId;
+    let accountAdminGroupId;
     try {
       const groupResponse = await imsClient.createGroup({
         name: groupTemplate.name,
         description: groupTemplate.description
-      }, tenantId);
+      }, accountId);
       
-      tenantAdminGroupId = groupResponse.data.data.groupId;
-      logger.info({ tenantAdminGroupId }, 'Tenant-admin group created via IMS');
+      accountAdminGroupId = groupResponse.data.data.groupId;
+      logger.info({ accountAdminGroupId }, 'Account-admin group created via IMS');
     } catch (error) {
-      logger.error({ error: error.message }, 'Failed to create tenant-admin group');
+      logger.error({ error: error.message }, 'Failed to create account-admin group');
       throw error;
     }
 
-    // Step 4: Assign all roles to tenant-admin group via IMS API
-    logger.info('Assigning roles to tenant-admin group via IMS');
+    // Step 4: Assign all roles to account-admin group via IMS API
+    logger.info('Assigning roles to account-admin group via IMS');
     let roleMappingCount = 0;
     
     for (const roleName of groupTemplate.roles) {
@@ -124,7 +124,7 @@ exports.handler = async (event) => {
       }
       
       try {
-        await imsClient.assignRoleToGroup(tenantAdminGroupId, roleId, tenantId);
+        await imsClient.assignRoleToGroup(accountAdminGroupId, roleId, accountId);
         roleMappingCount++;
         logger.debug({ roleId, roleName }, 'Role assigned to group via IMS');
       } catch (error) {
@@ -137,13 +137,13 @@ exports.handler = async (event) => {
       }
     }
     
-    logger.info({ count: roleMappingCount }, 'Roles assigned to tenant-admin group via IMS');
+    logger.info({ count: roleMappingCount }, 'Roles assigned to account-admin group via IMS');
 
     // Step 5: Return result
     const result = {
       statusCode: 200,
-      tenantId,
-      tenantAdminGroupId,
+      accountId,
+      accountAdminGroupId,
       summary: {
         permissionsCreated: Object.keys(createdPermissions).length,
         rolesCreated: Object.keys(createdRoles).length,

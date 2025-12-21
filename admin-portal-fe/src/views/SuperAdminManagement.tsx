@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { userApiClient, User, CreateUserRequest } from '../api/UserApiClient';
-import { TenantApiClient } from '../api/TenantApiClient';
-import { TenantData } from '../models/TenantModel';
+import { AccountApiClient } from '../api/AccountApiClient';
+import { AccountData } from '../models/AccountModel';
 import { RoleGuard } from '../components/RoleGuard';
 import { useAuth } from '../contexts/AuthContext';
 import { getCommonGroupId } from '../utils/groupHelper';
@@ -11,7 +11,7 @@ import './SuperAdminManagement.css';
 
 export const SuperAdminManagement: React.FC = () => {
   const [superAdmins, setSuperAdmins] = useState<User[]>([]);
-  const [tenants, setTenants] = useState<TenantData[]>([]);
+  const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -60,19 +60,19 @@ export const SuperAdminManagement: React.FC = () => {
         console.log('SuperAdminManagement: Starting API calls...');
         console.log('SuperAdminManagement: Using token:', token.substring(0, 20) + '...');
         
-        // Fetch tenants and super admins separately with individual error handling
-        let tenantsData: TenantData[] = [];
+        // Fetch accounts and super admins separately with individual error handling
+        let accountsData: AccountData[] = [];
         let usersData: User[] = [];
         
-        // Try to fetch tenants from admin-portal-be
+        // Try to fetch accounts from admin-portal-be
         try {
-          console.log('SuperAdminManagement: Calling fetchTenants from admin-portal-be...');
-          const tenantClient = TenantApiClient.getInstance();
-          tenantsData = await tenantClient.fetchTenants();
-          console.log('SuperAdminManagement: Fetched tenants:', tenantsData);
-        } catch (tenantError) {
-          console.warn('SuperAdminManagement: Failed to fetch tenants, showing empty list:', tenantError);
-          // Continue with empty tenants list instead of failing completely
+          console.log('SuperAdminManagement: Calling fetchAccounts from admin-portal-be...');
+          const accountClient = AccountApiClient.getInstance();
+          accountsData = await accountClient.fetchAccounts();
+          console.log('SuperAdminManagement: Fetched accounts:', accountsData);
+        } catch (accountError) {
+          console.warn('SuperAdminManagement: Failed to fetch accounts, showing empty list:', accountError);
+          // Continue with empty accounts list instead of failing completely
         }
         
         // Try to fetch users from IMS service
@@ -97,7 +97,7 @@ export const SuperAdminManagement: React.FC = () => {
           // Continue with empty users list instead of failing completely
         }
         
-        setTenants(tenantsData);
+        setAccounts(accountsData);
         setSuperAdmins(usersData);
       } catch (err) {
         console.error('SuperAdminManagement: Unexpected error:', err);
@@ -125,7 +125,7 @@ export const SuperAdminManagement: React.FC = () => {
         email: adminData.email,
         userRole: adminData.userGroup,
         userGroup: adminData.userGroup,
-        tenantId: adminData.tenantId,
+        accountId: adminData.accountId,
         groups: [adminData.userGroup || 'super-admin']
       });
       
@@ -134,7 +134,7 @@ export const SuperAdminManagement: React.FC = () => {
         username: adminData.username,
         email: adminData.email,
         userRole: adminData.userGroup || 'super-admin', // Map userGroup to userRole for API
-        tenantId: adminData.tenantId,
+        accountId: adminData.accountId,
         firstName: adminData.firstName,
         lastName: adminData.lastName,
         temporaryPassword: adminData.temporaryPassword,
@@ -276,7 +276,7 @@ export const SuperAdminManagement: React.FC = () => {
               <th>Username</th>
               <th>Email</th>
               <th>Name</th>
-              <th>Tenant</th>
+              <th>Account</th>
               <th>Group</th>
               <th>Status</th>
               <th>Created</th>
@@ -299,7 +299,7 @@ export const SuperAdminManagement: React.FC = () => {
                   <td>{admin.username}</td>
                   <td>{admin.email}</td>
                   <td>{admin.firstName && admin.lastName ? `${admin.firstName} ${admin.lastName}` : 'N/A'}</td>
-                  <td>{tenants.find(t => t.tenantId === admin.tenantId)?.tenantName || admin.tenantId || 'N/A'}</td>
+                  <td>{accounts.find(t => t.accountId === admin.accountId)?.accountName || admin.accountId || 'N/A'}</td>
                   <td>
                     <span className="group-badge">
                       {admin.userRole}
@@ -349,7 +349,7 @@ export const SuperAdminManagement: React.FC = () => {
           title="Create Super Admin"
           onSubmit={handleCreateSuperAdmin}
           onCancel={() => setShowCreateForm(false)}
-          tenants={tenants}
+          accounts={accounts}
         />
       )}
 
@@ -363,7 +363,7 @@ export const SuperAdminManagement: React.FC = () => {
             setShowEditForm(false);
             setSelectedAdmin(null);
           }}
-          tenants={tenants}
+          accounts={accounts}
         />
       )}
     </div>
@@ -377,7 +377,7 @@ interface SuperAdminFormData {
   firstName?: string;
   lastName?: string;
   userGroup: string;
-  tenantId: string;
+  accountId: string;
   enabled: boolean;
   temporaryPassword?: string;
 }
@@ -388,7 +388,7 @@ interface SuperAdminFormProps {
   initialData?: User;
   onSubmit: (data: SuperAdminFormData) => void;
   onCancel: () => void;
-  tenants: TenantData[];
+  accounts: AccountData[];
 }
 
 const SuperAdminForm: React.FC<SuperAdminFormProps> = ({
@@ -396,7 +396,7 @@ const SuperAdminForm: React.FC<SuperAdminFormProps> = ({
   initialData,
   onSubmit,
   onCancel,
-  tenants
+  accounts
 }) => {
   const [formData, setFormData] = useState<SuperAdminFormData>({
     username: initialData?.username || '',
@@ -404,7 +404,7 @@ const SuperAdminForm: React.FC<SuperAdminFormProps> = ({
     firstName: initialData?.firstName || '',
     lastName: initialData?.lastName || '',
     userGroup: initialData?.userRole || 'super-admin', // Changed from userRole to userGroup
-    tenantId: initialData?.tenantId || '',
+    accountId: initialData?.accountId || '',
     enabled: initialData?.enabled !== undefined ? initialData.enabled : true,
     temporaryPassword: ''
   });
@@ -478,18 +478,18 @@ const SuperAdminForm: React.FC<SuperAdminFormProps> = ({
           </div>
 
           <div className="form-group">
-            <label htmlFor="tenantId">Tenant *</label>
+            <label htmlFor="accountId">Account *</label>
             <select
-              id="tenantId"
-              name="tenantId"
-              value={formData.tenantId}
+              id="accountId"
+              name="accountId"
+              value={formData.accountId}
               onChange={handleChange}
               required
             >
-              <option value="">Select a tenant...</option>
-              {tenants.map(tenant => (
-                <option key={tenant.tenantId} value={tenant.tenantId}>
-                  {tenant.tenantName} ({tenant.tenantId})
+              <option value="">Select a account...</option>
+              {accounts.map(account => (
+                <option key={account.accountId} value={account.accountId}>
+                  {account.accountName} ({account.accountId})
                 </option>
               ))}
             </select>

@@ -9,18 +9,18 @@ class RoleManagement {
     /**
      * Create a new role
      */
-    static async createRole(tenantId, roleData) {
+    static async createRole(accountId, roleData) {
         try {
 
             
-            const rolePK = `TENANT#${tenantId}`;
+            const rolePK = `ACCOUNT#${accountId}`;
             const roleSK = `ROLE#${roleData.roleId}`;
             
             const roleItem = {
                 PK: rolePK,
                 SK: roleSK,
                 entityType: 'ROLE',
-                tenantId,
+                accountId,
                 roleId: roleData.roleId,
                 name: roleData.name,
                 description: roleData.description,
@@ -40,11 +40,11 @@ class RoleManagement {
     /**
      * Get role by ID
      */
-    static async getRole(tenantId, roleId) {
+    static async getRole(accountId, roleId) {
         try {
 
             
-            const rolePK = `TENANT#${tenantId}`;
+            const rolePK = `ACCOUNT#${accountId}`;
             const roleSK = `ROLE#${roleId}`;
             const result = await RBACModel.get({
                 PK: rolePK,
@@ -64,11 +64,11 @@ class RoleManagement {
     /**
      * Update role
      */
-    static async updateRole(tenantId, roleId, updateData) {
+    static async updateRole(accountId, roleId, updateData) {
         try {
 
             
-            const rolePK = `TENANT#${tenantId}`;
+            const rolePK = `ACCOUNT#${accountId}`;
             const roleSK = `ROLE#${roleId}`;
             
             const updateItem = {
@@ -90,11 +90,11 @@ class RoleManagement {
     /**
      * Delete role
      */
-    static async deleteRole(tenantId, roleId) {
+    static async deleteRole(accountId, roleId) {
         try {
 
             
-            const rolePK = `TENANT#${tenantId}`;
+            const rolePK = `ACCOUNT#${accountId}`;
             const roleSK = `ROLE#${roleId}`;
             return await RBACModel.delete({
                 PK: rolePK,
@@ -107,20 +107,20 @@ class RoleManagement {
     }
 
     /**
-     * Get all roles in a tenant
+     * Get all roles in a account
      */
-    static async getAllRolesInTenant(tenantId) {
+    static async getAllRolesInAccount(accountId) {
         try {
 
             
-            const rolePK = `TENANT#${tenantId}`;
+            const rolePK = `ACCOUNT#${accountId}`;
             const roles = await RBACModel.query("PK").eq(rolePK)
                 .where('SK').beginsWith('ROLE#')
                 .exec();
             
             return roles.map(role => this.cleanRoleResponse(role));
         } catch (error) {
-            logger.error('Error getting all roles in tenant:', error);
+            logger.error('Error getting all roles in account:', error);
             throw error;
         }
     }
@@ -128,31 +128,31 @@ class RoleManagement {
     /**
      * Add permission to role
      */
-    static async addPermissionToRole(tenantId, roleId, permissionId) {
+    static async addPermissionToRole(accountId, roleId, permissionId) {
         try {
-            // Role's Permission mapping: PK: ROLE#<tenant_id>#<role_id>#PERMISSION, SK: PERMISSION#<permissionID>
-            const rolePermissionPK = `ROLE#${tenantId}#${roleId}#PERMISSIONS`;
+            // Role's Permission mapping: PK: ROLE#<account_id>#<role_id>#PERMISSION, SK: PERMISSION#<permissionID>
+            const rolePermissionPK = `ROLE#${accountId}#${roleId}#PERMISSIONS`;
             const rolePermissionSK = `PERMISSION#${permissionId}`;
             
             const rolePermissionItem = {
                 PK: rolePermissionPK,
                 SK: rolePermissionSK,
                 entityType: 'ROLE_PERMISSION_ASSIGNMENT',
-                tenantId,
+                accountId,
                 roleId,
                 permissionId,
                 createdAt: new Date().toISOString()
             };
 
-            // Permission's Role mapping: PK: PERMISSION#<tenant_id>#<permission_id>#ROLES, SK: ROLE#<role_id>
-            const permissionRolePK = `PERMISSION#${tenantId}#${permissionId}#ROLES`;
+            // Permission's Role mapping: PK: PERMISSION#<account_id>#<permission_id>#ROLES, SK: ROLE#<role_id>
+            const permissionRolePK = `PERMISSION#${accountId}#${permissionId}#ROLES`;
             const permissionRoleSK = `ROLE#${roleId}`;
             
             const permissionRoleItem = {
                 PK: permissionRolePK,
                 SK: permissionRoleSK,
                 entityType: 'PERMISSION_ROLE_ASSIGNMENT',
-                tenantId,
+                accountId,
                 roleId,
                 permissionId,
                 createdAt: new Date().toISOString()
@@ -174,13 +174,13 @@ class RoleManagement {
     /**
      * Remove permission from role
      */
-    static async removePermissionFromRole(tenantId, roleId, permissionId) {
+    static async removePermissionFromRole(accountId, roleId, permissionId) {
         try {
             // Remove both mappings in parallel
-            const rolePermissionPK = `ROLE#${tenantId}#${roleId}#PERMISSIONS`;
+            const rolePermissionPK = `ROLE#${accountId}#${roleId}#PERMISSIONS`;
             const rolePermissionSK = `PERMISSION#${permissionId}`;
             
-            const permissionRolePK = `PERMISSION#${tenantId}#${permissionId}#ROLES`;
+            const permissionRolePK = `PERMISSION#${accountId}#${permissionId}#ROLES`;
             const permissionRoleSK = `ROLE#${roleId}`;
             
             await Promise.all([

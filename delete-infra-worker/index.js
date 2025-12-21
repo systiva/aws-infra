@@ -4,23 +4,23 @@ const CrossAccountService = require('./src/cross-account-service');
 const DynamoDBService = require('./src/dynamodb-service');
 
 /**
- * AWS Lambda handler for deleting tenant DynamoDB table/entry based on subscription tier
+ * AWS Lambda handler for deleting account DynamoDB table/entry based on subscription tier
  * 
  * ARCHITECTURE:
- * 1. Cross-account role assumption: Required to delete DynamoDB table/entry in tenant account
- * 2. Admin account DynamoDB: Used to update tenant registry status (no cross-account needed)
+ * 1. Cross-account role assumption: Required to delete DynamoDB table/entry in account account
+ * 2. Admin account DynamoDB: Used to update account registry status (no cross-account needed)
  * 
  * DELETION LOGIC:
- * - Public tenants: Delete tenant entry from TENANT_PUBLIC table (immediate)
- * - Private tenants: Delete entire CloudFormation stack containing DynamoDB table (requires polling)
+ * - Public accounts: Delete account entry from ACCOUNT_PUBLIC table (immediate)
+ * - Private accounts: Delete entire CloudFormation stack containing DynamoDB table (requires polling)
  * 
  * Expected input from Step Functions:
  * {
  *   "operation": "DELETE",
- *   "tenantId": "tenant-12345", 
- *   "tenantName": "company-xyz",
+ *   "accountId": "account-12345", 
+ *   "accountName": "company-xyz",
  *   "subscriptionTier": "public" | "private",
- *   "tenantAccountId": "949642303066",
+ *   "accountAccountId": "949642303066",
  *   "email": "user@company.com",
  *   "deletedBy": "admin",
  *   "deletedOn": "2025-09-28T..."
@@ -37,8 +37,8 @@ exports.handler = async (event, context) => {
   }, 'Delete Infrastructure Worker - Lambda invoked');
 
   // Validate required environment variables
-  if (!config.DYNAMODB.TENANT_PUBLIC_TABLE) {
-    const error = new Error('Missing required environment variable: TENANT_PUBLIC_DYNAMO_DB');
+  if (!config.DYNAMODB.ACCOUNT_PUBLIC_TABLE) {
+    const error = new Error('Missing required environment variable: ACCOUNT_PUBLIC_DYNAMO_DB');
     logger.error({ error: error.message }, 'Configuration validation failed');
     throw error;
   }
@@ -47,8 +47,8 @@ exports.handler = async (event, context) => {
   logger.debug({
     rawEvent: event,
     eventStructure: {
-      hasNestedTenant: !!event.tenant,
-      hasFlatTenantId: !!event.tenantId,
+      hasNestedAccount: !!event.account,
+      hasFlatAccountId: !!event.accountId,
       hasStackId: !!event.stackId,
       subscriptionTier: event.subscriptionTier,
       operation: event.operation
@@ -57,27 +57,27 @@ exports.handler = async (event, context) => {
 
   // Initialize services
   const crossAccountService = new CrossAccountService();
-  const adminDynamoDBService = new DynamoDBService(); // For admin account tenant registry
+  const adminDynamoDBService = new DynamoDBService(); // For admin account account registry
 
   try {
     // Extract and validate input - handle both nested and flat structures
-    let tenant, infrastructure, metadata;
+    let account, infrastructure, metadata;
     
-    if (event.tenant) {
+    if (event.account) {
       // Nested structure
-      ({ tenant, infrastructure, metadata } = event);
+      ({ account, infrastructure, metadata } = event);
     } else {
       // Flat structure from admin-portal-be Step Functions (current format)
-      tenant = {
-        id: event.tenantId,
-        name: event.tenantName || `tenant-${event.tenantId}`, // Default if not provided
+      account = {
+        id: event.accountId,
+        name: event.accountName || `account-${event.accountId}`, // Default if not provided
         subscriptionTier: event.subscriptionTier,
-        email: event.email || `${event.tenantId}@tenant.local` // Default if not provided
+        email: event.email || `${event.accountId}@account.local` // Default if not provided
       };
       infrastructure = {
-        targetAccountId: event.tenantAccountId,
-        stackId: event.stackId || event.infrastructure?.stackId, // Handle stackId for private tenants (direct from event)
-        stackName: event.infrastructure?.stackName || event.tenantTableName,
+        targetAccountId: event.accountAccountId,
+        stackId: event.stackId || event.infrastructure?.stackId, // Handle stackId for private accounts (direct from event)
+        stackName: event.infrastructure?.stackName || event.accountTableName,
         status: event.infrastructure?.status || 'UNKNOWN'
       };
       metadata = {
@@ -88,88 +88,88 @@ exports.handler = async (event, context) => {
       };
     }
     
-    if (!tenant || !tenant.id) {
-      throw new Error('Invalid input: tenant ID is required');
+    if (!account || !account.id) {
+      throw new Error('Invalid input: account ID is required');
     }
 
-    if (!tenant.subscriptionTier) {
-      throw new Error('Invalid input: tenant.subscriptionTier is required');
+    if (!account.subscriptionTier) {
+      throw new Error('Invalid input: account.subscriptionTier is required');
     }
 
-    if (!['public', 'private'].includes(tenant.subscriptionTier)) {
-      throw new Error('Invalid input: tenant.subscriptionTier must be "public" or "private"');
+    if (!['public', 'private'].includes(account.subscriptionTier)) {
+      throw new Error('Invalid input: account.subscriptionTier must be "public" or "private"');
     }
 
     if (!infrastructure || !infrastructure.targetAccountId) {
       throw new Error('Invalid input: infrastructure.targetAccountId is required');
     }
 
-    // Additional validation and stackId handling for private tenants
-    if (tenant.subscriptionTier === 'private') {
+    // Additional validation and stackId handling for private accounts
+    if (account.subscriptionTier === 'private') {
       if (!infrastructure.stackId) {
         // Generate expected stack name if not provided
-        infrastructure.stackId = `tenant-${tenant.id}-dynamodb`;
+        infrastructure.stackId = `account-${account.id}-dynamodb`;
         logger.info({
-          tenantId: tenant.id,
+          accountId: account.id,
           generatedStackId: infrastructure.stackId
-        }, 'Generated stackId for private tenant (not provided in input)');
+        }, 'Generated stackId for private account (not provided in input)');
       }
     }
 
     logger.info({
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-      subscriptionTier: tenant.subscriptionTier,
+      accountId: account.id,
+      accountName: account.name,
+      subscriptionTier: account.subscriptionTier,
       targetAccountId: infrastructure.targetAccountId,
       requestId: metadata?.requestId
-    }, 'Processing tenant DynamoDB deletion request');
+    }, 'Processing account DynamoDB deletion request');
 
-    // Step 1: Assume cross-account role to access tenant account
-    logger.info({ tenantId: tenant.id }, 'Step 1: Assuming cross-account role');
-    const credentials = await crossAccountService.assumeTenantRole(
+    // Step 1: Assume cross-account role to access account account
+    logger.info({ accountId: account.id }, 'Step 1: Assuming cross-account role');
+    const credentials = await crossAccountService.assumeAccountRole(
       infrastructure.targetAccountId,
-      tenant.id
+      account.id
     );
 
-    // Step 2: Create DynamoDB service for tenant account operations
-    logger.info({ tenantId: tenant.id }, 'Step 2: Creating tenant account DynamoDB service');
-    const tenantDynamoDBService = new DynamoDBService(credentials, infrastructure.targetAccountId);
+    // Step 2: Create DynamoDB service for account account operations
+    logger.info({ accountId: account.id }, 'Step 2: Creating account account DynamoDB service');
+    const accountDynamoDBService = new DynamoDBService(credentials, infrastructure.targetAccountId);
 
     let result;
 
-    // Step 3: Delete DynamoDB table/entry based on subscription tier IN TENANT ACCOUNT
-    if (tenant.subscriptionTier === 'public') {
-      logger.info({ tenantId: tenant.id }, 'Step 3: Deleting tenant entry from public shared table (in tenant account)');
+    // Step 3: Delete DynamoDB table/entry based on subscription tier IN ACCOUNT ACCOUNT
+    if (account.subscriptionTier === 'public') {
+      logger.info({ accountId: account.id }, 'Step 3: Deleting account entry from public shared table (in account account)');
       
-      result = await tenantDynamoDBService.deleteTenantEntryFromPublicTable({
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        email: tenant.email,
-        tenantAccountId: infrastructure.targetAccountId,
+      result = await accountDynamoDBService.deleteAccountEntryFromPublicTable({
+        accountId: account.id,
+        accountName: account.name,
+        email: account.email,
+        accountAccountId: infrastructure.targetAccountId,
         deletedBy: metadata.initiatedBy,
         deletedOn: metadata.timestamp
       });
       
-    } else if (tenant.subscriptionTier === 'private') {
-      logger.info({ tenantId: tenant.id, stackId: infrastructure.stackId }, 'Step 3: Deleting dedicated DynamoDB table via CloudFormation (in tenant account)');
+    } else if (account.subscriptionTier === 'private') {
+      logger.info({ accountId: account.id, stackId: infrastructure.stackId }, 'Step 3: Deleting dedicated DynamoDB table via CloudFormation (in account account)');
       
-      result = await tenantDynamoDBService.deleteTenantDynamoDBTable({
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        email: tenant.email,
-        tenantAccountId: infrastructure.targetAccountId,
+      result = await accountDynamoDBService.deleteAccountDynamoDBTable({
+        accountId: account.id,
+        accountName: account.name,
+        email: account.email,
+        accountAccountId: infrastructure.targetAccountId,
         stackId: infrastructure.stackId, // Pass the stackId from the infrastructure object
         deletedBy: metadata.initiatedBy,
         deletedOn: metadata.timestamp
       });
       
     } else {
-      throw new Error(`Unsupported subscription tier: ${tenant.subscriptionTier}. Must be 'public' or 'private'`);
+      throw new Error(`Unsupported subscription tier: ${account.subscriptionTier}. Must be 'public' or 'private'`);
     }
 
-    // Step 4: Update tenant registry status in admin account
-    logger.info({ tenantId: tenant.id }, 'Step 4: Updating tenant registry in admin account');
-    await adminDynamoDBService.updateTenantInfrastructure(tenant.id, {
+    // Step 4: Update account registry status in admin account
+    logger.info({ accountId: account.id }, 'Step 4: Updating account registry in admin account');
+    await adminDynamoDBService.updateAccountInfrastructure(account.id, {
       status: result.success ? 'DELETE_COMPLETE' : 'DELETE_FAILED',
       stackName: result.tableName,
       stackId: result.stackId || null,
@@ -181,25 +181,25 @@ exports.handler = async (event, context) => {
       ...event,
       infrastructure: {
         ...event.infrastructure,
-        stackId: result.stackId || null, // Include stackId for delete polling (null for public tenants)
+        stackId: result.stackId || null, // Include stackId for delete polling (null for public accounts)
         stackName: result.tableName,
         status: result.success ? 'DELETE_COMPLETE' : 'DELETE_FAILED'
       },
       result: {
         success: result.success,
         operation: result.operation,
-        tenantId: result.tenantId || tenant.id,
+        accountId: result.accountId || account.id,
         tableName: result.tableName,
-        stackId: result.stackId || null, // Include stackId in result as well (null for public tenants)
-        subscriptionTier: tenant.subscriptionTier,
+        stackId: result.stackId || null, // Include stackId in result as well (null for public accounts)
+        subscriptionTier: account.subscriptionTier,
         deletedAt: result.deletedAt,
         executionTime: Date.now() - startTime
       }
     };
 
     logger.info({
-      tenantId: tenant.id,
-      subscriptionTier: tenant.subscriptionTier,
+      accountId: account.id,
+      subscriptionTier: account.subscriptionTier,
       tableName: result.tableName,
       success: result.success,
       executionTime: response.result.executionTime
@@ -220,7 +220,7 @@ exports.handler = async (event, context) => {
       ...event,
       result: {
         success: false,
-        operation: 'DELETE_TENANT_INFRASTRUCTURE',
+        operation: 'DELETE_ACCOUNT_INFRASTRUCTURE',
         error: error.message,
         executionTime: Date.now() - startTime
       }

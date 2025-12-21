@@ -1,4 +1,4 @@
-# Multi-Tenant POC CI/CD Pipeline# Multi-Tenant POC CI/CD Pipeline
+# Multi-Account POC CI/CD Pipeline# Multi-Account POC CI/CD Pipeline
 
 # Tool-agnostic pipeline using Make for local development and CI/CD integration# Tool-agnostic pipeline using Make for local development and CI/CD integration
 
@@ -804,7 +804,7 @@ status:	$(call log_success,🎉 Full pipeline completed successfully!)
 
 help:deploy-dev: ENV=dev
 
-	@echo "$(BLUE)Multi-Tenant POC CI/CD Pipeline$(NC)"deploy-dev: full-pipeline
+	@echo "$(BLUE)Multi-Account POC CI/CD Pipeline$(NC)"deploy-dev: full-pipeline
 
 	@echo ""
 
@@ -883,7 +883,7 @@ help:deploy-dev: ENV=dev
 
 ## Display help information
 help:
-	@echo "$(BLUE)🛠️  Multi-Tenant POC CI/CD Pipeline$(NC)"
+	@echo "$(BLUE)🛠️  Multi-Account POC CI/CD Pipeline$(NC)"
 	@echo ""
 	@echo "$(CYAN)Environment Configuration:$(NC)"
 	@echo "  ENV=$(ENV)              Environment (dev/prod)"

@@ -88,7 +88,7 @@ async function verifyEnhancedToken(token) {
       userId: decoded.sub,
       email: decoded.email,
       username: decoded.username,
-      tenantId: decoded.tenant_id || decoded['custom:tenant_id'],
+      accountId: decoded.account_id || decoded['custom:account_id'],
       userRole: decoded.user_role || decoded['custom:user_role'],
       permissions: decoded.permissions || (decoded['custom:permissions'] ? JSON.parse(decoded['custom:permissions']) : []),
       groups: decoded.groups || (decoded['custom:groups'] ? JSON.parse(decoded['custom:groups']) : []),
@@ -124,7 +124,7 @@ async function verifyCognitoToken(token, decodedHeader) {
       userId: decoded.sub,
       email: decoded.email,
       username: decoded['cognito:username'],
-      tenantId: decoded['custom:tenant_id'] || null,
+      accountId: decoded['custom:account_id'] || null,
       userRole: decoded['custom:user_role'] || null,
       permissions: decoded['custom:permissions'] ? JSON.parse(decoded['custom:permissions']) : [],
       groups: decoded['custom:groups'] ? JSON.parse(decoded['custom:groups']) : [],
@@ -218,7 +218,7 @@ function generatePolicy(principalId, effect, resource, context = {}) {
     policy.context = {
       userId: context.userId,
       email: context.email || '',
-      tenantId: context.tenantId || '',
+      accountId: context.accountId || '',
       userRole: context.userRole || '',
       permissions: JSON.stringify(context.permissions || []),
       groups: JSON.stringify(context.groups || [])

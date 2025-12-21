@@ -11,13 +11,13 @@ class StackPollingService {
   /**
    * Poll CloudFormation stack status
    * @param {string} stackId - CloudFormation stack ID or name
-   * @param {string} tenantId - Tenant identifier for logging
+   * @param {string} accountId - Account identifier for logging
    * @returns {Object} Stack status and details
    */
-  async pollStackStatus(stackId, tenantId) {
+  async pollStackStatus(stackId, accountId) {
     logger.info({
       stackId,
-      tenantId
+      accountId
     }, 'Polling CloudFormation stack status');
 
     try {
@@ -36,7 +36,7 @@ class StackPollingService {
       
       logger.info({
         stackId,
-        tenantId,
+        accountId,
         stackStatus: status,
         stackName: stack.StackName
       }, 'Retrieved stack status');
@@ -58,7 +58,7 @@ class StackPollingService {
       logger.error({
         error: error.message,
         stackId,
-        tenantId
+        accountId
       }, 'Failed to poll stack status');
       throw error;
     }
@@ -122,13 +122,13 @@ class StackPollingService {
   /**
    * Get stack events for troubleshooting
    * @param {string} stackId - CloudFormation stack ID
-   * @param {string} tenantId - Tenant identifier for logging
+   * @param {string} accountId - Account identifier for logging
    * @returns {Array} Recent stack events
    */
-  async getStackEvents(stackId, tenantId) {
+  async getStackEvents(stackId, accountId) {
     logger.debug({
       stackId,
-      tenantId
+      accountId
     }, 'Retrieving stack events');
 
     try {
@@ -150,7 +150,7 @@ class StackPollingService {
 
       logger.debug({
         stackId,
-        tenantId,
+        accountId,
         eventCount: events.length
       }, 'Retrieved stack events');
 
@@ -159,7 +159,7 @@ class StackPollingService {
       logger.error({
         error: error.message,
         stackId,
-        tenantId
+        accountId
       }, 'Failed to retrieve stack events');
       return []; // Return empty array on error
     }

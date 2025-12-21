@@ -27,8 +27,8 @@ const extractJwtFromApiGateway = (req) => {
           email: authorizer.email,
           // JWT authorizer sends 'username' directly, not 'cognito:username'
           username: authorizer.username || authorizer['cognito:username'],
-          // JWT authorizer sends 'tenantId' directly, not 'custom:tenant_id'
-          tenantId: authorizer.tenantId || authorizer['custom:tenant_id'],
+          // JWT authorizer sends 'accountId' directly, not 'custom:account_id'
+          accountId: authorizer.accountId || authorizer['custom:account_id'],
           groups: authorizer.groups ? (typeof authorizer.groups === 'string' ? JSON.parse(authorizer.groups) : authorizer.groups) : [],
           permissions: authorizer.permissions ? (typeof authorizer.permissions === 'string' ? JSON.parse(authorizer.permissions) : authorizer.permissions) : []
         };
@@ -48,7 +48,7 @@ const extractJwtFromApiGateway = (req) => {
         sub: 'local-dev-user',
         email: 'dev@example.com',
         username: 'local-dev',
-        tenantId: 'local-tenant',
+        accountId: 'local-account',
         groups: [],
         permissions: []
       };
@@ -97,7 +97,7 @@ const authMiddleware = (req, res, next) => {
       userId: userClaims.sub,
       email: userClaims.email,
       username: userClaims.username || userClaims.email,
-      tenantId: userClaims.tenantId,
+      accountId: userClaims.accountId,
       groups: userClaims.groups || [],
       permissions: userClaims.permissions || []
     };
@@ -133,7 +133,7 @@ const optionalAuthMiddleware = (req, res, next) => {
         userId: userClaims.sub,
         email: userClaims.email,
         username: userClaims.username || userClaims.email,
-        tenantId: userClaims.tenantId,
+        accountId: userClaims.accountId,
         groups: userClaims.groups || [],
         permissions: userClaims.permissions || []
       };

@@ -23,10 +23,10 @@ resource "random_integer" "platform_id" {
 
 # Generate UUIDs for entities
 resource "random_uuid" "platform_admin_group_id" {}
-resource "random_uuid" "tenant_admin_group_id" {}
+resource "random_uuid" "account_admin_group_id" {}
 resource "random_uuid" "infra_manager_role_id" {}
 resource "random_uuid" "platform_admin_manager_role_id" {}
-resource "random_uuid" "tenant_admin_manager_role_id" {}
+resource "random_uuid" "account_admin_manager_role_id" {}
 resource "random_uuid" "user_manager_role_id" {}
 resource "random_uuid" "user_group_manager_role_id" {}
 resource "random_uuid" "user_role_manager_role_id" {}
@@ -36,10 +36,10 @@ resource "random_uuid" "user_permission_manager_role_id" {}
 resource "random_uuid" "permission_ids" {
   for_each = {
     # Infrastructure management permissions (4)
-    "onboard-tenant" = {}
-    "suspend-tenant" = {}
-    "resume-tenant" = {}
-    "offboard-tenant" = {}
+    "onboard-account" = {}
+    "suspend-account" = {}
+    "resume-account" = {}
+    "offboard-account" = {}
     # Platform admin management permissions (6)
     "create-platform-admin" = {}
     "get-platform-admin" = {}
@@ -47,12 +47,12 @@ resource "random_uuid" "permission_ids" {
     "delete-platform-admin" = {}
     "resume-platform-admin" = {}
     "suspend-platform-admin" = {}
-    # Tenant admin management permissions (5)
-    "create-tenant-admin" = {}
-    "update-tenant-admin" = {}
-    "delete-tenant-admin" = {}
-    "suspend-tenant-admin" = {}
-    "resume-tenant-admin" = {}
+    # Account admin management permissions (5)
+    "create-account-admin" = {}
+    "update-account-admin" = {}
+    "delete-account-admin" = {}
+    "suspend-account-admin" = {}
+    "resume-account-admin" = {}
     # User management permissions (6)
     "create-user" = {}
     "update-user" = {}
@@ -74,9 +74,9 @@ resource "random_uuid" "permission_ids" {
     "assign-user-role" = {}
     # User permission management permissions (4)
     "create-user-permission" = {}
-    "get-tenant-permission" = {}
-    "delete-tenant-permission" = {}
-    "update-tenant-permission" = {}
+    "get-account-permission" = {}
+    "delete-account-permission" = {}
+    "update-account-permission" = {}
     "assign-permission-assign" = {}
   }
 }
@@ -132,7 +132,7 @@ resource "null_resource" "set_platform_admin_attributes" {
         --user-attributes \
           Name=email,Value=${local.platform_admin_email} \
           Name=email_verified,Value=true \
-          Name=custom:tenant_id,Value=${local.platform_id}
+          Name=custom:account_id,Value=${local.platform_id}
     EOT
   }
   
@@ -143,26 +143,26 @@ resource "null_resource" "set_platform_admin_attributes" {
 # DynamoDB RBAC Entries
 # ==============================================
 
-# Create platform tenant entity
-resource "aws_dynamodb_table_item" "platform_tenant" {
+# Create platform account entity
+resource "aws_dynamodb_table_item" "platform_account" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "METADATA"
     }
     entityType = {
-      S = "TENANT"
+      S = "ACCOUNT"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
-    tenantName = {
+    accountName = {
       S = "Platform"
     }
     email = {
@@ -197,7 +197,7 @@ resource "aws_dynamodb_table_item" "platform_admin_group" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "GROUP#${random_uuid.platform_admin_group_id.result}"
@@ -205,7 +205,7 @@ resource "aws_dynamodb_table_item" "platform_admin_group" {
     entityType = {
       S = "GROUP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     groupId = {
@@ -229,33 +229,33 @@ resource "aws_dynamodb_table_item" "platform_admin_group" {
   })
 }
 
-# Create tenant-admin group
-resource "aws_dynamodb_table_item" "tenant_admin_group" {
+# Create account-admin group
+resource "aws_dynamodb_table_item" "account_admin_group" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
-      S = "GROUP#${random_uuid.tenant_admin_group_id.result}"
+      S = "GROUP#${random_uuid.account_admin_group_id.result}"
     }
     entityType = {
       S = "GROUP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     groupId = {
-      S = random_uuid.tenant_admin_group_id.result
+      S = random_uuid.account_admin_group_id.result
     }
     name = {
-      S = "tenant-admin"
+      S = "account-admin"
     }
     description = {
-      S = "Tenant administrator group for user, role, and permission management capabilities"
+      S = "Account administrator group for user, role, and permission management capabilities"
     }
     status = {
       S = "ACTIVE"
@@ -277,7 +277,7 @@ resource "aws_dynamodb_table_item" "infra_manager_role" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "ROLE#${random_uuid.infra_manager_role_id.result}"
@@ -285,7 +285,7 @@ resource "aws_dynamodb_table_item" "infra_manager_role" {
     entityType = {
       S = "ROLE"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
@@ -295,7 +295,7 @@ resource "aws_dynamodb_table_item" "infra_manager_role" {
       S = "infra-manager"
     }
     description = {
-      S = "Infrastructure management role for tenant onboarding, suspension, resumption, and offboarding"
+      S = "Infrastructure management role for account onboarding, suspension, resumption, and offboarding"
     }
     status = {
       S = "ACTIVE"
@@ -320,7 +320,7 @@ resource "aws_dynamodb_table_item" "platform_admin_manager_role" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "ROLE#${random_uuid.platform_admin_manager_role_id.result}"
@@ -328,7 +328,7 @@ resource "aws_dynamodb_table_item" "platform_admin_manager_role" {
     entityType = {
       S = "ROLE"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
@@ -355,33 +355,33 @@ resource "aws_dynamodb_table_item" "platform_admin_manager_role" {
   })
 }
 
-# Create tenant-admin-manager role
-resource "aws_dynamodb_table_item" "tenant_admin_manager_role" {
+# Create account-admin-manager role
+resource "aws_dynamodb_table_item" "account_admin_manager_role" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
-      S = "ROLE#${random_uuid.tenant_admin_manager_role_id.result}"
+      S = "ROLE#${random_uuid.account_admin_manager_role_id.result}"
     }
     entityType = {
       S = "ROLE"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
-      S = random_uuid.tenant_admin_manager_role_id.result
+      S = random_uuid.account_admin_manager_role_id.result
     }
     name = {
-      S = "tenant-admin-manager"
+      S = "account-admin-manager"
     }
     description = {
-      S = "Tenant administrator management role for creating, updating, and managing tenant admins"
+      S = "Account administrator management role for creating, updating, and managing account admins"
     }
     status = {
       S = "ACTIVE"
@@ -406,7 +406,7 @@ resource "aws_dynamodb_table_item" "user_manager_role" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "ROLE#${random_uuid.user_manager_role_id.result}"
@@ -414,7 +414,7 @@ resource "aws_dynamodb_table_item" "user_manager_role" {
     entityType = {
       S = "ROLE"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
@@ -449,7 +449,7 @@ resource "aws_dynamodb_table_item" "user_group_manager_role" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "ROLE#${random_uuid.user_group_manager_role_id.result}"
@@ -457,7 +457,7 @@ resource "aws_dynamodb_table_item" "user_group_manager_role" {
     entityType = {
       S = "ROLE"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
@@ -492,7 +492,7 @@ resource "aws_dynamodb_table_item" "user_role_manager_role" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "ROLE#${random_uuid.user_role_manager_role_id.result}"
@@ -500,7 +500,7 @@ resource "aws_dynamodb_table_item" "user_role_manager_role" {
     entityType = {
       S = "ROLE"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
@@ -535,7 +535,7 @@ resource "aws_dynamodb_table_item" "user_permission_manager_role" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "ROLE#${random_uuid.user_permission_manager_role_id.result}"
@@ -543,7 +543,7 @@ resource "aws_dynamodb_table_item" "user_permission_manager_role" {
     entityType = {
       S = "ROLE"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
@@ -574,24 +574,24 @@ resource "aws_dynamodb_table_item" "user_permission_manager_role" {
 resource "aws_dynamodb_table_item" "permissions" {
   for_each = {
     # Infrastructure management permissions (4)
-    "onboard-tenant" = {
-      description = "Permission to onboard new tenants to the platform"
-      resource    = "tenant"
+    "onboard-account" = {
+      description = "Permission to onboard new accounts to the platform"
+      resource    = "account"
       action      = "onboard"
     }
-    "suspend-tenant" = {
-      description = "Permission to suspend tenant access"
-      resource    = "tenant"
+    "suspend-account" = {
+      description = "Permission to suspend account access"
+      resource    = "account"
       action      = "suspend"
     }
-    "resume-tenant" = {
-      description = "Permission to resume tenant access"
-      resource    = "tenant"
+    "resume-account" = {
+      description = "Permission to resume account access"
+      resource    = "account"
       action      = "resume"
     }
-    "offboard-tenant" = {
-      description = "Permission to offboard tenants from the platform"
-      resource    = "tenant"
+    "offboard-account" = {
+      description = "Permission to offboard accounts from the platform"
+      resource    = "account"
       action      = "offboard"
     }
     # Platform admin management permissions (6)
@@ -625,30 +625,30 @@ resource "aws_dynamodb_table_item" "permissions" {
       resource    = "platform-admin"
       action      = "suspend"
     }
-    # Tenant admin management permissions (5)
-    "create-tenant-admin" = {
-      description = "Permission to create tenant administrators"
-      resource    = "tenant-admin"
+    # Account admin management permissions (5)
+    "create-account-admin" = {
+      description = "Permission to create account administrators"
+      resource    = "account-admin"
       action      = "create"
     }
-    "update-tenant-admin" = {
-      description = "Permission to update tenant administrators"
-      resource    = "tenant-admin"
+    "update-account-admin" = {
+      description = "Permission to update account administrators"
+      resource    = "account-admin"
       action      = "update"
     }
-    "delete-tenant-admin" = {
-      description = "Permission to delete tenant administrators"
-      resource    = "tenant-admin"
+    "delete-account-admin" = {
+      description = "Permission to delete account administrators"
+      resource    = "account-admin"
       action      = "delete"
     }
-    "suspend-tenant-admin" = {
-      description = "Permission to suspend tenant administrators"
-      resource    = "tenant-admin"
+    "suspend-account-admin" = {
+      description = "Permission to suspend account administrators"
+      resource    = "account-admin"
       action      = "suspend"
     }
-    "resume-tenant-admin" = {
-      description = "Permission to resume tenant administrators"
-      resource    = "tenant-admin"
+    "resume-account-admin" = {
+      description = "Permission to resume account administrators"
+      resource    = "account-admin"
       action      = "resume"
     }
     # User management permissions (6)
@@ -740,19 +740,19 @@ resource "aws_dynamodb_table_item" "permissions" {
       resource    = "user-permission"
       action      = "create"
     }
-    "get-tenant-permission" = {
-      description = "Permission to retrieve tenant permissions"
-      resource    = "tenant-permission"
+    "get-account-permission" = {
+      description = "Permission to retrieve account permissions"
+      resource    = "account-permission"
       action      = "get"
     }
-    "delete-tenant-permission" = {
-      description = "Permission to delete tenant permissions"
-      resource    = "tenant-permission"
+    "delete-account-permission" = {
+      description = "Permission to delete account permissions"
+      resource    = "account-permission"
       action      = "delete"
     }
-    "update-tenant-permission" = {
-      description = "Permission to update tenant permissions"
-      resource    = "tenant-permission"
+    "update-account-permission" = {
+      description = "Permission to update account permissions"
+      resource    = "account-permission"
       action      = "update"
     }
     "assign-permission-assign" = {
@@ -768,7 +768,7 @@ resource "aws_dynamodb_table_item" "permissions" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "PERMISSION#${random_uuid.permission_ids[each.key].result}"
@@ -776,7 +776,7 @@ resource "aws_dynamodb_table_item" "permissions" {
     entityType = {
       S = "PERMISSION"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     permissionId = {
@@ -814,7 +814,7 @@ resource "aws_dynamodb_table_item" "platform_admin_user" {
   
   item = jsonencode({
     PK = {
-      S = "TENANT#${local.platform_id}"
+      S = "ACCOUNT#${local.platform_id}"
     }
     SK = {
       S = "USER#${aws_cognito_user.platform_admin.sub}"
@@ -822,7 +822,7 @@ resource "aws_dynamodb_table_item" "platform_admin_user" {
     entityType = {
       S = "USER"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     userId = {
@@ -873,7 +873,7 @@ resource "aws_dynamodb_table_item" "platform_admin_user" {
 
 # Group -> Roles mappings (platform-admin group to roles)
 resource "aws_dynamodb_table_item" "platform_admin_group_role_mappings" {
-  for_each = toset(["infra-manager", "platform-admin-manager", "tenant-admin-manager"])
+  for_each = toset(["infra-manager", "platform-admin-manager", "account-admin-manager"])
   
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
@@ -884,19 +884,19 @@ resource "aws_dynamodb_table_item" "platform_admin_group_role_mappings" {
       S = "GROUP#${local.platform_id}#${random_uuid.platform_admin_group_id.result}#ROLES"
     }
     SK = {
-      S = "ROLE#${each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.tenant_admin_manager_role_id.result)}"
+      S = "ROLE#${each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.account_admin_manager_role_id.result)}"
     }
     entityType = {
       S = "GROUP_ROLE_MEMBERSHIP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     groupId = {
       S = random_uuid.platform_admin_group_id.result
     }
     roleId = {
-      S = each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.tenant_admin_manager_role_id.result)
+      S = each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.account_admin_manager_role_id.result)
     }
     createdAt = {
       S = local.current_timestamp
@@ -904,8 +904,8 @@ resource "aws_dynamodb_table_item" "platform_admin_group_role_mappings" {
   })
 }
 
-# Tenant-admin group -> roles mapping
-resource "aws_dynamodb_table_item" "tenant_admin_group_role_mappings" {
+# Account-admin group -> roles mapping
+resource "aws_dynamodb_table_item" "account_admin_group_role_mappings" {
   for_each = toset(["user-manager", "user-group-manager", "user-role-manager", "user-permission-manager"])
   
   table_name = var.rbac_table_name
@@ -914,7 +914,7 @@ resource "aws_dynamodb_table_item" "tenant_admin_group_role_mappings" {
   
   item = jsonencode({
     PK = {
-      S = "GROUP#${local.platform_id}#${random_uuid.tenant_admin_group_id.result}#ROLES"
+      S = "GROUP#${local.platform_id}#${random_uuid.account_admin_group_id.result}#ROLES"
     }
     SK = {
       S = "ROLE#${each.value == "user-manager" ? random_uuid.user_manager_role_id.result : (each.value == "user-group-manager" ? random_uuid.user_group_manager_role_id.result : (each.value == "user-role-manager" ? random_uuid.user_role_manager_role_id.result : random_uuid.user_permission_manager_role_id.result))}"
@@ -922,11 +922,11 @@ resource "aws_dynamodb_table_item" "tenant_admin_group_role_mappings" {
     entityType = {
       S = "GROUP_ROLE_MEMBERSHIP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     groupId = {
-      S = random_uuid.tenant_admin_group_id.result
+      S = random_uuid.account_admin_group_id.result
     }
     roleId = {
       S = each.value == "user-manager" ? random_uuid.user_manager_role_id.result : (each.value == "user-group-manager" ? random_uuid.user_group_manager_role_id.result : (each.value == "user-role-manager" ? random_uuid.user_role_manager_role_id.result : random_uuid.user_permission_manager_role_id.result))
@@ -939,7 +939,7 @@ resource "aws_dynamodb_table_item" "tenant_admin_group_role_mappings" {
 
 # Role -> Groups mappings (roles to platform-admin group)
 resource "aws_dynamodb_table_item" "platform_admin_role_group_mappings" {
-  for_each = toset(["infra-manager", "platform-admin-manager", "tenant-admin-manager"])
+  for_each = toset(["infra-manager", "platform-admin-manager", "account-admin-manager"])
   
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
@@ -947,7 +947,7 @@ resource "aws_dynamodb_table_item" "platform_admin_role_group_mappings" {
   
   item = jsonencode({
     PK = {
-      S = "ROLE#${local.platform_id}#${each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.tenant_admin_manager_role_id.result)}#GROUPS"
+      S = "ROLE#${local.platform_id}#${each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.account_admin_manager_role_id.result)}#GROUPS"
     }
     SK = {
       S = "GROUP#${random_uuid.platform_admin_group_id.result}"
@@ -955,11 +955,11 @@ resource "aws_dynamodb_table_item" "platform_admin_role_group_mappings" {
     entityType = {
       S = "ROLE_GROUP_MEMBERSHIP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
-      S = each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.tenant_admin_manager_role_id.result)
+      S = each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.account_admin_manager_role_id.result)
     }
     groupId = {
       S = random_uuid.platform_admin_group_id.result
@@ -970,8 +970,8 @@ resource "aws_dynamodb_table_item" "platform_admin_role_group_mappings" {
   })
 }
 
-# Roles -> tenant-admin group mappings
-resource "aws_dynamodb_table_item" "tenant_admin_role_group_mappings" {
+# Roles -> account-admin group mappings
+resource "aws_dynamodb_table_item" "account_admin_role_group_mappings" {
   for_each = toset(["user-manager", "user-group-manager", "user-role-manager", "user-permission-manager"])
   
   table_name = var.rbac_table_name
@@ -983,19 +983,19 @@ resource "aws_dynamodb_table_item" "tenant_admin_role_group_mappings" {
       S = "ROLE#${local.platform_id}#${each.value == "user-manager" ? random_uuid.user_manager_role_id.result : (each.value == "user-group-manager" ? random_uuid.user_group_manager_role_id.result : (each.value == "user-role-manager" ? random_uuid.user_role_manager_role_id.result : random_uuid.user_permission_manager_role_id.result))}#GROUPS"
     }
     SK = {
-      S = "GROUP#${random_uuid.tenant_admin_group_id.result}"
+      S = "GROUP#${random_uuid.account_admin_group_id.result}"
     }
     entityType = {
       S = "ROLE_GROUP_MEMBERSHIP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
       S = each.value == "user-manager" ? random_uuid.user_manager_role_id.result : (each.value == "user-group-manager" ? random_uuid.user_group_manager_role_id.result : (each.value == "user-role-manager" ? random_uuid.user_role_manager_role_id.result : random_uuid.user_permission_manager_role_id.result))
     }
     groupId = {
-      S = random_uuid.tenant_admin_group_id.result
+      S = random_uuid.account_admin_group_id.result
     }
     createdAt = {
       S = local.current_timestamp
@@ -1010,10 +1010,10 @@ resource "aws_dynamodb_table_item" "tenant_admin_role_group_mappings" {
 locals {
   role_permissions = {
     "infra-manager" = [
-      "onboard-tenant",
-      "suspend-tenant",
-      "resume-tenant",
-      "offboard-tenant"
+      "onboard-account",
+      "suspend-account",
+      "resume-account",
+      "offboard-account"
     ]
     "platform-admin-manager" = [
       "create-platform-admin",
@@ -1023,12 +1023,12 @@ locals {
       "resume-platform-admin",
       "suspend-platform-admin"
     ]
-    "tenant-admin-manager" = [
-      "create-tenant-admin",
-      "update-tenant-admin",
-      "delete-tenant-admin",
-      "suspend-tenant-admin",
-      "resume-tenant-admin"
+    "account-admin-manager" = [
+      "create-account-admin",
+      "update-account-admin",
+      "delete-account-admin",
+      "suspend-account-admin",
+      "resume-account-admin"
     ]
     "user-manager" = [
       "create-user",
@@ -1054,9 +1054,9 @@ locals {
     ]
     "user-permission-manager" = [
       "create-user-permission",
-      "get-tenant-permission",
-      "delete-tenant-permission",
-      "update-tenant-permission",
+      "get-account-permission",
+      "delete-account-permission",
+      "update-account-permission",
       "assign-permission-assign"
     ]
   }
@@ -1073,7 +1073,7 @@ resource "aws_dynamodb_table_item" "role_permission_mappings" {
           role_id = (
             role == "infra-manager" ? random_uuid.infra_manager_role_id.result :
             role == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result :
-            role == "tenant-admin-manager" ? random_uuid.tenant_admin_manager_role_id.result :
+            role == "account-admin-manager" ? random_uuid.account_admin_manager_role_id.result :
             role == "user-manager" ? random_uuid.user_manager_role_id.result :
             role == "user-group-manager" ? random_uuid.user_group_manager_role_id.result :
             role == "user-role-manager" ? random_uuid.user_role_manager_role_id.result :
@@ -1099,7 +1099,7 @@ resource "aws_dynamodb_table_item" "role_permission_mappings" {
     entityType = {
       S = "ROLE_PERMISSION_MEMBERSHIP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     roleId = {
@@ -1125,7 +1125,7 @@ resource "aws_dynamodb_table_item" "permission_role_mappings" {
           role_id = (
             role == "infra-manager" ? random_uuid.infra_manager_role_id.result :
             role == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result :
-            role == "tenant-admin-manager" ? random_uuid.tenant_admin_manager_role_id.result :
+            role == "account-admin-manager" ? random_uuid.account_admin_manager_role_id.result :
             role == "user-manager" ? random_uuid.user_manager_role_id.result :
             role == "user-group-manager" ? random_uuid.user_group_manager_role_id.result :
             role == "user-role-manager" ? random_uuid.user_role_manager_role_id.result :
@@ -1151,7 +1151,7 @@ resource "aws_dynamodb_table_item" "permission_role_mappings" {
     entityType = {
       S = "PERMISSION_ROLE_MEMBERSHIP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     permissionId = {
@@ -1186,7 +1186,7 @@ resource "aws_dynamodb_table_item" "user_group_mapping" {
     entityType = {
       S = "USER_GROUP_MEMBERSHIP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     userId = {
@@ -1217,7 +1217,7 @@ resource "aws_dynamodb_table_item" "group_user_mapping" {
     entityType = {
       S = "GROUP_USER_MEMBERSHIP"
     }
-    tenantId = {
+    accountId = {
       S = local.platform_id
     }
     groupId = {

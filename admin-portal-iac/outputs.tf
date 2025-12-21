@@ -80,6 +80,31 @@ output "oms_service_function_name" {
 }
 
 # ==============================================
+# Sys App Backend Outputs (Workflow 10)
+# Source: https://github.com/tripleh1701-dev/ppp-be
+# ==============================================
+
+output "app_backend_function_arn" {
+  description = "ARN of the Sys App Backend Lambda function"
+  value       = var.enable_app_backend ? module.app_backend[0].lambda_function_arn : null
+}
+
+output "app_backend_function_name" {
+  description = "Name of the Sys App Backend Lambda function"
+  value       = var.enable_app_backend ? module.app_backend[0].lambda_function_name : null
+}
+
+output "app_backend_function_url" {
+  description = "Function URL of the Sys App Backend Lambda (if enabled)"
+  value       = var.enable_app_backend && var.enable_lambda_function_urls ? module.app_backend[0].function_url : null
+}
+
+output "app_backend_api_url" {
+  description = "API Gateway URL for Sys App Backend"
+  value       = var.enable_api_gateway && var.enable_app_backend ? "${module.api_gateway[0].api_gateway_url}/api/v1/app" : null
+}
+
+# ==============================================
 # Platform Bootstrap Outputs
 # ==============================================
 
@@ -122,13 +147,13 @@ output "deployment_summary" {
       module.create_infra_worker.lambda_function_name,
       module.delete_infra_worker.lambda_function_name,
       module.poll_infra_worker.lambda_function_name
-    ], 
+    ],
     var.enable_jwt_authorizer && var.enable_cognito ? [module.jwt_authorizer[0].lambda_function_name] : [],
     var.enable_ims_service && var.enable_cognito ? [module.ims_service[0].lambda_function_name] : []
     )
     access_url = var.enable_lambda_function_urls ? module.admin_portal_web_server.function_url : "No public access configured"
-    tenant_registry_table = var.tenant_registry_table_name
-    rbac_table = var.tenant_registry_table_name
+    account_registry_table = var.account_registry_table_name
+    rbac_table = var.account_registry_table_name
     vpc_endpoints_created = module.vpc_endpoints.endpoint_services_created
     architecture_type = "Independent Lambda-based with Identity Management and JWT Authorization"
     identity_management = var.enable_cognito ? {
@@ -137,7 +162,7 @@ output "deployment_summary" {
       jwt_authorizer_enabled = var.enable_jwt_authorizer
       rbac_enabled = true
       platform_admin_created = var.enable_platform_bootstrap
-      rbac_table_shared = "Using tenant registry table for RBAC data"
+      rbac_table_shared = "Using account registry table for RBAC data"
     } : null
   }
 }
@@ -257,8 +282,8 @@ output "infrastructure_summary" {
   value = {
     vpc_id                = module.networking.vpc_id
     private_subnet_ids    = module.networking.private_subnet_ids
-    tenant_registry_table = var.tenant_registry_table_name
-    rbac_table           = var.tenant_registry_table_name  # Same table used for RBAC
+    account_registry_table = var.account_registry_table_name
+    rbac_table           = var.account_registry_table_name  # Same table used for RBAC
     lambda_functions      = {
       admin_portal        = module.admin_portal_web_server.lambda_function_name
       # admin_backend       = module.admin_backend.lambda_function_name  # COMMENTED OUT
@@ -272,7 +297,7 @@ output "infrastructure_summary" {
       cognito_user_pool_id = module.cognito[0].user_pool_id
       platform_admin_created = var.enable_platform_bootstrap
       rbac_system_ready = true
-      rbac_table_shared = "RBAC data stored in tenant registry table"
+      rbac_table_shared = "RBAC data stored in account registry table"
     } : null
   }
 }
@@ -285,7 +310,7 @@ output "resource_counts" {
     lambda_functions     = var.enable_cognito ? (var.enable_ims_service && var.enable_jwt_authorizer ? 7 : 6) : 5
     s3_buckets           = 2
     vpc_endpoints        = length(var.vpc_endpoint_services)
-    dynamodb_tables      = 1  # Tenant registry table (also used for RBAC)
+    dynamodb_tables      = 1  # Account registry table (also used for RBAC)
     cognito_user_pools   = var.enable_cognito ? 1 : 0
     cognito_users        = var.enable_platform_bootstrap ? 1 : 0
     rbac_entries         = var.enable_platform_bootstrap ? "32+ (Groups, Roles, Permissions, Mappings)" : 0
@@ -307,13 +332,13 @@ output "platform_admin_quick_start" {
       step_4 = "You will have full platform administration capabilities"
     }
     admin_capabilities = [
-      "Tenant onboarding and offboarding",
-      "Tenant suspension and reactivation", 
-      "Tenant super-admin management",
+      "Account onboarding and offboarding",
+      "Account suspension and reactivation",
+      "Account super-admin management",
       "Platform-wide governance",
       "User and role management"
     ]
-    rbac_storage = "RBAC data stored in tenant registry table (single-table design)"
+    rbac_storage = "RBAC data stored in account registry table (single-table design)"
     security_note = "Please change the default password after first login for security"
   } : null
 }
@@ -328,8 +353,8 @@ output "create_admin_worker_config" {
     lambda_function_name   = module.create_admin_worker.function_name
     lambda_function_arn    = module.create_admin_worker.function_arn
     ims_service_url        = var.enable_api_gateway ? module.api_gateway[0].ims_service_base_url : var.ims_service_url
-    tenant_platform_id     = var.enable_platform_bootstrap ? module.platform_bootstrap[0].platform_tenant_id : "platform"
-    tenant_admin_group_id  = var.enable_platform_bootstrap ? module.platform_bootstrap[0].tenant_admin_group_id : var.tenant_admin_group_id
+    account_platform_id     = var.enable_platform_bootstrap ? module.platform_bootstrap[0].platform_account_id : "platform"
+    account_admin_group_id  = var.enable_platform_bootstrap ? module.platform_bootstrap[0].account_admin_group_id : var.account_admin_group_id
     configuration_source   = "dynamically_resolved_from_terraform_outputs"
   }
 }

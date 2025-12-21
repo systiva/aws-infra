@@ -5,13 +5,13 @@ variable "admin_account_id" {
   type        = string
 }
 
-variable "tenant_account_id" {
-  description = "Tenant account ID (detected from workflow)"
+variable "account_account_id" {
+  description = "Account account ID (detected from workflow)"
   type        = string
 }
 
 variable "cross_account_role_name" {
-  description = "Cross-account role name (e.g., qa-CrossAccountTenantRole)"
+  description = "Cross-account role name (e.g., qa-CrossAccountAccountRole)"
   type        = string
 }
 
@@ -25,10 +25,10 @@ variable "aws_region" {
   type        = string
 }
 
-variable "tenant_public_table_name" {
-  description = "Name of the DynamoDB table in tenant account for public tenant data"
+variable "account_public_table_name" {
+  description = "Name of the DynamoDB table in account account for public account data"
   type        = string
-  default     = "TENANT_PUBLIC"
+  default     = "ACCOUNT_PUBLIC"
 }
 
 variable "project_name" {
@@ -71,8 +71,8 @@ variable "log_retention_days" {
   default     = 14
 }
 
-variable "tenant_registry_table_name" {
-  description = "Name of the tenant registry DynamoDB table"
+variable "account_registry_table_name" {
+  description = "Name of the account registry DynamoDB table"
   type        = string
 }
 

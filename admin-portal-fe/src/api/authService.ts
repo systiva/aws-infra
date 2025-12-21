@@ -13,7 +13,7 @@ export interface LoginResponse {
     username: string;
     email: string;
     userRole: string;
-    tenantId: string;
+    accountId: string;
     permissions: string[];
   };
   challengeName?: string;
@@ -33,7 +33,7 @@ export interface SignupResponse {
     username: string;
     email: string;
     userRole: string;
-    tenantId: string;
+    accountId: string;
     permissions: string[];
   };
 }
@@ -54,7 +54,7 @@ export interface SignupRequest {
   password: string;
   firstName: string;
   lastName: string;
-  tenantId: string;
+  accountId: string;
   userRole?: string;
 }
 

@@ -9,13 +9,13 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "tenant_registry_table_name" {
-  description = "Name of the Tenant Registry DynamoDB table"
+variable "account_registry_table_name" {
+  description = "Name of the Account Registry DynamoDB table"
   type        = string
 }
 
 variable "cross_account_role_name" {
-  description = "Name of the cross-account IAM role in tenant accounts"
+  description = "Name of the cross-account IAM role in account accounts"
   type        = string
   default     = "OMS-CrossAccountRole"
 }

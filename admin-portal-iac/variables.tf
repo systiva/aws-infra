@@ -4,7 +4,7 @@
 variable "workspace_prefix" {
   description = "Workspace prefix for resource naming (dev|qa|prod|uat)"
   type        = string
-  
+
   validation {
     condition     = contains(["dev", "qa", "prod", "uat"], var.workspace_prefix)
     error_message = "Workspace prefix must be one of: dev, qa, prod, uat."
@@ -15,20 +15,20 @@ variable "workspace_prefix" {
 variable "admin_account_id" {
   description = "AWS account ID for admin account"
   type        = string
-  
+
   validation {
     condition     = can(regex("^[0-9]{12}$", var.admin_account_id))
     error_message = "Admin account ID must be a 12-digit number."
   }
 }
 
-variable "tenant_account_id" {
-  description = "AWS account ID for tenant account"
+variable "account_account_id" {
+  description = "AWS account ID for account account"
   type        = string
-  
+
   validation {
-    condition     = can(regex("^[0-9]{12}$", var.tenant_account_id))
-    error_message = "Tenant account ID must be a 12-digit number."
+    condition     = can(regex("^[0-9]{12}$", var.account_account_id))
+    error_message = "Account account ID must be a 12-digit number."
   }
 }
 
@@ -190,37 +190,37 @@ variable "vpc_endpoint_services" {
 }
 
 # External Dependencies (independent configuration)
-variable "tenant_registry_table_name" {
-  description = "Name of the DynamoDB tenant registry table (can be independent or reference existing)"
+variable "account_registry_table_name" {
+  description = "Name of the DynamoDB account registry table (can be independent or reference existing)"
   type        = string
   default     = ""  # Will be auto-generated if empty
 }
 
-variable "tenant_public_table_name" {
-  description = "Name of the DynamoDB table in tenant account for public tenant data"
+variable "account_public_table_name" {
+  description = "Name of the DynamoDB table in account account for public account data. Convention: account-admin-public-{workspace}"
   type        = string
-  default     = "TENANT_PUBLIC"
+  default     = ""  # Will be auto-generated as account-admin-public-{workspace}
 }
 
 variable "step_functions_arn" {
-  description = "ARN of Step Functions state machine for tenant operations (optional - legacy)"
+  description = "ARN of Step Functions state machine for account operations (optional - legacy)"
   type        = string
   default     = ""
 }
 
-variable "create_tenant_step_function_arn" {
-  description = "ARN of the Create Tenant Step Functions state machine"
+variable "create_account_step_function_arn" {
+  description = "ARN of the Create Account Step Functions state machine"
   type        = string
   default     = ""
 }
 
-variable "delete_tenant_step_function_arn" {
-  description = "ARN of the Delete Tenant Step Functions state machine"
+variable "delete_account_step_function_arn" {
+  description = "ARN of the Delete Account Step Functions state machine"
   type        = string
   default     = ""
 }
 
-# Create Admin Worker Configuration (Tenant Admin User Creation)
+# Create Admin Worker Configuration (Account Admin User Creation)
 variable "ims_service_url" {
   description = "Base URL for IMS service (Identity Management Service). If enable_api_gateway is true, this is dynamically resolved from API Gateway outputs."
   type        = string
@@ -233,20 +233,20 @@ variable "ims_timeout" {
   default     = 30000
 }
 
-variable "tenant_platform_id" {
-  description = "Platform tenant ID where admin users are created. Dynamically resolved from platform-bootstrap module."
+variable "account_platform_id" {
+  description = "Platform account ID where admin users are created. Dynamically resolved from platform-bootstrap module."
   type        = string
   default     = "PLATFORM"
 }
 
-variable "tenant_admin_group_id" {
-  description = "UUID of the tenant admin group in platform tenant. Dynamically resolved from platform-bootstrap module."
+variable "account_admin_group_id" {
+  description = "UUID of the account admin group in platform account. Dynamically resolved from platform-bootstrap module."
   type        = string
   default     = ""
 }
 
-variable "trusted_tenant_account_ids" {
-  description = "List of trusted tenant account IDs for cross-account access"
+variable "trusted_account_account_ids" {
+  description = "List of trusted account account IDs for cross-account access"
   type        = list(string)
   default     = []
 }
@@ -398,9 +398,9 @@ variable "enable_oms_service" {
 }
 
 variable "oms_cross_account_role_name" {
-  description = "Name of the cross-account IAM role in tenant accounts for OMS"
+  description = "Name of the cross-account IAM role in account accounts for OMS"
   type        = string
-  default     = "CrossAccountTenantRole"
+  default     = "CrossAccountAccountRole"
 }
 
 variable "oms_log_level" {
@@ -423,16 +423,61 @@ variable "enable_platform_bootstrap" {
 variable "platform_admin_email" {
   description = "Email address for the platform admin user"
   type        = string
-  default     = "demo_platform_admin@platform.com"
+  default     = "admin@systiva.ai"
 }
 
 variable "temporary_password" {
   description = "Temporary password for platform admin user"
   type        = string
   sensitive   = true
-  
+
   validation {
     condition     = length(var.temporary_password) >= 8
     error_message = "Temporary password must be at least 8 characters long."
   }
+}
+
+# ==============================================
+# Sys App Frontend Configuration
+# ==============================================
+
+variable "enable_app_frontend" {
+  description = "Enable Sys App Frontend (separate from admin portal)"
+  type        = bool
+  default     = false
+}
+
+# ==============================================
+# Sys App Backend Configuration (Workflow 10)
+# Source: https://github.com/tripleh1701-dev/ppp-be
+# ==============================================
+
+variable "enable_app_backend" {
+  description = "Enable Sys App Backend Lambda (separate from admin backend)"
+  type        = bool
+  default     = false
+}
+
+variable "app_backend_timeout" {
+  description = "Sys App Backend Lambda timeout in seconds"
+  type        = number
+  default     = 30
+}
+
+variable "app_backend_memory_size" {
+  description = "Sys App Backend Lambda memory size in MB"
+  type        = number
+  default     = 512
+}
+
+variable "app_backend_log_level" {
+  description = "Log level for Sys App Backend Lambda"
+  type        = string
+  default     = "info"
+}
+
+variable "ims_api_url" {
+  description = "IMS API URL - AUTO-SET by null_resource after API Gateway is created. No manual configuration needed."
+  type        = string
+  default     = ""
 }

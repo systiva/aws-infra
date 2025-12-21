@@ -7,7 +7,7 @@ export interface User {
   email: string;
   firstName?: string;
   lastName?: string;
-  tenantId: string;
+  accountId: string;
   userRole: string;
   status: 'CONFIRMED' | 'UNCONFIRMED' | 'FORCE_CHANGE_PASSWORD';
   enabled: boolean;
@@ -20,7 +20,7 @@ export interface CreateUserRequest {
   email: string;
   firstName?: string;
   lastName?: string;
-  tenantId: string;
+  accountId: string;
   userRole: string;
   temporaryPassword?: string;
   groups?: string[];

@@ -1,4 +1,4 @@
-const { createTenantDynamooseInstance } = require('../db');
+const { createAccountDynamooseInstance } = require('../db');
 const { wrapDynamoDBOperation } = require('../dynamodb-error');
 const logger = require('../../../logger');
 const { v4: uuidv4 } = require('uuid');
@@ -12,12 +12,12 @@ class InventoryManagement {
     /**
      * Create or initialize inventory for a product
      */
-    static async createInventory(tenantContext, inventoryData, userId) {
+    static async createInventory(accountContext, inventoryData, userId) {
         return wrapDynamoDBOperation(async () => {
             const { productId } = inventoryData;
             const now = new Date().toISOString();
             
-            const inventoryPK = `TENANT#${tenantContext.tenantId}`;
+            const inventoryPK = `ACCOUNT#${accountContext.accountId}`;
             const inventorySK = `INVENTORY#${productId}`;
             
             const quantity = inventoryData.quantity || 0;
@@ -41,11 +41,11 @@ class InventoryManagement {
                 createdBy: userId
             };
             
-            logger.debug('Creating inventory', { productId, tenantId: tenantContext.tenantId });
+            logger.debug('Creating inventory', { productId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             await dbClient.docClient.put({
@@ -55,22 +55,22 @@ class InventoryManagement {
             
             return this.cleanInventoryResponse(inventoryItem);
             
-        }, 'createInventory', { tenantId: tenantContext.tenantId });
+        }, 'createInventory', { accountId: accountContext.accountId });
     }
     
     /**
      * Get inventory for a product
      */
-    static async getInventory(tenantContext, productId) {
+    static async getInventory(accountContext, productId) {
         return wrapDynamoDBOperation(async () => {
-            const inventoryPK = `TENANT#${tenantContext.tenantId}`;
+            const inventoryPK = `ACCOUNT#${accountContext.accountId}`;
             const inventorySK = `INVENTORY#${productId}`;
             
-            logger.debug('Getting inventory', { productId, tenantId: tenantContext.tenantId });
+            logger.debug('Getting inventory', { productId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.get({
@@ -87,21 +87,21 @@ class InventoryManagement {
             
             return this.cleanInventoryResponse(result.Item);
             
-        }, 'getInventory', { tenantId: tenantContext.tenantId, productId });
+        }, 'getInventory', { accountId: accountContext.accountId, productId });
     }
     
     /**
      * Get all inventory items
      */
-    static async getAllInventory(tenantContext) {
+    static async getAllInventory(accountContext) {
         return wrapDynamoDBOperation(async () => {
-            const inventoryPK = `TENANT#${tenantContext.tenantId}`;
+            const inventoryPK = `ACCOUNT#${accountContext.accountId}`;
             
-            logger.debug('Getting all inventory', { tenantId: tenantContext.tenantId });
+            logger.debug('Getting all inventory', { accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.query({
@@ -115,23 +115,23 @@ class InventoryManagement {
             
             return result.Items.map(inventory => this.cleanInventoryResponse(inventory));
             
-        }, 'getAllInventory', { tenantId: tenantContext.tenantId });
+        }, 'getAllInventory', { accountId: accountContext.accountId });
     }
     
     /**
      * Update inventory quantity (restock)
      */
-    static async updateInventoryQuantity(tenantContext, productId, quantityChange, userId) {
+    static async updateInventoryQuantity(accountContext, productId, quantityChange, userId) {
         return wrapDynamoDBOperation(async () => {
-            const inventoryPK = `TENANT#${tenantContext.tenantId}`;
+            const inventoryPK = `ACCOUNT#${accountContext.accountId}`;
             const inventorySK = `INVENTORY#${productId}`;
             const now = new Date().toISOString();
             
-            logger.debug('Updating inventory quantity', { productId, quantityChange, tenantId: tenantContext.tenantId });
+            logger.debug('Updating inventory quantity', { productId, quantityChange, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             // Get current inventory
@@ -169,7 +169,7 @@ class InventoryManagement {
             // Create stock transaction record
             await this.createStockTransaction(
                 dbClient,
-                tenantContext,
+                accountContext,
                 productId,
                 quantityChange,
                 now,
@@ -179,23 +179,23 @@ class InventoryManagement {
             
             return this.cleanInventoryResponse(result.Attributes);
             
-        }, 'updateInventoryQuantity', { tenantId: tenantContext.tenantId, productId, quantityChange });
+        }, 'updateInventoryQuantity', { accountId: accountContext.accountId, productId, quantityChange });
     }
     
     /**
      * Reserve inventory (for orders)
      */
-    static async reserveInventory(tenantContext, productId, quantity, userId) {
+    static async reserveInventory(accountContext, productId, quantity, userId) {
         return wrapDynamoDBOperation(async () => {
-            const inventoryPK = `TENANT#${tenantContext.tenantId}`;
+            const inventoryPK = `ACCOUNT#${accountContext.accountId}`;
             const inventorySK = `INVENTORY#${productId}`;
             const now = new Date().toISOString();
             
-            logger.debug('Reserving inventory', { productId, quantity, tenantId: tenantContext.tenantId });
+            logger.debug('Reserving inventory', { productId, quantity, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             // Get current inventory
@@ -236,23 +236,23 @@ class InventoryManagement {
             
             return this.cleanInventoryResponse(result.Attributes);
             
-        }, 'reserveInventory', { tenantId: tenantContext.tenantId, productId, quantity });
+        }, 'reserveInventory', { accountId: accountContext.accountId, productId, quantity });
     }
     
     /**
      * Release reserved inventory
      */
-    static async releaseInventory(tenantContext, productId, quantity, userId) {
+    static async releaseInventory(accountContext, productId, quantity, userId) {
         return wrapDynamoDBOperation(async () => {
-            const inventoryPK = `TENANT#${tenantContext.tenantId}`;
+            const inventoryPK = `ACCOUNT#${accountContext.accountId}`;
             const inventorySK = `INVENTORY#${productId}`;
             const now = new Date().toISOString();
             
-            logger.debug('Releasing inventory', { productId, quantity, tenantId: tenantContext.tenantId });
+            logger.debug('Releasing inventory', { productId, quantity, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             // Get current inventory
@@ -288,15 +288,15 @@ class InventoryManagement {
             
             return this.cleanInventoryResponse(result.Attributes);
             
-        }, 'releaseInventory', { tenantId: tenantContext.tenantId, productId, quantity });
+        }, 'releaseInventory', { accountId: accountContext.accountId, productId, quantity });
     }
     
     /**
      * Create stock transaction record
      */
-    static async createStockTransaction(dbClient, tenantContext, productId, quantityChange, timestamp, userId, newQuantity) {
+    static async createStockTransaction(dbClient, accountContext, productId, quantityChange, timestamp, userId, newQuantity) {
         const transactionId = uuidv4();
-        const transactionPK = `PRODUCT#${tenantContext.tenantId}#${productId}#STOCK`;
+        const transactionPK = `PRODUCT#${accountContext.accountId}#${productId}#STOCK`;
         const transactionSK = `TRANSACTION#${timestamp}#${transactionId}`;
         
         await dbClient.docClient.put({
@@ -320,15 +320,15 @@ class InventoryManagement {
     /**
      * Get stock transaction history
      */
-    static async getStockTransactions(tenantContext, productId) {
+    static async getStockTransactions(accountContext, productId) {
         return wrapDynamoDBOperation(async () => {
-            const transactionPK = `PRODUCT#${tenantContext.tenantId}#${productId}#STOCK`;
+            const transactionPK = `PRODUCT#${accountContext.accountId}#${productId}#STOCK`;
             
-            logger.debug('Getting stock transactions', { productId, tenantId: tenantContext.tenantId });
+            logger.debug('Getting stock transactions', { productId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.query({
@@ -347,23 +347,23 @@ class InventoryManagement {
                 createdBy: transaction.createdBy
             }));
             
-        }, 'getStockTransactions', { tenantId: tenantContext.tenantId, productId });
+        }, 'getStockTransactions', { accountId: accountContext.accountId, productId });
     }
     
     /**
      * Update inventory settings
      */
-    static async updateInventorySettings(tenantContext, productId, settings, userId) {
+    static async updateInventorySettings(accountContext, productId, settings, userId) {
         return wrapDynamoDBOperation(async () => {
-            const inventoryPK = `TENANT#${tenantContext.tenantId}`;
+            const inventoryPK = `ACCOUNT#${accountContext.accountId}`;
             const inventorySK = `INVENTORY#${productId}`;
             const now = new Date().toISOString();
             
-            logger.debug('Updating inventory settings', { productId, tenantId: tenantContext.tenantId });
+            logger.debug('Updating inventory settings', { productId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const updateData = {
@@ -396,7 +396,7 @@ class InventoryManagement {
             
             return this.cleanInventoryResponse(result.Attributes);
             
-        }, 'updateInventorySettings', { tenantId: tenantContext.tenantId, productId });
+        }, 'updateInventorySettings', { accountId: accountContext.accountId, productId });
     }
     
     /**

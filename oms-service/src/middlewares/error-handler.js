@@ -11,7 +11,7 @@ const errorHandler = (err, req, res, next) => {
         path: req.path,
         method: req.method,
         userId: req.user?.userId,
-        tenantId: req.tenantId
+        accountId: req.accountId
     });
     
     // DynamoDB errors

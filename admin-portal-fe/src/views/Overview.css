@@ -75,7 +75,7 @@
   margin-bottom: 0.5rem;
 }
 
-.recent-tenants {
+.recent-accounts {
   background: #ffffff;
   border-radius: 12px;
   padding: 2rem;
@@ -83,13 +83,13 @@
   margin-bottom: 2rem;
 }
 
-.recent-tenants h2 {
+.recent-accounts h2 {
   color: #1e3a5f;
   margin-bottom: 1.5rem;
   font-size: 1.5rem;
 }
 
-.tenant-table table {
+.account-table table {
   width: 100%;
   border-collapse: collapse;
   border-radius: 8px;
@@ -97,7 +97,7 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.tenant-table th {
+.account-table th {
   background-color: #f8fafc;
   color: #374151;
   font-weight: 600;
@@ -106,31 +106,31 @@
   border-bottom: 2px solid #e5e7eb;
 }
 
-.tenant-table td {
+.account-table td {
   padding: 1rem 1.5rem;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.tenant-table tr:hover {
+.account-table tr:hover {
   background-color: #f9fafb;
 }
 
-.tenant-table .tenant-id {
+.account-table .account-id {
   font-family: 'Monaco', 'Consolas', monospace;
   font-size: 0.875rem;
   color: #6b7280;
 }
 
-.tenant-table .tenant-name {
+.account-table .account-name {
   font-weight: 600;
   color: #1f2937;
 }
 
-.tenant-table .tenant-email {
+.account-table .account-email {
   color: #4b5563;
 }
 
-.tenant-table .created-date {
+.account-table .created-date {
   color: #6b7280;
   font-size: 0.875rem;
 }

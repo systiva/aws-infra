@@ -29,7 +29,7 @@ const AuthOverlay: React.FC<AuthOverlayProps> = () => {
     newPassword: '',
     firstName: '',
     lastName: '',
-    tenantId: '',
+    accountId: '',
   });
   const [localError, setLocalError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -67,7 +67,7 @@ const AuthOverlay: React.FC<AuthOverlayProps> = () => {
       newPassword: '',
       firstName: '',
       lastName: '',
-      tenantId: '',
+      accountId: '',
     });
     setLocalError('');
     setSuccessMessage('');
@@ -86,7 +86,7 @@ const AuthOverlay: React.FC<AuthOverlayProps> = () => {
       newPassword: '',
       firstName: '',
       lastName: '',
-      tenantId: '',
+      accountId: '',
     });
     setLocalError('');
     setSuccessMessage('');
@@ -118,7 +118,7 @@ const AuthOverlay: React.FC<AuthOverlayProps> = () => {
       
       case 'signup':
         if (!formData.username || !formData.email || !formData.password || 
-            !formData.firstName || !formData.lastName || !formData.tenantId) {
+            !formData.firstName || !formData.lastName || !formData.accountId) {
           setLocalError('All fields are required');
           return false;
         }
@@ -200,7 +200,7 @@ const AuthOverlay: React.FC<AuthOverlayProps> = () => {
             password: formData.password,
             firstName: formData.firstName,
             lastName: formData.lastName,
-            tenantId: formData.tenantId,
+            accountId: formData.accountId,
             userRole: 'viewer', // Default role
           };
           await authSignup(signupData);
@@ -358,14 +358,14 @@ const AuthOverlay: React.FC<AuthOverlayProps> = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="tenantId">Tenant ID</label>
+                <label htmlFor="accountId">Account ID</label>
                 <input
                   type="text"
-                  id="tenantId"
-                  name="tenantId"
-                  value={formData.tenantId}
+                  id="accountId"
+                  name="accountId"
+                  value={formData.accountId}
                   onChange={handleInputChange}
-                  placeholder="Enter tenant ID"
+                  placeholder="Enter account ID"
                   required
                 />
               </div>

@@ -19,8 +19,8 @@ export interface RBACContext {
 
 // Role-Route mapping
 export const ROLE_ROUTES: Record<string, string[]> = {
-  'tenant-gov': ['/register', '/directory'],
-  'tenant-super-admin': ['/register', '/directory', '/super-admins'], // Platform admin can access all
+  'account-gov': ['/register', '/directory'],
+  'account-super-admin': ['/register', '/directory', '/super-admins'], // Platform admin can access all
 };
 
 // Permission checking utilities
@@ -131,22 +131,22 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
     path: '/user-management',
     label: 'User Management',
-    requiredGroups: ['tenant-admin'],
+    requiredGroups: ['account-admin'],
   },
   {
     path: '/group-management',
     label: 'Group Management',
-    requiredGroups: ['tenant-admin'],
+    requiredGroups: ['account-admin'],
   },
   {
     path: '/role-management',
     label: 'Role Management',
-    requiredGroups: ['tenant-admin'],
+    requiredGroups: ['account-admin'],
   },
   {
     path: '/permission-management',
     label: 'Permission Management',
-    requiredGroups: ['tenant-admin'],
+    requiredGroups: ['account-admin'],
   },
   {
     path: '/',
@@ -155,12 +155,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   },
   {
     path: '/register',
-    label: 'Register Tenant',
+    label: 'Register Account',
     requiredGroups: ['platform-admin'],
   },
   {
     path: '/directory',
-    label: 'Tenant Directory',
+    label: 'Account Directory',
     requiredGroups: ['platform-admin'],
   },
   {
@@ -168,31 +168,31 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: 'Super Admins',
     requiredGroups: ['platform-admin'],
   },
-  // OMS Navigation Items - Only for tenant users
+  // OMS Navigation Items - Only for account users
   {
     path: '/oms',
     label: 'OMS Dashboard',
-    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+    requiredGroups: ['account-user-ro', 'account-user-rw', 'account-admin'],
   },
   {
     path: '/oms/customers',
     label: 'Customers',
-    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+    requiredGroups: ['account-user-ro', 'account-user-rw', 'account-admin'],
   },
   {
     path: '/oms/products',
     label: 'Products',
-    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+    requiredGroups: ['account-user-ro', 'account-user-rw', 'account-admin'],
   },
   {
     path: '/oms/orders',
     label: 'Orders',
-    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+    requiredGroups: ['account-user-ro', 'account-user-rw', 'account-admin'],
   },
   {
     path: '/oms/inventory',
     label: 'Inventory',
-    requiredGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'],
+    requiredGroups: ['account-user-ro', 'account-user-rw', 'account-admin'],
   },
 ];
 

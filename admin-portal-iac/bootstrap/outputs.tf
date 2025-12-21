@@ -20,24 +20,24 @@ output "terraform_lock_table_arn" {
   value       = aws_dynamodb_table.terraform_lock.arn
 }
 
-output "tenant_registry_table_name" {
-  description = "Name of the DynamoDB tenant registry table"
-  value       = aws_dynamodb_table.tenant_registry.name
+output "account_registry_table_name" {
+  description = "Name of the DynamoDB account registry table"
+  value       = aws_dynamodb_table.account_registry.name
 }
 
-output "tenant_registry_table_arn" {
-  description = "ARN of the DynamoDB tenant registry table"
-  value       = aws_dynamodb_table.tenant_registry.arn
+output "account_registry_table_arn" {
+  description = "ARN of the DynamoDB account registry table"
+  value       = aws_dynamodb_table.account_registry.arn
 }
 
 output "step_functions_arn" {
   description = "ARN of the Step Functions state machine"
-  value       = aws_sfn_state_machine.tenant_operations.arn
+  value       = aws_sfn_state_machine.account_operations.arn
 }
 
 output "step_functions_name" {
   description = "Name of the Step Functions state machine"
-  value       = aws_sfn_state_machine.tenant_operations.name
+  value       = aws_sfn_state_machine.account_operations.name
 }
 
 output "backend_config_file" {
@@ -62,6 +62,6 @@ output "next_steps" {
     Backend Configuration:
     - S3 Bucket: ${aws_s3_bucket.terraform_state.bucket}
     - DynamoDB Table: ${aws_dynamodb_table.terraform_lock.name}
-    - Tenant Registry: ${aws_dynamodb_table.tenant_registry.name}
+    - Account Registry: ${aws_dynamodb_table.account_registry.name}
   EOT
 }

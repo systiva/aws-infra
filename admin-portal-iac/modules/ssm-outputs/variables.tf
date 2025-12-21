@@ -11,12 +11,12 @@ variable "workspace" {
 }
 
 variable "account_type" {
-  description = "Account type (admin/tenant)"
+  description = "Account type (admin/account)"
   type        = string
   
   validation {
-    condition     = contains(["admin", "tenant"], var.account_type)
-    error_message = "Account type must be either 'admin' or 'tenant'"
+    condition     = contains(["admin", "account"], var.account_type)
+    error_message = "Account type must be either 'admin' or 'account'"
   }
 }
 

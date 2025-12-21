@@ -15,19 +15,19 @@ export const LoginPage: React.FC = () => {
     <div className="login-page">
       <div className="login-container">
         <div className="login-header">
-          <h1>Tenant Portal</h1>
-          <p>Secure Multi-Tenant Management Platform</p>
+          <h1>Account Portal</h1>
+          <p>Secure Multi-Account Management Platform</p>
         </div>
         
         <div className="login-content">
           <div className="welcome-section">
             <h2>Welcome</h2>
-            <p>Please sign in to access your tenant management dashboard.</p>
+            <p>Please sign in to access your account management dashboard.</p>
             
             <div className="features-list">
               <div className="feature-item">
                 <span className="feature-icon">🏢</span>
-                <span>Manage Multiple Tenants</span>
+                <span>Manage Multiple Accounts</span>
               </div>
               <div className="feature-item">
                 <span className="feature-icon">👥</span>

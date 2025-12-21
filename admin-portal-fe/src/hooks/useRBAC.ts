@@ -58,19 +58,19 @@ export const usePermissions = () => {
   const rbac = useRBAC();
   
   return {
-    // Tenant management
-    canCreateTenant: rbac.hasAnyPermission(['tenant-onboarding', 'tenant:create']),
-    canUpdateTenant: rbac.hasAnyPermission(['tenant-suspension', 'tenant:update']),
-    canDeleteTenant: rbac.hasAnyPermission(['tenant-offboarding', 'tenant:delete']),
-    canViewTenants: rbac.hasAnyRole(['super-admin', 'tenant-gov']),
+    // Account management
+    canCreateAccount: rbac.hasAnyPermission(['account-onboarding', 'account:create']),
+    canUpdateAccount: rbac.hasAnyPermission(['account-suspension', 'account:update']),
+    canDeleteAccount: rbac.hasAnyPermission(['account-offboarding', 'account:delete']),
+    canViewAccounts: rbac.hasAnyRole(['super-admin', 'account-gov']),
     
     // Super admin management
-    canManageSuperAdmins: rbac.hasAnyRole(['super-admin', 'tenant-super-admin']),
-    canCreateSuperAdmin: rbac.hasAnyPermission(['tenant-super-admin-create']),
-    canUpdateSuperAdmin: rbac.hasAnyPermission(['tenant-super-admin-update']),
-    canDeleteSuperAdmin: rbac.hasAnyPermission(['tenant-super-admin-delete']),
+    canManageSuperAdmins: rbac.hasAnyRole(['super-admin', 'account-super-admin']),
+    canCreateSuperAdmin: rbac.hasAnyPermission(['account-super-admin-create']),
+    canUpdateSuperAdmin: rbac.hasAnyPermission(['account-super-admin-update']),
+    canDeleteSuperAdmin: rbac.hasAnyPermission(['account-super-admin-delete']),
     
     // General access
-    canAccessAdminPanel: rbac.hasAnyRole(['super-admin', 'tenant-gov', 'tenant-super-admin']),
+    canAccessAdminPanel: rbac.hasAnyRole(['super-admin', 'account-gov', 'account-super-admin']),
   };
 };

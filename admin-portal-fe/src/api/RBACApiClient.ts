@@ -1,9 +1,9 @@
 interface RBACUser {
-  // New TenantRBACService properties
+  // New AccountRBACService properties
   PK?: string;
   SK?: string;
   entity_type?: string;
-  tenant_id?: string;
+  account_id?: string;
   entity_id?: string;
   user_id?: string;
   name?: string;
@@ -32,7 +32,7 @@ interface RBACGroup {
   PK: string;
   SK: string;
   entity_type: string;
-  tenant_id: string;
+  account_id: string;
   entity_id: string;
   groupId: string;  // Changed from group_id to match backend
   name: string;
@@ -47,7 +47,7 @@ interface RBACRole {
   PK: string;
   SK: string;
   entity_type: string;
-  tenant_id: string;
+  account_id: string;
   entity_id: string;
   roleId: string;  // Changed from role_id to match backend
   name: string;
@@ -63,7 +63,7 @@ interface RBACPermission {
   PK: string;
   SK: string;
   entity_type: string;
-  tenant_id: string;
+  account_id: string;
   entity_id: string;
   permissionId: string;  // Changed from permission_id to match backend
   name: string;
@@ -120,15 +120,15 @@ interface APIResponse<T> {
 class RBACApiClient {
   private rbacBaseUrl: string;
   private usersBaseUrl: string;
-  private tenantId: string | null = null;
+  private accountId: string | null = null;
 
   constructor(baseUrl: string = process.env.REACT_APP_IMS_BASE_URL || 'http://localhost:3001/api/v1') {
     this.rbacBaseUrl = `${baseUrl}/rbac`;
     this.usersBaseUrl = `${baseUrl}/users`;
   }
 
-  setTenantId(tenantId: string) {
-    this.tenantId = tenantId;
+  setAccountId(accountId: string) {
+    this.accountId = accountId;
   }
 
   private async makeRequest<T>(
@@ -154,13 +154,13 @@ class RBACApiClient {
       config.body = JSON.stringify(body);
     }
 
-    // Add tenant ID as query parameter if not in body
-    const urlWithTenant = this.tenantId ? 
-      `${url}${url.includes('?') ? '&' : '?'}tenantId=${this.tenantId}` : 
+    // Add account ID as query parameter if not in body
+    const urlWithAccount = this.accountId ? 
+      `${url}${url.includes('?') ? '&' : '?'}accountId=${this.accountId}` : 
       url;
 
     try {
-      const response = await fetch(urlWithTenant, config);
+      const response = await fetch(urlWithAccount, config);
       
       if (!response.ok) {
         try {

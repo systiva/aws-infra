@@ -84,124 +84,124 @@ class MappingAccessPatterns {
     }
   }
 
-  // Helper method to clean tenant response data
-  static cleanTenantResponse(tenant) {
-    if (!tenant) return tenant;
+  // Helper method to clean account response data
+  static cleanAccountResponse(account) {
+    if (!account) return account;
     
-    const cleanTenant = { ...tenant };
+    const cleanAccount = { ...account };
     // Remove internal DynamoDB keys and metadata
-    delete cleanTenant.PK;
-    delete cleanTenant.SK;
-    delete cleanTenant.entityType;
+    delete cleanAccount.PK;
+    delete cleanAccount.SK;
+    delete cleanAccount.entityType;
     
-    return cleanTenant;
+    return cleanAccount;
   }
 
-  // Helper method to clean multiple tenant responses
-  static cleanTenantsResponse(tenants) {
-    if (!Array.isArray(tenants)) return tenants;
-    return tenants.map(tenant => this.cleanTenantResponse(tenant));
+  // Helper method to clean multiple account responses
+  static cleanAccountsResponse(accounts) {
+    if (!Array.isArray(accounts)) return accounts;
+    return accounts.map(account => this.cleanAccountResponse(account));
   }
 
-  // Tenant-specific access patterns
-  static async createTenant(tenant) {
+  // Account-specific access patterns
+  static async createAccount(account) {
     try {
-      Logger.info(`Creating tenant: ${JSON.stringify(tenant)}`);
+      Logger.info(`Creating account: ${JSON.stringify(account)}`);
       const item = {
-        PK: `TENANT#${tenant.tenantId}`,
+        PK: `ACCOUNT#${account.accountId}`,
         SK: `METADATA`,
-        ...tenant,
-        entityType: 'TENANT'
+        ...account,
+        entityType: 'ACCOUNT'
       };
       const result = await this.putItem(item);
       // Clean up the response to remove internal DB keys
-      return this.cleanTenantResponse(result);
+      return this.cleanAccountResponse(result);
     } catch (err) {
-      Logger.error(`Error creating tenant: ${err.message}`);
+      Logger.error(`Error creating account: ${err.message}`);
       DynamoDBError.handleRequestExecutionError(err);
     }
   }
 
-  static async getTenant(tenantId) {
+  static async getAccount(accountId) {
     try {
-      Logger.info(`Getting tenant with id: ${tenantId}`);
-      const result = await this.getItem(`TENANT#${tenantId}`, 'METADATA');
-      return this.cleanTenantResponse(result);
+      Logger.info(`Getting account with id: ${accountId}`);
+      const result = await this.getItem(`ACCOUNT#${accountId}`, 'METADATA');
+      return this.cleanAccountResponse(result);
     } catch (err) {
-      Logger.error(`Error getting tenant: ${err.message}`);
+      Logger.error(`Error getting account: ${err.message}`);
       DynamoDBError.handleRequestExecutionError(err);
     }
   }
 
-  static async getTenantByName(tenantName) {
+  static async getAccountByName(accountName) {
     try {
-      Logger.info(`Getting tenant by name: ${tenantName}`);
-      const tenants = await this.scanTenants();
-      const tenant = tenants.find(tenant => tenant.tenantName === tenantName);
-      return this.cleanTenantResponse(tenant);
+      Logger.info(`Getting account by name: ${accountName}`);
+      const accounts = await this.scanAccounts();
+      const account = accounts.find(account => account.accountName === accountName);
+      return this.cleanAccountResponse(account);
     } catch (err) {
-      Logger.error(`Error getting tenant by name: ${err.message}`);
+      Logger.error(`Error getting account by name: ${err.message}`);
       DynamoDBError.handleRequestExecutionError(err);
     }
   }
 
-  static async updateTenant(tenantId, updateData) {
+  static async updateAccount(accountId, updateData) {
     try {
-      Logger.info(`Updating tenant: ${tenantId} with data: ${JSON.stringify(updateData)}`);
-      const updatedItem = await this.updateItem(`TENANT#${tenantId}`, 'METADATA', updateData);
-      return this.cleanTenantResponse(updatedItem);
+      Logger.info(`Updating account: ${accountId} with data: ${JSON.stringify(updateData)}`);
+      const updatedItem = await this.updateItem(`ACCOUNT#${accountId}`, 'METADATA', updateData);
+      return this.cleanAccountResponse(updatedItem);
     } catch (err) {
-      Logger.error(`Error updating tenant: ${err.message}`);
+      Logger.error(`Error updating account: ${err.message}`);
       DynamoDBError.handleRequestExecutionError(err);
     }
   }
 
-  static async updateTenantStatus(tenantId, status) {
+  static async updateAccountStatus(accountId, status) {
     try {
-      Logger.info(`Updating tenant status: ${tenantId} to ${status}`);
-      return await this.updateItem(`TENANT#${tenantId}`, 'METADATA', { 
+      Logger.info(`Updating account status: ${accountId} to ${status}`);
+      return await this.updateItem(`ACCOUNT#${accountId}`, 'METADATA', { 
         provisioningState: status,
         lastModified: new Date().toISOString()
       });
     } catch (err) {
-      Logger.error(`Error updating tenant status: ${err.message}`);
+      Logger.error(`Error updating account status: ${err.message}`);
       DynamoDBError.handleRequestExecutionError(err);
     }
   }
 
-  static async deleteTenant(tenantId) {
+  static async deleteAccount(accountId) {
     try {
-      Logger.info(`Deleting tenant: ${tenantId}`);
-      return await this.deleteItem(`TENANT#${tenantId}`, 'METADATA');
+      Logger.info(`Deleting account: ${accountId}`);
+      return await this.deleteItem(`ACCOUNT#${accountId}`, 'METADATA');
     } catch (err) {
-      Logger.error(`Error deleting tenant: ${err.message}`);
+      Logger.error(`Error deleting account: ${err.message}`);
       DynamoDBError.handleRequestExecutionError(err);
     }
   }
 
-  static async scanTenants() {
+  static async scanAccounts() {
     try {
-      Logger.info('Scanning all tenants');
+      Logger.info('Scanning all accounts');
       const allItems = await this.scanItems();
-      // Filter only tenant items
-      const tenants = allItems.filter(item => 
-        item.PK && item.PK.startsWith('TENANT#') && item.SK === 'METADATA'
+      // Filter only account items
+      const accounts = allItems.filter(item => 
+        item.PK && item.PK.startsWith('ACCOUNT#') && item.SK === 'METADATA'
       );
-      Logger.info(`Found ${tenants.length} tenants`);
-      return this.cleanTenantsResponse(tenants);
+      Logger.info(`Found ${accounts.length} accounts`);
+      return this.cleanAccountsResponse(accounts);
     } catch (err) {
-      Logger.error(`Error scanning tenants: ${err.message}`);
+      Logger.error(`Error scanning accounts: ${err.message}`);
       DynamoDBError.handleRequestExecutionError(err);
     }
   }
 
-  static async queryTenantsByStatus(status) {
+  static async queryAccountsByStatus(status) {
     try {
-      Logger.info(`Querying tenants by status: ${status}`);
-      const allTenants = await this.scanTenants();
-      return allTenants.filter(tenant => tenant.provisioningState === status);
+      Logger.info(`Querying accounts by status: ${status}`);
+      const allAccounts = await this.scanAccounts();
+      return allAccounts.filter(account => account.provisioningState === status);
     } catch (err) {
-      Logger.error(`Error querying tenants by status: ${err.message}`);
+      Logger.error(`Error querying accounts by status: ${err.message}`);
       DynamoDBError.handleRequestExecutionError(err);
     }
   }

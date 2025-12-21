@@ -1,0 +1,396 @@
+name: 09 - Sys App Frontend Code Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+
+jobs:
+  get-config:
+    name: Get Configuration from SSM
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.config.outputs.api_url }}
+      api_base_url: ${{ steps.config.outputs.api_base_url }}
+      cognito_user_pool_id: ${{ steps.config.outputs.cognito_user_pool_id }}
+      cognito_client_id: ${{ steps.config.outputs.cognito_client_id }}
+      cognito_domain: ${{ steps.config.outputs.cognito_domain }}
+      s3_bucket: ${{ steps.config.outputs.s3_bucket }}
+      web_server_url: ${{ steps.config.outputs.web_server_url }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Get Configuration from SSM
+        id: config
+        run: |
+          # Validate admin infrastructure exists
+          if ! STATUS=$(aws ssm get-parameter \
+              --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/status" \
+              --region "${{ inputs.aws_region }}" \
+              --query 'Parameter.Value' \
+              --output text 2>/dev/null); then
+            echo "Admin infrastructure not found. Please run '04 - Admin Infrastructure' first."
+            exit 1
+          fi
+
+          # Get API Gateway URL
+          API_URL=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/api-gateway-url" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+
+          # Extract base URL (remove /api/v1 suffix)
+          API_BASE_URL=$(echo "$API_URL" | sed 's|/api/v1$||')
+
+          # Get Cognito configuration
+          COGNITO_USER_POOL_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-id" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+
+          COGNITO_CLIENT_ID=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-client-id" \
+            --region "${{ inputs.aws_region }}" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)
+
+          COGNITO_DOMAIN=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/cognito-user-pool-domain" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text)
+
+          # Get S3 bucket for Sys App Frontend (separate from admin portal)
+          S3_BUCKET=$(aws ssm get-parameter \
+            --name "/admin-portal/${{ inputs.workspace }}/admin/infrastructure/app-frontend-s3-bucket" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+
+          # If SSM param not found, try to find bucket by prefix
+          if [ -z "$S3_BUCKET" ] || [ "$S3_BUCKET" == "None" ]; then
+            S3_BUCKET=$(aws s3api list-buckets \
+              --query "Buckets[?starts_with(Name, 'app-fe-${{ inputs.workspace }}')].Name | [0]" \
+              --output text 2>/dev/null || echo "")
+          fi
+
+          if [ -z "$S3_BUCKET" ] || [ "$S3_BUCKET" == "None" ]; then
+            echo "Error: S3 bucket for Sys App Frontend not found."
+            echo "Please run '04 - Admin Infrastructure' with enable_app_frontend=true first."
+            exit 1
+          fi
+
+          # Web Server URL for Sys App Frontend (via API Gateway /ui path)
+          WEB_SERVER_URL="${API_BASE_URL}/ui"
+
+          # Export outputs
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "api_base_url=$API_BASE_URL" >> $GITHUB_OUTPUT
+          echo "cognito_user_pool_id=$COGNITO_USER_POOL_ID" >> $GITHUB_OUTPUT
+          echo "cognito_client_id=$COGNITO_CLIENT_ID" >> $GITHUB_OUTPUT
+          echo "cognito_domain=$COGNITO_DOMAIN" >> $GITHUB_OUTPUT
+          echo "s3_bucket=$S3_BUCKET" >> $GITHUB_OUTPUT
+          echo "web_server_url=$WEB_SERVER_URL" >> $GITHUB_OUTPUT
+
+          echo "Configuration retrieved successfully"
+          echo "API URL: $API_URL"
+          echo "API Base URL: $API_BASE_URL"
+          echo "Cognito User Pool: $COGNITO_USER_POOL_ID"
+          echo "S3 Bucket (Sys App): $S3_BUCKET"
+          echo "Web Server URL: $WEB_SERVER_URL"
+
+  build-and-deploy:
+    name: Build and Deploy Sys App Frontend
+    runs-on: ubuntu-latest
+    needs: [get-config]
+
+    steps:
+      - name: Checkout Code from Remote Repository
+        uses: actions/checkout@v4
+        with:
+          repository: tripleh1701-dev/ppp-fe
+          ref: main
+
+      - name: Verify Checkout
+        run: |
+          echo "=== Verifying repository checkout ==="
+          echo "Current directory: $(pwd)"
+          echo "Files in root:"
+          ls -la
+          echo ""
+          if [ -f "package.json" ]; then
+            echo "package.json found"
+          else
+            echo "ERROR: package.json not found!"
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: |
+          npm ci
+
+      - name: Create Environment Configuration
+        run: |
+          # NEXT_PUBLIC_API_BASE_URL = base URL with stage (e.g., https://xxx.execute-api.../prod)
+          # Frontend code adds /api/v1/auth/login, /api/v1/app/*, etc.
+          cat > .env.production << EOF
+          NEXT_PUBLIC_ENV=${{ inputs.workspace }}
+          NEXT_PUBLIC_API_BASE_URL=${{ needs.get-config.outputs.api_base_url }}
+          NEXT_PUBLIC_API_BASE=${{ needs.get-config.outputs.api_base_url }}
+          NEXT_PUBLIC_API_URL=${{ needs.get-config.outputs.api_url }}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID=${{ needs.get-config.outputs.cognito_user_pool_id }}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID=${{ needs.get-config.outputs.cognito_client_id }}
+          NEXT_PUBLIC_COGNITO_DOMAIN=${{ needs.get-config.outputs.cognito_domain }}
+          NEXT_PUBLIC_AWS_REGION=${{ inputs.aws_region }}
+          NEXT_PUBLIC_VERSION=${{ github.sha }}
+          EOF
+
+          cp .env.production .env.local
+          echo "Environment configuration created:"
+          cat .env.production
+
+      - name: Configure Next.js for Static Export
+        run: |
+          echo "Configuring Next.js for static export with /prod/ui basePath..."
+
+          # Create next.config.js with proper formatting
+          # basePath and assetPrefix include stage (/prod) for API Gateway compatibility
+          cat > next.config.js << 'NEXTCONFIG'
+          /** @type {import('next').NextConfig} */
+          const nextConfig = {
+            output: 'export',
+            basePath: '/prod/ui',
+            assetPrefix: '/prod/ui',
+            trailingSlash: true,
+            images: { unoptimized: true },
+          };
+          module.exports = nextConfig;
+          NEXTCONFIG
+
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' next.config.js
+
+          echo "=== next.config.js content ==="
+          cat next.config.js
+          echo "=== end of next.config.js ==="
+
+      - name: Clean Build Cache
+        run: |
+          echo "Cleaning Next.js cache..."
+          rm -rf .next out node_modules/.cache 2>/dev/null || true
+
+      - name: Build Frontend
+        env:
+          CI: false
+        run: |
+          npm run build
+
+          echo "Build completed successfully"
+          echo "Build output:"
+          ls -la out/ 2>/dev/null || ls -la build/ 2>/dev/null || echo "Build directory not found"
+
+          # Verify basePath is applied in HTML
+          echo ""
+          echo "=== Verifying basePath in index.html ==="
+          if [ -f "out/index.html" ]; then
+            echo "Checking for /ui prefix in asset paths..."
+            grep -o 'src="[^"]*"' out/index.html | head -5 || true
+            grep -o 'href="[^"]*"' out/index.html | head -5 || true
+
+            if grep -q '"/ui/_next' out/index.html; then
+              echo "✓ basePath /ui is correctly applied"
+            else
+              echo "⚠ WARNING: basePath /ui might not be applied correctly"
+              echo "First 50 lines of index.html:"
+              head -50 out/index.html
+            fi
+          fi
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ADMIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ADMIN_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Upload to S3
+        run: |
+          echo "Uploading build to S3 bucket: ${{ needs.get-config.outputs.s3_bucket }}"
+
+          # Determine build directory (Next.js uses 'out' for static export)
+          BUILD_DIR="out"
+          if [ ! -d "$BUILD_DIR" ]; then
+            BUILD_DIR="build"
+          fi
+
+          if [ ! -d "$BUILD_DIR" ]; then
+            echo "ERROR: No build directory found!"
+            exit 1
+          fi
+
+          echo "Using build directory: $BUILD_DIR"
+
+          # Clear existing content
+          aws s3 rm s3://${{ needs.get-config.outputs.s3_bucket }}/ --recursive --region "${{ inputs.aws_region }}" || true
+
+          # Sync build directory to S3
+          aws s3 sync $BUILD_DIR/ s3://${{ needs.get-config.outputs.s3_bucket }}/ \
+            --delete \
+            --cache-control "public, max-age=31536000" \
+            --exclude "index.html" \
+            --exclude "*.html" \
+            --region "${{ inputs.aws_region }}"
+
+          # Upload HTML files with no-cache
+          find $BUILD_DIR -name "*.html" -type f | while read file; do
+            key="${file#$BUILD_DIR/}"
+            aws s3 cp "$file" "s3://${{ needs.get-config.outputs.s3_bucket }}/$key" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --region "${{ inputs.aws_region }}"
+          done
+
+          echo "Upload to S3 completed"
+
+      - name: Update Lambda with S3 Serving Code
+        env:
+          # Lambda code: serves S3 files, adds /prod prefix to /images and /fonts paths in HTML
+          LAMBDA_CODE_B64: "Y29uc3QgeyBTM0NsaWVudCwgR2V0T2JqZWN0Q29tbWFuZCB9ID0gcmVxdWlyZSgiQGF3cy1zZGsvY2xpZW50LXMzIik7Cgpjb25zdCBzMyA9IG5ldyBTM0NsaWVudCh7IHJlZ2lvbjogcHJvY2Vzcy5lbnYuQVdTX1JFR0lPTiB8fCAidXMtZWFzdC0xIiB9KTsKY29uc3QgQlVDS0VUID0gcHJvY2Vzcy5lbnYuUzNfQlVDS0VUX05BTUU7Cgpjb25zdCBNSU1FX1RZUEVTID0gewogICIuaHRtbCI6ICJ0ZXh0L2h0bWwiLAogICIuY3NzIjogInRleHQvY3NzIiwKICAiLmpzIjogImFwcGxpY2F0aW9uL2phdmFzY3JpcHQiLAogICIuanNvbiI6ICJhcHBsaWNhdGlvbi9qc29uIiwKICAiLnBuZyI6ICJpbWFnZS9wbmciLAogICIuanBnIjogImltYWdlL2pwZWciLAogICIuanBlZyI6ICJpbWFnZS9qcGVnIiwKICAiLmdpZiI6ICJpbWFnZS9naWYiLAogICIuc3ZnIjogImltYWdlL3N2Zyt4bWwiLAogICIuaWNvIjogImltYWdlL3gtaWNvIiwKICAiLndvZmYiOiAiZm9udC93b2ZmIiwKICAiLndvZmYyIjogImZvbnQvd29mZjIiLAogICIudHRmIjogImZvbnQvdHRmIiwKICAiLndlYnAiOiAiaW1hZ2Uvd2VicCIsCn07Cgpjb25zdCBCSU5BUllfRVhUUyA9IFsiLnBuZyIsICIuanBnIiwgIi5qcGVnIiwgIi5naWYiLCAiLmljbyIsICIud29mZiIsICIud29mZjIiLCAiLnR0ZiIsICIud2VicCJdOwoKZnVuY3Rpb24gZ2V0TWltZShmaWxlUGF0aCkgewogIGNvbnN0IGV4dCA9IGZpbGVQYXRoLnN1YnN0cmluZyhmaWxlUGF0aC5sYXN0SW5kZXhPZigiLiIpKS50b0xvd2VyQ2FzZSgpOwogIHJldHVybiBNSU1FX1RZUEVTW2V4dF0gfHwgImFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbSI7Cn0KCmZ1bmN0aW9uIGlzQmluYXJ5KGZpbGVQYXRoKSB7CiAgY29uc3QgZXh0ID0gZmlsZVBhdGguc3Vic3RyaW5nKGZpbGVQYXRoLmxhc3RJbmRleE9mKCIuIikpLnRvTG93ZXJDYXNlKCk7CiAgcmV0dXJuIEJJTkFSWV9FWFRTLmluY2x1ZGVzKGV4dCk7Cn0KCmFzeW5jIGZ1bmN0aW9uIGdldFMzRmlsZShrZXkpIHsKICB0cnkgewogICAgY29uc3QgcmVzcCA9IGF3YWl0IHMzLnNlbmQobmV3IEdldE9iamVjdENvbW1hbmQoeyBCdWNrZXQ6IEJVQ0tFVCwgS2V5OiBrZXkgfSkpOwogICAgY29uc3QgY2h1bmtzID0gW107CiAgICBmb3IgYXdhaXQgKGNvbnN0IGNodW5rIG9mIHJlc3AuQm9keSkgewogICAgICBjaHVua3MucHVzaChjaHVuayk7CiAgICB9CiAgICBjb25zdCBidWZmZXIgPSBCdWZmZXIuY29uY2F0KGNodW5rcyk7CiAgICByZXR1cm4gewogICAgICBib2R5OiBpc0JpbmFyeShrZXkpID8gYnVmZmVyLnRvU3RyaW5nKCJiYXNlNjQiKSA6IGJ1ZmZlci50b1N0cmluZygidXRmLTgiKSwKICAgICAgaXNCYXNlNjQ6IGlzQmluYXJ5KGtleSksCiAgICAgIGNvbnRlbnRUeXBlOiByZXNwLkNvbnRlbnRUeXBlIHx8IGdldE1pbWUoa2V5KSwKICAgIH07CiAgfSBjYXRjaCAoZSkgewogICAgaWYgKGUubmFtZSA9PT0gIk5vU3VjaEtleSIpIHJldHVybiBudWxsOwogICAgY29uc29sZS5lcnJvcigiUzMgRXJyb3I6IiwgZS5uYW1lLCBlLm1lc3NhZ2UpOwogICAgdGhyb3cgZTsKICB9Cn0KCmV4cG9ydHMuaGFuZGxlciA9IGFzeW5jIChldmVudCkgPT4gewogIHRyeSB7CiAgICBjb25zb2xlLmxvZygiRXZlbnQ6IiwgSlNPTi5zdHJpbmdpZnkoZXZlbnQpKTsKICAgIGNvbnNvbGUubG9nKCJCVUNLRVQ6IiwgQlVDS0VUKTsKICAgIAogICAgaWYgKCFCVUNLRVQpIHsKICAgICAgcmV0dXJuIHsKICAgICAgICBzdGF0dXNDb2RlOiA1MDAsCiAgICAgICAgaGVhZGVyczogeyAiQ29udGVudC1UeXBlIjogImFwcGxpY2F0aW9uL2pzb24iIH0sCiAgICAgICAgYm9keTogSlNPTi5zdHJpbmdpZnkoeyBlcnJvcjogIlMzX0JVQ0tFVF9OQU1FIG5vdCBjb25maWd1cmVkIiB9KSwKICAgICAgfTsKICAgIH0KICAgIAogICAgbGV0IHJlcVBhdGggPSBldmVudC5wYXRoIHx8IGV2ZW50LnJhd1BhdGggfHwgIi8iOwogICAgY29uc29sZS5sb2coIk9yaWdpbmFsIHBhdGg6IiwgcmVxUGF0aCk7CiAgICAKICAgIC8vIFN0cmlwIC91aSBwcmVmaXggZm9yIFVJIHJvdXRlcwogICAgaWYgKHJlcVBhdGguc3RhcnRzV2l0aCgiL3VpIikpIHsKICAgICAgcmVxUGF0aCA9IHJlcVBhdGguc3Vic3RyaW5nKDMpIHx8ICIvIjsKICAgIH0KICAgIAogICAgLy8gRm9yIC9pbWFnZXMgYW5kIC9mb250cyByb3V0ZXMsIGtlZXAgdGhlIHBhdGggYXMtaXMKICAgIC8vIFRoZXkgYXJlIGFscmVhZHkgc3RvcmVkIGluIFMzIGF0IGltYWdlcy8gYW5kIGZvbnRzLwogICAgCiAgICBsZXQga2V5ID0gcmVxUGF0aC5zdGFydHNXaXRoKCIvIikgPyByZXFQYXRoLnN1YnN0cmluZygxKSA6IHJlcVBhdGg7CiAgICBpZiAoa2V5ID09PSAiIiB8fCBrZXkuZW5kc1dpdGgoIi8iKSkgewogICAgICBrZXkgPSBrZXkgKyAiaW5kZXguaHRtbCI7CiAgICB9CiAgICAKICAgIGNvbnNvbGUubG9nKCJGZXRjaGluZyBmcm9tIFMzOiIsIEJVQ0tFVCArICIvIiArIGtleSk7CiAgICAKICAgIGxldCByZXN1bHQgPSBhd2FpdCBnZXRTM0ZpbGUoa2V5KTsKICAgIAogICAgaWYgKCFyZXN1bHQgJiYgIWtleS5pbmNsdWRlcygiLiIpKSB7CiAgICAgIHJlc3VsdCA9IGF3YWl0IGdldFMzRmlsZShrZXkgKyAiLmh0bWwiKTsKICAgICAgaWYgKCFyZXN1bHQpIHsKICAgICAgICByZXN1bHQgPSBhd2FpdCBnZXRTM0ZpbGUoa2V5ICsgIi9pbmRleC5odG1sIik7CiAgICAgIH0KICAgIH0KICAgIAogICAgaWYgKCFyZXN1bHQpIHsKICAgICAgY29uc29sZS5sb2coIkZpbGUgbm90IGZvdW5kLCBmYWxsaW5nIGJhY2sgdG8gaW5kZXguaHRtbCIpOwogICAgICByZXN1bHQgPSBhd2FpdCBnZXRTM0ZpbGUoImluZGV4Lmh0bWwiKTsKICAgIH0KICAgIAogICAgaWYgKCFyZXN1bHQpIHsKICAgICAgcmV0dXJuIHsKICAgICAgICBzdGF0dXNDb2RlOiA0MDQsCiAgICAgICAgaGVhZGVyczogeyAiQ29udGVudC1UeXBlIjogInRleHQvaHRtbCIgfSwKICAgICAgICBib2R5OiAiPGgxPjQwNCAtIE5vdCBGb3VuZDwvaDE+PHA+QnVja2V0OiAiICsgQlVDS0VUICsgIjwvcD48cD5LZXk6ICIgKyBrZXkgKyAiPC9wPiIsCiAgICAgIH07CiAgICB9CiAgICAKICAgIC8vIEZpeCBhc3NldCBwYXRocyBpbiBIVE1MIC0gYWRkIC9wcm9kIHByZWZpeCBmb3IgQVBJIEdhdGV3YXkgc3RhZ2UKICAgIGlmIChrZXkuZW5kc1dpdGgoIi5odG1sIikgfHwga2V5LmVuZHNXaXRoKCJodG1sIikpIHsKICAgICAgcmVzdWx0LmJvZHkgPSByZXN1bHQuYm9keQogICAgICAgIC5yZXBsYWNlKC9ocmVmPSJcL2ltYWdlc1wvL2csICdocmVmPSIvcHJvZC9pbWFnZXMvJykKICAgICAgICAucmVwbGFjZSgvc3JjPSJcL2ltYWdlc1wvL2csICdzcmM9Ii9wcm9kL2ltYWdlcy8nKQogICAgICAgIC5yZXBsYWNlKC9ocmVmPSJcL2ZvbnRzXC8vZywgJ2hyZWY9Ii9wcm9kL2ZvbnRzLycpCiAgICAgICAgLnJlcGxhY2UoL3NyYz0iXC9mb250c1wvL2csICdzcmM9Ii9wcm9kL2ZvbnRzLycpCiAgICAgICAgLnJlcGxhY2UoL3VybFwoXC9pbWFnZXNcLy9nLCAndXJsKC9wcm9kL2ltYWdlcy8nKQogICAgICAgIC5yZXBsYWNlKC91cmxcKFwvZm9udHNcLy9nLCAndXJsKC9wcm9kL2ZvbnRzLycpOwogICAgICBjb25zb2xlLmxvZygiRml4ZWQgYXNzZXQgcGF0aHMgaW4gSFRNTCIpOwogICAgfQogICAgCiAgICByZXR1cm4gewogICAgICBzdGF0dXNDb2RlOiAyMDAsCiAgICAgIGhlYWRlcnM6IHsKICAgICAgICAiQ29udGVudC1UeXBlIjogcmVzdWx0LmNvbnRlbnRUeXBlLAogICAgICAgICJDYWNoZS1Db250cm9sIjoga2V5LmluY2x1ZGVzKCJfbmV4dC9zdGF0aWMiKSA/ICJwdWJsaWMsIG1heC1hZ2U9MzE1MzYwMDAiIDogIm5vLWNhY2hlIiwKICAgICAgICAiQWNjZXNzLUNvbnRyb2wtQWxsb3ctT3JpZ2luIjogIioiLAogICAgICB9LAogICAgICBib2R5OiByZXN1bHQuYm9keSwKICAgICAgaXNCYXNlNjRFbmNvZGVkOiByZXN1bHQuaXNCYXNlNjQsCiAgICB9OwogIH0gY2F0Y2ggKGVycm9yKSB7CiAgICBjb25zb2xlLmVycm9yKCJIYW5kbGVyIEVycm9yOiIsIGVycm9yKTsKICAgIHJldHVybiB7CiAgICAgIHN0YXR1c0NvZGU6IDUwMCwKICAgICAgaGVhZGVyczogeyAiQ29udGVudC1UeXBlIjogImFwcGxpY2F0aW9uL2pzb24iIH0sCiAgICAgIGJvZHk6IEpTT04uc3RyaW5naWZ5KHsKICAgICAgICBlcnJvcjogZXJyb3IubWVzc2FnZSwKICAgICAgICBuYW1lOiBlcnJvci5uYW1lLAogICAgICAgIGJ1Y2tldDogQlVDS0VULAogICAgICB9KSwKICAgIH07CiAgfQp9Owo="
+        run: |
+          echo "Updating app-frontend-web-server Lambda to serve from S3..."
+
+          LAMBDA_NAME="app-fe-${{ inputs.workspace }}-web-server"
+
+          # Check if Lambda exists
+          if ! aws lambda get-function --function-name "$LAMBDA_NAME" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
+            echo "ERROR: Lambda $LAMBDA_NAME not found. Run workflow 04 first."
+            exit 1
+          fi
+
+          # Create Lambda package directory
+          mkdir -p lambda-pkg
+          cd lambda-pkg
+
+          # Decode base64 Lambda code
+          echo "$LAMBDA_CODE_B64" | base64 -d > index.js
+
+          # Verify the file was created correctly
+          echo "=== Lambda index.js content (first 20 lines) ==="
+          head -20 index.js
+          echo "=== end ==="
+
+          # Create package.json
+          echo '{"name":"app-frontend-web-server","version":"1.0.0","main":"index.js","dependencies":{"@aws-sdk/client-s3":"^3.400.0"}}' > package.json
+
+          # Install dependencies and create zip
+          echo "Installing dependencies..."
+          npm install --production --silent
+
+          echo "Creating zip file..."
+          zip -r ../lambda.zip . -q
+
+          cd ..
+
+          echo "Zip file size:"
+          ls -la lambda.zip
+
+          # Update Lambda code
+          echo "Updating Lambda function..."
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_NAME" \
+            --zip-file fileb://lambda.zip \
+            --region "${{ inputs.aws_region }}"
+
+          # Wait for update
+          echo "Waiting for Lambda update to complete..."
+          aws lambda wait function-updated \
+            --function-name "$LAMBDA_NAME" \
+            --region "${{ inputs.aws_region }}"
+
+          echo "✓ Lambda $LAMBDA_NAME updated successfully"
+
+          # Cleanup
+          rm -rf lambda-pkg lambda.zip
+
+      - name: Update SSM with Deployment Metadata
+        run: |
+          # Store Sys App Frontend deployment metadata (separate from admin portal)
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/last-deployment-timestamp" \
+            --value "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/build-number" \
+            --value "${{ github.run_number }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/deployment-url" \
+            --value "${{ needs.get-config.outputs.web_server_url }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/s3-bucket" \
+            --value "${{ needs.get-config.outputs.s3_bucket }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/frontend/commit-sha" \
+            --value "${{ github.sha }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
+      - name: Display Deployment Summary
+        run: |
+          echo "=========================================="
+          echo "Sys App Frontend Deployment Complete"
+          echo "=========================================="
+          echo "Workspace: ${{ inputs.workspace }}"
+          echo "Build Number: ${{ github.run_number }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "Source: tripleh1701-dev/ppp-fe (main branch)"
+          echo ""
+          echo "Application URL: ${{ needs.get-config.outputs.web_server_url }}"
+          echo "S3 Bucket: ${{ needs.get-config.outputs.s3_bucket }}"
+          echo ""
+          echo "Configuration:"
+          echo "  - API URL: ${{ needs.get-config.outputs.api_url }}"
+          echo "  - Cognito Pool: ${{ needs.get-config.outputs.cognito_user_pool_id }}"
+          echo "  - Region: ${{ inputs.aws_region }}"
+          echo "=========================================="

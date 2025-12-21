@@ -4,24 +4,24 @@ exports.handler = async (event, context) => {
     console.log('Create Infrastructure Worker - Event:', JSON.stringify(event, null, 2));
     
     try {
-        const { tenantId, operation, payload } = event;
+        const { accountId, operation, payload } = event;
         
-        if (!tenantId || operation !== 'CREATE') {
-            throw new Error('Invalid input: tenantId and operation=CREATE required');
+        if (!accountId || operation !== 'CREATE') {
+            throw new Error('Invalid input: accountId and operation=CREATE required');
         }
         
         // TODO: Implement infrastructure creation logic
-        // 1. Validate tenant configuration
-        // 2. Assume role in target tenant account
+        // 1. Validate account configuration
+        // 2. Assume role in target account account
         // 3. Create CloudFormation stack
-        // 4. Update tenant registry with operation status
+        // 4. Update account registry with operation status
         
-        console.log(`Creating infrastructure for tenant: ${tenantId}`);
+        console.log(`Creating infrastructure for account: ${accountId}`);
         
         // Placeholder response
         return {
             statusCode: 200,
-            tenantId: tenantId,
+            accountId: accountId,
             operation: operation,
             status: 'IN_PROGRESS',
             message: 'Infrastructure creation initiated',

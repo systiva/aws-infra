@@ -9,11 +9,11 @@ module.exports = {
     AWS_REGION: process.env.AWS_REGION || 'us-east-1',
     
     // DynamoDB Tables
-    TENANT_REGISTRY_TABLE: process.env.TENANT_REGISTRY_TABLE || 'TenantRegistry',
+    ACCOUNT_REGISTRY_TABLE: process.env.ACCOUNT_REGISTRY_TABLE || 'AccountRegistry',
     
     // Cross-Account Role Configuration
-    CROSS_ACCOUNT_ROLE_NAME: process.env.CROSS_ACCOUNT_ROLE_NAME || 'dev-CrossAccountTenantRole',
-    CROSS_ACCOUNT_EXTERNAL_ID: process.env.CROSS_ACCOUNT_EXTERNAL_ID || 'tenant-provisioning',
+    CROSS_ACCOUNT_ROLE_NAME: process.env.CROSS_ACCOUNT_ROLE_NAME || 'dev-CrossAccountAccountRole',
+    CROSS_ACCOUNT_EXTERNAL_ID: process.env.CROSS_ACCOUNT_EXTERNAL_ID || 'account-provisioning',
     ASSUME_ROLE_DURATION: process.env.ASSUME_ROLE_DURATION || 3600, // 1 hour
     
     // Logging

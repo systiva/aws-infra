@@ -6,16 +6,16 @@ const logger = require('../../logger');
 
 /**
  * GET /api/v1/oms/inventory
- * Get all inventory items for the tenant
+ * Get all inventory items for the account
  */
 router.get('/', checkOMSAccess, async (req, res, next) => {
     try {
         logger.debug('Getting all inventory', { 
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const inventory = await InventoryManagement.getAllInventory(req.tenantContext);
+        const inventory = await InventoryManagement.getAllInventory(req.accountContext);
         
         res.json({
             success: true,
@@ -39,11 +39,11 @@ router.get('/:productId', checkOMSAccess, async (req, res, next) => {
         
         logger.debug('Getting inventory', { 
             productId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const inventory = await InventoryManagement.getInventory(req.tenantContext, productId);
+        const inventory = await InventoryManagement.getInventory(req.accountContext, productId);
         
         if (!inventory) {
             return res.status(404).json({
@@ -73,11 +73,11 @@ router.get('/:productId/transactions', checkOMSAccess, async (req, res, next) =>
         
         logger.debug('Getting stock transactions', { 
             productId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const transactions = await InventoryManagement.getStockTransactions(req.tenantContext, productId);
+        const transactions = await InventoryManagement.getStockTransactions(req.accountContext, productId);
         
         res.json({
             success: true,
@@ -118,7 +118,7 @@ router.post('/', checkWritePermission, async (req, res, next) => {
         logger.debug('Creating inventory', { 
             productId,
             quantity,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
@@ -133,7 +133,7 @@ router.post('/', checkWritePermission, async (req, res, next) => {
         };
         
         const inventory = await InventoryManagement.createInventory(
-            req.tenantContext,
+            req.accountContext,
             inventoryData,
             req.user.userId
         );
@@ -168,12 +168,12 @@ router.patch('/:productId/quantity', checkWritePermission, async (req, res, next
         logger.debug('Updating inventory quantity', { 
             productId,
             quantityChange,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
         const inventory = await InventoryManagement.updateInventoryQuantity(
-            req.tenantContext,
+            req.accountContext,
             productId,
             quantityChange,
             req.user.userId
@@ -209,12 +209,12 @@ router.patch('/:productId/reserve', checkWritePermission, async (req, res, next)
         logger.debug('Reserving inventory', { 
             productId,
             quantity,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
         const inventory = await InventoryManagement.reserveInventory(
-            req.tenantContext,
+            req.accountContext,
             productId,
             quantity,
             req.user.userId
@@ -250,12 +250,12 @@ router.patch('/:productId/release', checkWritePermission, async (req, res, next)
         logger.debug('Releasing inventory', { 
             productId,
             quantity,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
         const inventory = await InventoryManagement.releaseInventory(
-            req.tenantContext,
+            req.accountContext,
             productId,
             quantity,
             req.user.userId
@@ -283,7 +283,7 @@ router.put('/:productId/settings', checkWritePermission, async (req, res, next) 
         
         logger.debug('Updating inventory settings', { 
             productId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
@@ -294,7 +294,7 @@ router.put('/:productId/settings', checkWritePermission, async (req, res, next) 
         if (metadata !== undefined) settings.metadata = metadata;
         
         const inventory = await InventoryManagement.updateInventorySettings(
-            req.tenantContext,
+            req.accountContext,
             productId,
             settings,
             req.user.userId

@@ -3,15 +3,15 @@ const config = require('./config');
 const DynamoDBService = require('./src/dynamodb-service');
 
 /**
- * AWS Lambda handler for creating tenant DynamoDB table/entry based on subscription tier
+ * AWS Lambda handler for creating account DynamoDB table/entry based on subscription tier
  * This worker ONLY handles DynamoDB operations in admin account - no cross-account access needed
  * Expected input from Step Functions:
  * {
  *   "operation": "CREATE",
- *   "tenantId": "tenant-12345",
- *   "tenantName": "company-xyz",
+ *   "accountId": "account-12345",
+ *   "accountName": "company-xyz",
  *   "subscriptionTier": "public" | "private",
- *   "tenantAccountId": "949642303066",
+ *   "accountAccountId": "949642303066",
  *   "email": "user@company.com",
  *   "createdBy": "admin",
  *   "registeredOn": "2025-09-28T..."
@@ -34,18 +34,18 @@ exports.handler = async (event, context) => {
     // Extract and validate input - expecting flat structure from Step Functions
     const {
       operation,
-      tenantId,
-      tenantName,
+      accountId,
+      accountName,
       subscriptionTier,
-      tenantAccountId,
+      accountAccountId,
       email,
       createdBy,
       registeredOn
     } = event;
 
     // Validate required fields
-    if (!tenantId) {
-      throw new Error('Invalid input: tenantId is required');
+    if (!accountId) {
+      throw new Error('Invalid input: accountId is required');
     }
 
     if (!subscriptionTier) {
@@ -57,20 +57,20 @@ exports.handler = async (event, context) => {
     }
 
     logger.info({
-      tenantId,
-      tenantName,
+      accountId,
+      accountName,
       subscriptionTier,
       operation
-    }, 'Processing tenant DynamoDB creation request');
+    }, 'Processing account DynamoDB creation request');
 
     let result;
 
-    // Create tenant data object
-    const tenantData = {
-      tenantId,
-      tenantName,
+    // Create account data object
+    const accountData = {
+      accountId,
+      accountName,
       subscriptionTier,
-      tenantAccountId,
+      accountAccountId,
       email,
       createdBy,
       registeredOn
@@ -78,21 +78,21 @@ exports.handler = async (event, context) => {
 
     // Handle subscription tier logic - NO cross-account operations needed
     if (subscriptionTier === 'public') {
-      logger.info({ tenantId }, 'Creating entry in public shared table');
-      result = await dynamoDBService.createTenantEntryInPublicTable(tenantData);
+      logger.info({ accountId }, 'Creating entry in public shared table');
+      result = await dynamoDBService.createAccountEntryInPublicTable(accountData);
     } else {
-      logger.info({ tenantId }, 'Creating dedicated DynamoDB table entry for private tenant');
-      result = await dynamoDBService.createTenantDynamoDBTable(tenantData);
+      logger.info({ accountId }, 'Creating dedicated DynamoDB table entry for private account');
+      result = await dynamoDBService.createAccountDynamoDBTable(accountData);
     }
 
     const executionTime = Date.now() - startTime;
 
     logger.info({
-      tenantId,
+      accountId,
       subscriptionTier,
       result: result.success,
       executionTime
-    }, 'Tenant DynamoDB creation completed');
+    }, 'Account DynamoDB creation completed');
 
     // Return result for Step Functions
     return {
@@ -120,7 +120,7 @@ exports.handler = async (event, context) => {
       status: 'FAILED',
       result: {
         success: false,
-        operation: 'CREATE_DYNAMODB_TENANT',
+        operation: 'CREATE_DYNAMODB_ACCOUNT',
         error: error.message,
         executionTime
       }

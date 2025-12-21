@@ -91,7 +91,7 @@ resource "aws_cognito_user_pool" "admin_portal" {
   # Custom attributes schema
   schema {
     attribute_data_type = "String"
-    name                = "tenant_id"
+    name                = "account_id"
     developer_only_attribute = false
     mutable             = true
     required            = false
@@ -106,7 +106,7 @@ resource "aws_cognito_user_pool" "admin_portal" {
   # Schema changes are ignored via lifecycle rule to prevent deployment issues
   
   # The following custom attributes exist in the deployed user pool:
-  # - custom:tenant_id (for tenant mapping)
+  # - custom:account_id (for account mapping)
   # - custom:user_role (DEPRECATED - ignore in application logic)
   # - custom:permissions (DEPRECATED - ignore in application logic)
 
@@ -183,16 +183,16 @@ resource "aws_cognito_user_pool_client" "admin_portal_client" {
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
 
-  # Read/write attributes - including custom tenant_id
+  # Read/write attributes - including custom account_id
   read_attributes = [
     "email",
     "email_verified",
-    "custom:tenant_id"
+    "custom:account_id"
   ]
 
   write_attributes = [
     "email",
-    "custom:tenant_id"
+    "custom:account_id"
   ]
 
   depends_on = [aws_cognito_user_pool.admin_portal]

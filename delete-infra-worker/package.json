@@ -1,7 +1,7 @@
 {
   "name": "delete-infra-worker",
   "version": "1.0.0",
-  "description": "AWS Lambda worker for deleting tenant infrastructure",
+  "description": "AWS Lambda worker for deleting account infrastructure",
   "main": "index.js",
   "scripts": {
     "lint": "eslint src/",

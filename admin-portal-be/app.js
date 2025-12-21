@@ -2,7 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const httpLogger = require('./src/middlewares/http-logger');
-const tenantRoutes = require('./src/routes/tenant');
+const accountRoutes = require('./src/routes/account');
 const Constant = require('./constant');
 const app = express();
 
@@ -24,7 +24,7 @@ app.use(bodyParser.json());
 app.use(httpLogger);
 
 // set routes
-app.use('/api/v1/tenants', tenantRoutes);
+app.use('/api/v1/accounts', accountRoutes);
 
 // Error Handling
 // catch 404

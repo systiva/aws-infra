@@ -49,7 +49,7 @@ variable "platform_admin_email" {
 variable "platform_admin_username" {
   description = "Username for the platform admin user"
   type        = string
-  default     = "demo_platform_admin"
+  default     = "admin"
 }
 
 variable "platform_admin_first_name" {

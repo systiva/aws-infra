@@ -33,15 +33,15 @@ resource "aws_lambda_function" "admin_backend" {
     variables = {
       NODE_ENV                         = var.environment
       LOG_LEVEL                        = "info"
-      TENANT_REGISTRY_TABLE_NAME       = var.tenant_registry_table_name
+      ACCOUNT_REGISTRY_TABLE_NAME       = var.account_registry_table_name
       
       # Step Functions Configuration
-      CREATE_TENANT_STATE_MACHINE_ARN  = var.create_tenant_step_function_arn
-      DELETE_TENANT_STATE_MACHINE_ARN  = var.delete_tenant_step_function_arn
+      CREATE_ACCOUNT_STATE_MACHINE_ARN  = var.create_account_step_function_arn
+      DELETE_ACCOUNT_STATE_MACHINE_ARN  = var.delete_account_step_function_arn
       
       # Cross-account access configuration
       ADMIN_ACCOUNT_ID                 = var.admin_account_id
-      TENANT_ACCOUNT_ID                = var.tenant_account_id
+      ACCOUNT_ACCOUNT_ID                = var.account_account_id
       CROSS_ACCOUNT_ROLE_NAME          = var.cross_account_role_name
       WORKSPACE                        = var.workspace_prefix
     }
@@ -154,8 +154,8 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
           "dynamodb:*"  # Full DynamoDB access for all operations
         ]
         Resource = [
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.tenant_registry_table_name}",
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.tenant_registry_table_name}/index/*",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}/index/*",
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/platform-admin*",
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/platform-admin*/index/*"
         ]
@@ -189,7 +189,7 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
         Action = [
           "sts:AssumeRole"
         ]
-        Resource = "arn:aws:iam::${var.tenant_account_id}:role/${var.cross_account_role_name}"
+        Resource = "arn:aws:iam::${var.account_account_id}:role/${var.cross_account_role_name}"
       }],
       [{
         Effect = "Allow"

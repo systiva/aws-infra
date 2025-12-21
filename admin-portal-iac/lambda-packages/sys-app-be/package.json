@@ -1,0 +1,11 @@
+{
+  "name": "sys-app-be",
+  "version": "1.0.0",
+  "description": "Sys App Backend Lambda - Placeholder (actual code from https://github.com/tripleh1701-dev/ppp-be)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Platform Team",
+  "license": "MIT"
+}

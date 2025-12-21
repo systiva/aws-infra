@@ -4,24 +4,24 @@ exports.handler = async (event, context) => {
     console.log('Delete Infrastructure Worker - Event:', JSON.stringify(event, null, 2));
     
     try {
-        const { tenantId, operation, payload } = event;
+        const { accountId, operation, payload } = event;
         
-        if (!tenantId || operation !== 'DELETE') {
-            throw new Error('Invalid input: tenantId and operation=DELETE required');
+        if (!accountId || operation !== 'DELETE') {
+            throw new Error('Invalid input: accountId and operation=DELETE required');
         }
         
         // TODO: Implement infrastructure deletion logic
-        // 1. Validate tenant exists
-        // 2. Assume role in target tenant account
+        // 1. Validate account exists
+        // 2. Assume role in target account account
         // 3. Delete CloudFormation stack
-        // 4. Update tenant registry with operation status
+        // 4. Update account registry with operation status
         
-        console.log(`Deleting infrastructure for tenant: ${tenantId}`);
+        console.log(`Deleting infrastructure for account: ${accountId}`);
         
         // Placeholder response
         return {
             statusCode: 200,
-            tenantId: tenantId,
+            accountId: accountId,
             operation: operation,
             status: 'IN_PROGRESS',
             message: 'Infrastructure deletion initiated',

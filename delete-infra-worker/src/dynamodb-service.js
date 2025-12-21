@@ -33,38 +33,38 @@ class DynamoDBService {
   }
 
   /**
-   * Delete ALL tenant entries from public shared table (TENANT_PUBLIC)
-   * Used for public subscription tier tenants - deletes all rows where pk = TENANT#<tenant_id>
+   * Delete ALL account entries from public shared table (ACCOUNT_PUBLIC)
+   * Used for public subscription tier accounts - deletes all rows where pk = ACCOUNT#<account_id>
    */
-  async deleteTenantEntryFromPublicTable(tenantData) {
+  async deleteAccountEntryFromPublicTable(accountData) {
     if (this.mode !== 'cross-account') {
       throw new Error('This method requires cross-account mode');
     }
 
     logger.info({
-      tenantId: tenantData.tenantId,
+      accountId: accountData.accountId,
       subscriptionTier: 'public',
       targetAccount: this.targetAccountId
-    }, 'Deleting ALL tenant entries from public shared table');
+    }, 'Deleting ALL account entries from public shared table');
 
     try {
-      const tableName = config.DYNAMODB.TENANT_PUBLIC_TABLE;
-      const tenantPk = `TENANT#${tenantData.tenantId}`;
+      const tableName = config.DYNAMODB.ACCOUNT_PUBLIC_TABLE;
+      const accountPk = `ACCOUNT#${accountData.accountId}`;
       
-      // Step 1: Query all items for this tenant (handle pagination)
+      // Step 1: Query all items for this account (handle pagination)
       const queryParams = {
         TableName: tableName,
         KeyConditionExpression: 'PK = :pk',
         ExpressionAttributeValues: {
-          ':pk': tenantPk
+          ':pk': accountPk
         }
       };
 
       logger.info({
-        tenantId: tenantData.tenantId,
+        accountId: accountData.accountId,
         tableName,
-        queryKey: tenantPk
-      }, 'Querying all tenant entries from public table');
+        queryKey: accountPk
+      }, 'Querying all account entries from public table');
 
       let allItems = [];
       let lastEvaluatedKey = null;
@@ -78,7 +78,7 @@ class DynamoDBService {
 
         queryCount++;
         logger.debug({
-          tenantId: tenantData.tenantId,
+          accountId: accountData.accountId,
           queryCount,
           hasStartKey: !!lastEvaluatedKey
         }, 'Executing paginated query');
@@ -92,7 +92,7 @@ class DynamoDBService {
         lastEvaluatedKey = queryResult.LastEvaluatedKey;
         
         logger.debug({
-          tenantId: tenantData.tenantId,
+          accountId: accountData.accountId,
           itemsInThisQuery: queryResult.Items ? queryResult.Items.length : 0,
           totalItemsSoFar: allItems.length,
           hasMorePages: !!lastEvaluatedKey
@@ -101,7 +101,7 @@ class DynamoDBService {
       } while (lastEvaluatedKey);
 
       logger.info({
-        tenantId: tenantData.tenantId,
+        accountId: accountData.accountId,
         tableName,
         totalQueries: queryCount,
         totalItemsFound: allItems.length
@@ -109,14 +109,14 @@ class DynamoDBService {
 
       if (allItems.length === 0) {
         logger.warn({
-          tenantId: tenantData.tenantId,
+          accountId: accountData.accountId,
           tableName
-        }, 'No tenant entries found to delete (may have already been deleted)');
+        }, 'No account entries found to delete (may have already been deleted)');
         
         return {
           success: true,
-          operation: 'DELETE_TENANT_ENTRIES',
-          tenantId: tenantData.tenantId,
+          operation: 'DELETE_ACCOUNT_ENTRIES',
+          accountId: accountData.accountId,
           tableName: tableName,
           deletedCount: 0,
           message: 'No entries found (may have already been deleted)',
@@ -125,10 +125,10 @@ class DynamoDBService {
       }
 
       logger.info({
-        tenantId: tenantData.tenantId,
+        accountId: accountData.accountId,
         tableName,
         itemCount: allItems.length
-      }, `Found ${allItems.length} tenant entries to delete`);
+      }, `Found ${allItems.length} account entries to delete`);
 
       // Step 2: Delete all items using batch write
       const deleteRequests = allItems.map(item => ({
@@ -154,7 +154,7 @@ class DynamoDBService {
         };
 
         logger.debug({
-          tenantId: tenantData.tenantId,
+          accountId: accountData.accountId,
           batchNumber: Math.floor(i / batchSize) + 1,
           itemsInBatch: batch.length,
           totalBatches: Math.ceil(deleteRequests.length / batchSize)
@@ -173,7 +173,7 @@ class DynamoDBService {
             retryCount++;
             
             logger.warn({
-              tenantId: tenantData.tenantId,
+              accountId: accountData.accountId,
               retryCount,
               unprocessedCount: batchResult.UnprocessedItems[tableName] ? batchResult.UnprocessedItems[tableName].length : 0
             }, 'Retrying unprocessed items in batch delete');
@@ -187,7 +187,7 @@ class DynamoDBService {
 
         if (unprocessedItems) {
           logger.error({
-            tenantId: tenantData.tenantId,
+            accountId: accountData.accountId,
             unprocessedItems
           }, 'Failed to delete some items after maximum retries');
         }
@@ -196,17 +196,17 @@ class DynamoDBService {
       }
 
       logger.info({
-        tenantId: tenantData.tenantId,
+        accountId: accountData.accountId,
         tableName,
         deletedCount,
         totalBatches: Math.ceil(deleteRequests.length / batchSize),
         originalItems: allItems.length
-      }, 'Successfully deleted all tenant entries from public table');
+      }, 'Successfully deleted all account entries from public table');
 
       return {
         success: true,
-        operation: 'DELETE_TENANT_ENTRIES',
-        tenantId: tenantData.tenantId,
+        operation: 'DELETE_ACCOUNT_ENTRIES',
+        accountId: accountData.accountId,
         tableName: tableName,
         deletedCount: deletedCount,
         deletedItems: allItems,
@@ -217,33 +217,33 @@ class DynamoDBService {
     } catch (error) {
       logger.error({
         error: error.message,
-        tenantId: tenantData.tenantId,
+        accountId: accountData.accountId,
         targetAccount: this.targetAccountId
-      }, 'Failed to delete tenant entries from public table');
+      }, 'Failed to delete account entries from public table');
 
       return {
         success: false,
-        operation: 'DELETE_TENANT_ENTRIES',
+        operation: 'DELETE_ACCOUNT_ENTRIES',
         error: error.message
       };
     }
   }
 
   /**
-   * Delete tenant's dedicated DynamoDB table via CloudFormation stack deletion
-   * Used for private subscription tier tenants
+   * Delete account's dedicated DynamoDB table via CloudFormation stack deletion
+   * Used for private subscription tier accounts
    */
-  async deleteTenantDynamoDBTable(tenantData) {
+  async deleteAccountDynamoDBTable(accountData) {
     if (this.mode !== 'cross-account') {
       throw new Error('This method requires cross-account mode');
     }
 
     logger.info({
-      tenantId: tenantData.tenantId,
+      accountId: accountData.accountId,
       subscriptionTier: 'private',
       targetAccount: this.targetAccountId,
-      stackId: tenantData.stackId
-    }, 'Initiating CloudFormation stack deletion for private tenant table');
+      stackId: accountData.stackId
+    }, 'Initiating CloudFormation stack deletion for private account table');
 
     try {
       // Configure CloudFormation with the cross-account credentials
@@ -255,14 +255,14 @@ class DynamoDBService {
       });
 
       // stackId should be provided from Step Functions input (from infrastructure object)
-      const stackId = tenantData.stackId;
+      const stackId = accountData.stackId;
       
       if (!stackId) {
         throw new Error('Invalid input: stackId is required for CloudFormation stack deletion');
       }
 
       logger.info({
-        tenantId: tenantData.tenantId,
+        accountId: accountData.accountId,
         stackId
       }, 'Using stackId from Step Functions input for stack deletion');
       
@@ -275,13 +275,13 @@ class DynamoDBService {
         if (!describeResult.Stacks || describeResult.Stacks.length === 0) {
           logger.warn({
             stackId,
-            tenantId: tenantData.tenantId
+            accountId: accountData.accountId
           }, 'CloudFormation stack not found (may have already been deleted)');
           
           return {
             success: true,
             operation: 'DELETE_DYNAMODB_TABLE',
-            tenantId: tenantData.tenantId,
+            accountId: accountData.accountId,
             stackId: stackId,
             message: 'Stack not found (may have already been deleted)',
             deletedAt: moment().toISOString()
@@ -291,13 +291,13 @@ class DynamoDBService {
         if (describeError.code === 'ValidationError' && describeError.message.includes('does not exist')) {
           logger.warn({
             stackId,
-            tenantId: tenantData.tenantId
+            accountId: accountData.accountId
           }, 'CloudFormation stack does not exist (may have already been deleted)');
           
           return {
             success: true,
             operation: 'DELETE_DYNAMODB_TABLE',
-            tenantId: tenantData.tenantId,
+            accountId: accountData.accountId,
             stackId: stackId,
             message: 'Stack does not exist (may have already been deleted)',
             deletedAt: moment().toISOString()
@@ -309,7 +309,7 @@ class DynamoDBService {
       // Delete CloudFormation stack using stackId
       logger.info({
         stackId,
-        tenantId: tenantData.tenantId
+        accountId: accountData.accountId
       }, 'Initiating CloudFormation stack deletion');
 
       const deleteStackResult = await cloudFormation.deleteStack({
@@ -318,15 +318,15 @@ class DynamoDBService {
 
       logger.info({
         stackId,
-        tenantId: tenantData.tenantId
+        accountId: accountData.accountId
       }, 'CloudFormation stack deletion initiated successfully');
 
-      const tableName = `TENANT_${tenantData.tenantId}`;
+      const tableName = `ACCOUNT_${accountData.accountId}`;
 
       return {
         success: true,
         operation: 'DELETE_DYNAMODB_TABLE',
-        tenantId: tenantData.tenantId,
+        accountId: accountData.accountId,
         tableName: tableName,
         stackId: stackId,
         status: 'DELETE_IN_PROGRESS',
@@ -336,9 +336,9 @@ class DynamoDBService {
     } catch (error) {
       logger.error({
         error: error.message,
-        tenantId: tenantData.tenantId,
+        accountId: accountData.accountId,
         targetAccount: this.targetAccountId
-      }, 'Failed to initiate CloudFormation stack deletion for private tenant');
+      }, 'Failed to initiate CloudFormation stack deletion for private account');
 
       return {
         success: false,
@@ -349,24 +349,24 @@ class DynamoDBService {
   }
 
   /**
-   * Update tenant infrastructure status in admin account registry
+   * Update account infrastructure status in admin account registry
    * Called from admin account context
    */
-  async updateTenantInfrastructure(tenantId, updateData) {
+  async updateAccountInfrastructure(accountId, updateData) {
     if (this.mode !== 'admin-account') {
       throw new Error('This method requires admin-account mode');
     }
 
     logger.info({
-      tenantId,
+      accountId,
       updateData
-    }, 'Updating tenant infrastructure status in admin account registry');
+    }, 'Updating account infrastructure status in admin account registry');
 
     try {
       const params = {
-        TableName: config.DYNAMODB.TENANT_REGISTRY_TABLE,
+        TableName: config.DYNAMODB.ACCOUNT_REGISTRY_TABLE,
         Key: {
-          PK: `TENANT#${tenantId}`,
+          PK: `ACCOUNT#${accountId}`,
           SK: 'METADATA'
         },
         UpdateExpression: 'SET lastModified = :lastModified',
@@ -394,9 +394,9 @@ class DynamoDBService {
       }
 
       // Add optional fields if provided
-      if (updateData.stackName && updateData.stackName !== 'TENANT_PUBLIC') {
-        params.UpdateExpression += ', tenantTableName = :tenantTableName';
-        params.ExpressionAttributeValues[':tenantTableName'] = updateData.stackName;
+      if (updateData.stackName && updateData.stackName !== 'ACCOUNT_PUBLIC') {
+        params.UpdateExpression += ', accountTableName = :accountTableName';
+        params.ExpressionAttributeValues[':accountTableName'] = updateData.stackName;
       }
 
       if (updateData.stackId) {
@@ -412,18 +412,18 @@ class DynamoDBService {
       const result = await this.docClient.update(params).promise();
       
       logger.info({
-        tenantId,
+        accountId,
         updatedAttributes: result.Attributes
-      }, 'Successfully updated tenant infrastructure status in admin account');
+      }, 'Successfully updated account infrastructure status in admin account');
 
       return result.Attributes;
 
     } catch (error) {
       logger.error({
         error: error.message,
-        tenantId,
+        accountId,
         updateData
-      }, 'Failed to update tenant infrastructure status in admin account');
+      }, 'Failed to update account infrastructure status in admin account');
       
       throw error;
     }
@@ -432,17 +432,17 @@ class DynamoDBService {
   /**
    * Record deletion attempt for tracking
    */
-  async recordDeletionAttempt(tenantId, attempts) {
+  async recordDeletionAttempt(accountId, attempts) {
     logger.info({
-      tenantId,
+      accountId,
       attempts
     }, 'Recording deletion attempt');
 
     try {
       const params = {
-        TableName: config.DYNAMODB.TENANT_REGISTRY_TABLE,
+        TableName: config.DYNAMODB.ACCOUNT_REGISTRY_TABLE,
         Key: {
-          PK: `TENANT#${tenantId}`,
+          PK: `ACCOUNT#${accountId}`,
           SK: 'METADATA'
         },
         UpdateExpression: 'SET deletionAttempts = :attempts, lastDeletionAttempt = :timestamp',
@@ -456,33 +456,33 @@ class DynamoDBService {
       await this.docClient.update(params).promise();
       
       logger.debug({
-        tenantId,
+        accountId,
         attempts
       }, 'Successfully recorded deletion attempt');
 
     } catch (error) {
       logger.warn({
         error: error.message,
-        tenantId,
+        accountId,
         attempts
       }, 'Failed to record deletion attempt (non-critical)');
     }
   }
 
   /**
-   * Update tenant infrastructure status with deletion details
+   * Update account infrastructure status with deletion details
    */
-  async updateTenantInfrastructureStatus(tenantId, statusUpdate) {
+  async updateAccountInfrastructureStatus(accountId, statusUpdate) {
     logger.info({
-      tenantId,
+      accountId,
       statusUpdate
-    }, 'Updating tenant infrastructure deletion status');
+    }, 'Updating account infrastructure deletion status');
 
     try {
       const params = {
-        TableName: config.DYNAMODB.TENANT_REGISTRY_TABLE,
+        TableName: config.DYNAMODB.ACCOUNT_REGISTRY_TABLE,
         Key: {
-          PK: `TENANT#${tenantId}`,
+          PK: `ACCOUNT#${accountId}`,
           SK: 'METADATA'
         },
         UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
@@ -515,18 +515,18 @@ class DynamoDBService {
       const result = await this.docClient.update(params).promise();
       
       logger.info({
-        tenantId,
+        accountId,
         updatedAttributes: result.Attributes
-      }, 'Successfully updated tenant infrastructure deletion status');
+      }, 'Successfully updated account infrastructure deletion status');
 
       return result.Attributes;
 
     } catch (error) {
       logger.error({
         error: error.message,
-        tenantId,
+        accountId,
         statusUpdate
-      }, 'Failed to update tenant infrastructure deletion status');
+      }, 'Failed to update account infrastructure deletion status');
       
       throw error;
     }

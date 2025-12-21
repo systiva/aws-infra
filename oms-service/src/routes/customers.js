@@ -6,16 +6,16 @@ const logger = require('../../logger');
 
 /**
  * GET /api/v1/oms/customers
- * Get all customers for the tenant
+ * Get all customers for the account
  */
 router.get('/', checkOMSAccess, async (req, res, next) => {
     try {
         logger.debug('Getting all customers', { 
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const customers = await CustomerManagement.getAllCustomers(req.tenantContext);
+        const customers = await CustomerManagement.getAllCustomers(req.accountContext);
         
         res.json({
             success: true,
@@ -39,11 +39,11 @@ router.get('/:customerId', checkOMSAccess, async (req, res, next) => {
         
         logger.debug('Getting customer', { 
             customerId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const customer = await CustomerManagement.getCustomer(req.tenantContext, customerId);
+        const customer = await CustomerManagement.getCustomer(req.accountContext, customerId);
         
         if (!customer) {
             return res.status(404).json({
@@ -82,7 +82,7 @@ router.post('/', checkWritePermission, async (req, res, next) => {
         logger.debug('Creating customer', { 
             name,
             email,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
@@ -96,7 +96,7 @@ router.post('/', checkWritePermission, async (req, res, next) => {
         };
         
         const customer = await CustomerManagement.createCustomer(
-            req.tenantContext,
+            req.accountContext,
             customerData,
             req.user.userId
         );
@@ -123,7 +123,7 @@ router.put('/:customerId', checkWritePermission, async (req, res, next) => {
         
         logger.debug('Updating customer', { 
             customerId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
@@ -136,7 +136,7 @@ router.put('/:customerId', checkWritePermission, async (req, res, next) => {
         if (metadata !== undefined) updateData.metadata = metadata;
         
         const customer = await CustomerManagement.updateCustomer(
-            req.tenantContext,
+            req.accountContext,
             customerId,
             updateData,
             req.user.userId
@@ -163,11 +163,11 @@ router.delete('/:customerId', checkWritePermission, async (req, res, next) => {
         
         logger.debug('Deleting customer', { 
             customerId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        await CustomerManagement.deleteCustomer(req.tenantContext, customerId);
+        await CustomerManagement.deleteCustomer(req.accountContext, customerId);
         
         res.json({
             success: true,

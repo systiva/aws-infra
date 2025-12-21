@@ -156,7 +156,7 @@ resource "aws_lambda_function" "setup_rbac_worker" {
     Name      = local.function_name
     Type      = "Lambda"
     Purpose   = "SetupDefaultRBAC"
-    Component = "TenantProvisioning"
+    Component = "AccountProvisioning"
   })
 }
 

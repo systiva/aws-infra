@@ -69,14 +69,14 @@ router.post('/login', async (req, res) => {
       username,
       userSub: user.sub,
       userEmail: user.email,
-      tenantId: user.customAttributes.tenantId,
+      accountId: user.customAttributes.accountId,
       cognitoRole: user.customAttributes.userRole, // DEPRECATED: Ignored in favor of DynamoDB RBAC
       note: 'RBAC data will be fetched from DynamoDB, not Cognito'
     });
 
     // Create user context with RBAC from DynamoDB (ignore Cognito RBAC)
     const userContext = await rbacService.createUserContext(
-      user.customAttributes.tenantId,
+      user.customAttributes.accountId,
       user.sub, // use the actual Cognito sub as user ID
       user.email,
       user.username
@@ -98,7 +98,7 @@ router.post('/login', async (req, res) => {
         userId: user.username, // Override with Cognito username for consistency
         username: user.username,
         email: user.email,
-        tenantId: user.customAttributes.tenantId
+        accountId: user.customAttributes.accountId
       },
       authResult.tokens // Original Cognito tokens for reference
     );
@@ -118,7 +118,7 @@ router.post('/login', async (req, res) => {
         username: user.username,
         email: user.email,
         userRoles: userContext.userRoles, // Use RBAC-derived roles
-        tenantId: user.customAttributes.tenantId,
+        accountId: user.customAttributes.accountId,
         permissions: userContext.permissions,
         groups: userContext.groups || []
       }
@@ -182,15 +182,15 @@ router.post('/complete-new-password-challenge', async (req, res) => {
     // Update user status in RBAC system
     try {
       const userDetails = await cognitoService.getUser(username);
-      const tenantId = userDetails.customAttributes.tenantId;
+      const accountId = userDetails.customAttributes.accountId;
       
-      if (tenantId) {
+      if (accountId) {
         // Find user by email in RBAC system and update password status
-        const rbacUsers = await rbacService.getAllUsersInTenant(tenantId);
+        const rbacUsers = await rbacService.getAllUsersInAccount(accountId);
         const rbacUser = rbacUsers.find(user => user.email === username);
         
         if (rbacUser) {
-          await rbacService.updateUser(tenantId, rbacUser.user_id, {
+          await rbacService.updateUser(accountId, rbacUser.user_id, {
             password_status: 'PERMANENT',
             first_login_completed: true,
             updated_by: username
@@ -216,7 +216,7 @@ router.post('/complete-new-password-challenge', async (req, res) => {
 
     // Create user context with RBAC from DynamoDB
     const userContext = await rbacService.createUserContext(
-      user.customAttributes.tenantId,
+      user.customAttributes.accountId,
       user.sub,
       user.email,
       user.username
@@ -229,7 +229,7 @@ router.post('/complete-new-password-challenge', async (req, res) => {
         userId: user.username,
         username: user.username,
         email: user.email,
-        tenantId: user.customAttributes.tenantId
+        accountId: user.customAttributes.accountId
       },
       challengeResult.tokens
     );
@@ -244,7 +244,7 @@ router.post('/complete-new-password-challenge', async (req, res) => {
         username: user.username,
         email: user.email,
         userRoles: userContext.userRoles,
-        tenantId: user.customAttributes.tenantId,
+        accountId: user.customAttributes.accountId,
         permissions: userContext.permissions,
         groups: userContext.groups || [],
         firstLoginCompleted: true
@@ -274,13 +274,13 @@ router.post('/complete-new-password-challenge', async (req, res) => {
  */
 router.post('/signup', async (req, res) => {
   try {
-    const { username, email, password, firstName, lastName, tenantId, userRole = 'viewer' } = req.body;
+    const { username, email, password, firstName, lastName, accountId, userRole = 'viewer' } = req.body;
 
-    // Validate required fields including tenantId
-    if (!username || !email || !password || !firstName || !lastName || !tenantId) {
+    // Validate required fields including accountId
+    if (!username || !email || !password || !firstName || !lastName || !accountId) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Username, email, password, first name, last name, and tenant ID are required'
+        message: 'Username, email, password, first name, last name, and account ID are required'
       });
     }
 
@@ -309,15 +309,15 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    // Validate tenantId format (basic validation)
-    if (tenantId.trim().length === 0) {
+    // Validate accountId format (basic validation)
+    if (accountId.trim().length === 0) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Tenant ID cannot be empty'
+        message: 'Account ID cannot be empty'
       });
     }
 
-    logger.info('User signup attempt', { username, email, tenantId, userRole });
+    logger.info('User signup attempt', { username, email, accountId, userRole });
 
     // Check if user already exists
     try {
@@ -347,7 +347,7 @@ router.post('/signup', async (req, res) => {
 
     const user = await cognitoService.createUser(userData);
 
-    logger.info('User signup successful', { username, email, tenantId });
+    logger.info('User signup successful', { username, email, accountId });
 
     res.status(201).json({
       success: true,
@@ -357,7 +357,7 @@ router.post('/signup', async (req, res) => {
         email,
         firstName,
         lastName,
-        tenantId,
+        accountId,
         userRole,
         userStatus: 'UNCONFIRMED' // New signups are unconfirmed until email verification
       }
@@ -456,7 +456,7 @@ router.post('/challenge', async (req, res) => {
 
     // Create user context with RBAC
     const userContext = await rbacService.createUserContext(
-      user.customAttributes.tenantId,
+      user.customAttributes.accountId,
       user.sub || user.username, // use sub if available
       user.email,
       user.username
@@ -469,7 +469,7 @@ router.post('/challenge', async (req, res) => {
         userId: user.username, // Override with Cognito username for consistency
         username: user.username,
         email: user.email,
-        tenantId: user.customAttributes.tenantId
+        accountId: user.customAttributes.accountId
       },
       challengeResult.tokens // Original Cognito tokens for reference
     );
@@ -489,7 +489,7 @@ router.post('/challenge', async (req, res) => {
         username: user.username,
         email: user.email,
         userRoles: userContext.userRoles,
-        tenantId: user.customAttributes.tenantId,
+        accountId: user.customAttributes.accountId,
         permissions: userContext.permissions,
         groups: userContext.groups || []
       }
@@ -565,7 +565,7 @@ router.post('/refresh', async (req, res) => {
     
     // Get updated user context from RBAC system to include any permission changes
     const updatedUserContext = await rbacService.createUserContext(
-      userContext.tenantId,
+      userContext.accountId,
       userContext.sub || userContext.username, // use sub if available
       userContext.email,
       userContext.username
@@ -583,7 +583,7 @@ router.post('/refresh', async (req, res) => {
 
     logger.info('Token refreshed successfully', {
       userId: userContext.username,
-      tenantId: userContext.tenantId,
+      accountId: userContext.accountId,
       permissionsCount: finalUserContext.permissions?.length || 0
     });
 
@@ -713,7 +713,7 @@ router.post('/validate', async (req, res) => {
 
     logger.info('Token validated successfully', {
       userId: userContext.username,
-      tenantId: userContext.tenantId
+      accountId: userContext.accountId
     });
 
     res.json({
@@ -723,7 +723,7 @@ router.post('/validate', async (req, res) => {
         username: userContext.username,
         email: userContext.email,
         userRole: userContext.userRole,
-        tenantId: userContext.tenantId,
+        accountId: userContext.accountId,
         permissions: userContext.permissions,
         groups: userContext.groups
       }
@@ -768,7 +768,7 @@ router.get('/me', async (req, res) => {
 
     // Get fresh user context from RBAC system for most up-to-date permissions
     const freshUserContext = await rbacService.createUserContext(
-      userContext.tenantId,
+      userContext.accountId,
       userContext.sub || userContext.username, // use sub if available
       userContext.email,
       userContext.username
@@ -776,7 +776,7 @@ router.get('/me', async (req, res) => {
 
     logger.info('User info retrieved', {
       userId: userContext.username,
-      tenantId: userContext.tenantId
+      accountId: userContext.accountId
     });
 
     res.json({
@@ -785,7 +785,7 @@ router.get('/me', async (req, res) => {
         username: userContext.username,
         email: userContext.email,
         userRole: userContext.userRole,
-        tenantId: userContext.tenantId,
+        accountId: userContext.accountId,
         permissions: freshUserContext.permissions,
         groups: freshUserContext.groups || []
       }

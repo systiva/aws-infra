@@ -1,4 +1,4 @@
-const { createTenantDynamooseInstance } = require('../db');
+const { createAccountDynamooseInstance } = require('../db');
 const { wrapDynamoDBOperation } = require('../dynamodb-error');
 const logger = require('../../../logger');
 const { v4: uuidv4 } = require('uuid');
@@ -12,12 +12,12 @@ class ProductManagement {
     /**
      * Create a new product
      */
-    static async createProduct(tenantContext, productData, userId) {
+    static async createProduct(accountContext, productData, userId) {
         return wrapDynamoDBOperation(async () => {
             const productId = productData.productId || uuidv4();
             const now = new Date().toISOString();
             
-            const productPK = `TENANT#${tenantContext.tenantId}`;
+            const productPK = `ACCOUNT#${accountContext.accountId}`;
             const productSK = `PRODUCT#${productId}`;
             
             const productItem = {
@@ -39,11 +39,11 @@ class ProductManagement {
                 createdBy: userId
             };
             
-            logger.debug('Creating product', { productId, tenantId: tenantContext.tenantId });
+            logger.debug('Creating product', { productId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             await dbClient.docClient.put({
@@ -53,22 +53,22 @@ class ProductManagement {
             
             return this.cleanProductResponse(productItem);
             
-        }, 'createProduct', { tenantId: tenantContext.tenantId });
+        }, 'createProduct', { accountId: accountContext.accountId });
     }
     
     /**
      * Get product by ID
      */
-    static async getProduct(tenantContext, productId) {
+    static async getProduct(accountContext, productId) {
         return wrapDynamoDBOperation(async () => {
-            const productPK = `TENANT#${tenantContext.tenantId}`;
+            const productPK = `ACCOUNT#${accountContext.accountId}`;
             const productSK = `PRODUCT#${productId}`;
             
-            logger.debug('Getting product', { productId, tenantId: tenantContext.tenantId });
+            logger.debug('Getting product', { productId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.get({
@@ -85,21 +85,21 @@ class ProductManagement {
             
             return this.cleanProductResponse(result.Item);
             
-        }, 'getProduct', { tenantId: tenantContext.tenantId, productId });
+        }, 'getProduct', { accountId: accountContext.accountId, productId });
     }
     
     /**
-     * Get all products in tenant
+     * Get all products in account
      */
-    static async getAllProducts(tenantContext) {
+    static async getAllProducts(accountContext) {
         return wrapDynamoDBOperation(async () => {
-            const productPK = `TENANT#${tenantContext.tenantId}`;
+            const productPK = `ACCOUNT#${accountContext.accountId}`;
             
-            logger.debug('Getting all products', { tenantId: tenantContext.tenantId });
+            logger.debug('Getting all products', { accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const result = await dbClient.docClient.query({
@@ -113,23 +113,23 @@ class ProductManagement {
             
             return result.Items.map(product => this.cleanProductResponse(product));
             
-        }, 'getAllProducts', { tenantId: tenantContext.tenantId });
+        }, 'getAllProducts', { accountId: accountContext.accountId });
     }
     
     /**
      * Update product
      */
-    static async updateProduct(tenantContext, productId, updateData, userId) {
+    static async updateProduct(accountContext, productId, updateData, userId) {
         return wrapDynamoDBOperation(async () => {
-            const productPK = `TENANT#${tenantContext.tenantId}`;
+            const productPK = `ACCOUNT#${accountContext.accountId}`;
             const productSK = `PRODUCT#${productId}`;
             const now = new Date().toISOString();
             
-            logger.debug('Updating product', { productId, tenantId: tenantContext.tenantId });
+            logger.debug('Updating product', { productId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             const updateItem = {
@@ -162,22 +162,22 @@ class ProductManagement {
             
             return this.cleanProductResponse(result.Attributes);
             
-        }, 'updateProduct', { tenantId: tenantContext.tenantId, productId });
+        }, 'updateProduct', { accountId: accountContext.accountId, productId });
     }
     
     /**
      * Delete product
      */
-    static async deleteProduct(tenantContext, productId) {
+    static async deleteProduct(accountContext, productId) {
         return wrapDynamoDBOperation(async () => {
-            const productPK = `TENANT#${tenantContext.tenantId}`;
+            const productPK = `ACCOUNT#${accountContext.accountId}`;
             const productSK = `PRODUCT#${productId}`;
             
-            logger.debug('Deleting product', { productId, tenantId: tenantContext.tenantId });
+            logger.debug('Deleting product', { productId, accountId: accountContext.accountId });
             
-            const dbClient = createTenantDynamooseInstance(
-                tenantContext.credentials,
-                tenantContext.orderTableName
+            const dbClient = createAccountDynamooseInstance(
+                accountContext.credentials,
+                accountContext.orderTableName
             );
             
             await dbClient.docClient.delete({
@@ -187,7 +187,7 @@ class ProductManagement {
             
             return { success: true, productId };
             
-        }, 'deleteProduct', { tenantId: tenantContext.tenantId, productId });
+        }, 'deleteProduct', { accountId: accountContext.accountId, productId });
     }
     
     /**

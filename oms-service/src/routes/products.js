@@ -6,16 +6,16 @@ const logger = require('../../logger');
 
 /**
  * GET /api/v1/oms/products
- * Get all products for the tenant
+ * Get all products for the account
  */
 router.get('/', checkOMSAccess, async (req, res, next) => {
     try {
         logger.debug('Getting all products', { 
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const products = await ProductManagement.getAllProducts(req.tenantContext);
+        const products = await ProductManagement.getAllProducts(req.accountContext);
         
         res.json({
             success: true,
@@ -39,11 +39,11 @@ router.get('/:productId', checkOMSAccess, async (req, res, next) => {
         
         logger.debug('Getting product', { 
             productId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        const product = await ProductManagement.getProduct(req.tenantContext, productId);
+        const product = await ProductManagement.getProduct(req.accountContext, productId);
         
         if (!product) {
             return res.status(404).json({
@@ -82,7 +82,7 @@ router.post('/', checkWritePermission, async (req, res, next) => {
         logger.debug('Creating product', { 
             name,
             sku,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
@@ -99,7 +99,7 @@ router.post('/', checkWritePermission, async (req, res, next) => {
         };
         
         const product = await ProductManagement.createProduct(
-            req.tenantContext,
+            req.accountContext,
             productData,
             req.user.userId
         );
@@ -126,7 +126,7 @@ router.put('/:productId', checkWritePermission, async (req, res, next) => {
         
         logger.debug('Updating product', { 
             productId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
@@ -142,7 +142,7 @@ router.put('/:productId', checkWritePermission, async (req, res, next) => {
         if (metadata !== undefined) updateData.metadata = metadata;
         
         const product = await ProductManagement.updateProduct(
-            req.tenantContext,
+            req.accountContext,
             productId,
             updateData,
             req.user.userId
@@ -169,11 +169,11 @@ router.delete('/:productId', checkWritePermission, async (req, res, next) => {
         
         logger.debug('Deleting product', { 
             productId,
-            tenantId: req.tenantId,
+            accountId: req.accountId,
             userId: req.user.userId 
         });
         
-        await ProductManagement.deleteProduct(req.tenantContext, productId);
+        await ProductManagement.deleteProduct(req.accountContext, productId);
         
         res.json({
             success: true,

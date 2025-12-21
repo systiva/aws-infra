@@ -9,18 +9,18 @@ class PermissionManagement {
     /**
      * Create a new permission
      */
-    static async createPermission(tenantId, permissionData) {
+    static async createPermission(accountId, permissionData) {
         try {
 
             
-            const permissionPK = `TENANT#${tenantId}`;
+            const permissionPK = `ACCOUNT#${accountId}`;
             const permissionSK = `PERMISSION#${permissionData.permissionId}`;
             
             const permissionItem = {
                 PK: permissionPK,
                 SK: permissionSK,
                 entityType: 'PERMISSION',
-                tenantId,
+                accountId,
                 permissionId: permissionData.permissionId,
                 name: permissionData.name,
                 description: permissionData.description,
@@ -32,7 +32,7 @@ class PermissionManagement {
                 ...permissionData
             };
 
-            logger.info(`Creating permission: ${permissionData.permissionId} in tenant: ${tenantId}`);
+            logger.info(`Creating permission: ${permissionData.permissionId} in account: ${accountId}`);
             return await RBACModel.create(permissionItem);
         } catch (error) {
             logger.error('Error creating permission:', error);
@@ -43,14 +43,14 @@ class PermissionManagement {
     /**
      * Get permission by ID
      */
-    static async getPermission(tenantId, permissionId) {
+    static async getPermission(accountId, permissionId) {
         try {
 
             
-            const permissionPK = `TENANT#${tenantId}`;
+            const permissionPK = `ACCOUNT#${accountId}`;
             const permissionSK = `PERMISSION#${permissionId}`;
             
-            logger.info(`Getting permission: ${permissionId} from tenant: ${tenantId}`);
+            logger.info(`Getting permission: ${permissionId} from account: ${accountId}`);
             const result = await RBACModel.get({
                 PK: permissionPK,
                 SK: permissionSK
@@ -69,11 +69,11 @@ class PermissionManagement {
     /**
      * Update permission
      */
-    static async updatePermission(tenantId, permissionId, updateData) {
+    static async updatePermission(accountId, permissionId, updateData) {
         try {
 
             
-            const permissionPK = `TENANT#${tenantId}`;
+            const permissionPK = `ACCOUNT#${accountId}`;
             const permissionSK = `PERMISSION#${permissionId}`;
             
             const updateItem = {
@@ -81,7 +81,7 @@ class PermissionManagement {
                 updatedAt: new Date().toISOString()
             };
 
-            logger.info(`Updating permission: ${permissionId} in tenant: ${tenantId}`);
+            logger.info(`Updating permission: ${permissionId} in account: ${accountId}`);
             const result = await RBACModel.update(
                 { PK: permissionPK, SK: permissionSK },
                 { $SET: updateItem }
@@ -97,14 +97,14 @@ class PermissionManagement {
     /**
      * Delete permission
      */
-    static async deletePermission(tenantId, permissionId) {
+    static async deletePermission(accountId, permissionId) {
         try {
 
             
-            const permissionPK = `TENANT#${tenantId}`;
+            const permissionPK = `ACCOUNT#${accountId}`;
             const permissionSK = `PERMISSION#${permissionId}`;
             
-            logger.info(`Deleting permission: ${permissionId} from tenant: ${tenantId}`);
+            logger.info(`Deleting permission: ${permissionId} from account: ${accountId}`);
             return await RBACModel.delete({
                 PK: permissionPK,
                 SK: permissionSK
@@ -116,22 +116,22 @@ class PermissionManagement {
     }
 
     /**
-     * Get all permissions in a tenant
+     * Get all permissions in a account
      */
-    static async getAllPermissionsInTenant(tenantId) {
+    static async getAllPermissionsInAccount(accountId) {
         try {
 
             
-            const permissionPK = `TENANT#${tenantId}`;
+            const permissionPK = `ACCOUNT#${accountId}`;
             
-            logger.info(`Getting all permissions from tenant: ${tenantId}`);
+            logger.info(`Getting all permissions from account: ${accountId}`);
             const permissions = await RBACModel.query("PK").eq(permissionPK)
                 .where('SK').beginsWith('PERMISSION#')
                 .exec();
             
             return permissions.map(permission => this.cleanPermissionResponse(permission));
         } catch (error) {
-            logger.error('Error getting all permissions in tenant:', error);
+            logger.error('Error getting all permissions in account:', error);
             throw error;
         }
     }
@@ -139,13 +139,13 @@ class PermissionManagement {
     /**
      * Get permissions by resource
      */
-    static async getPermissionsByResource(tenantId, resource) {
+    static async getPermissionsByResource(accountId, resource) {
         try {
 
             
-            const permissionPK = `TENANT#${tenantId}`;
+            const permissionPK = `ACCOUNT#${accountId}`;
             
-            logger.info(`Getting permissions for resource: ${resource} in tenant: ${tenantId}`);
+            logger.info(`Getting permissions for resource: ${resource} in account: ${accountId}`);
             const permissions = await RBACModel.query("PK").eq(permissionPK)
                 .where('SK').beginsWith('PERMISSION#')
                 .filter('resource').eq(resource)
@@ -161,13 +161,13 @@ class PermissionManagement {
     /**
      * Get permissions by action
      */
-    static async getPermissionsByAction(tenantId, action) {
+    static async getPermissionsByAction(accountId, action) {
         try {
 
             
-            const permissionPK = `TENANT#${tenantId}`;
+            const permissionPK = `ACCOUNT#${accountId}`;
             
-            logger.info(`Getting permissions for action: ${action} in tenant: ${tenantId}`);
+            logger.info(`Getting permissions for action: ${action} in account: ${accountId}`);
             const permissions = await RBACModel.query("PK").eq(permissionPK)
                 .where('SK').beginsWith('PERMISSION#')
                 .filter('action').eq(action)
@@ -183,12 +183,12 @@ class PermissionManagement {
     /**
      * Get user permissions (through groups -> roles -> permissions)
      */
-    static async getUserPermissions(tenantId, userId) {
+    static async getUserPermissions(accountId, userId) {
         try {
             
             // Step 1: Get user's group assignments
-            // PK: USER#<tenant_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
-            const userGroupsPK = `USER#${tenantId}#${userId}#GROUPS`;
+            // PK: USER#<account_id>#<user_id>#GROUPS, SK: GROUP#<groupID>
+            const userGroupsPK = `USER#${accountId}#${userId}#GROUPS`;
             const userGroups = await RBACModel.query("PK").eq(userGroupsPK).exec();
             
             if (!userGroups || userGroups.length === 0) {
@@ -199,7 +199,7 @@ class PermissionManagement {
             const roleQueries = userGroups.map(async (groupAssignment) => {
                 // SK format is GROUP#<groupID>
                 const groupId = groupAssignment.SK.replace('GROUP#', '');
-                const groupRolesPK = `GROUP#${tenantId}#${groupId}#ROLES`;
+                const groupRolesPK = `GROUP#${accountId}#${groupId}#ROLES`;
                 
                 try {
                     const groupRoles = await RBACModel.query("PK").eq(groupRolesPK).exec();
@@ -221,7 +221,7 @@ class PermissionManagement {
             const permissionQueries = flatRoles.map(async (roleAssignment) => {
                 // SK format is ROLE#<roleID>
                 const roleId = roleAssignment.SK.replace('ROLE#', '');
-                const rolePermissionsPK = `ROLE#${tenantId}#${roleId}#PERMISSIONS`;
+                const rolePermissionsPK = `ROLE#${accountId}#${roleId}#PERMISSIONS`;
                 
                 try {
                     const rolePermissions = await RBACModel.query("PK").eq(rolePermissionsPK).exec();
@@ -244,7 +244,7 @@ class PermissionManagement {
                 const permissionId = permissionAssignment.SK.replace('PERMISSION#', '');
                 if (permissionId && !uniquePermissionIds.has(permissionId)) {
                     uniquePermissionIds.add(permissionId);
-                    permissionDetailsQueries.push(this.getPermission(tenantId, permissionId));
+                    permissionDetailsQueries.push(this.getPermission(accountId, permissionId));
                 }
             });
             
@@ -263,9 +263,9 @@ class PermissionManagement {
     /**
      * Check if user has specific permission
      */
-    static async hasPermission(tenantId, userId, resource, action) {
+    static async hasPermission(accountId, userId, resource, action) {
         try {
-            const userPermissions = await this.getUserPermissions(tenantId, userId);
+            const userPermissions = await this.getUserPermissions(accountId, userId);
             
             return userPermissions.some(permission => 
                 permission.resource === resource && 
@@ -281,9 +281,9 @@ class PermissionManagement {
     /**
      * Get role permissions
      */
-    static async getRolePermissions(tenantId, roleId) {
+    static async getRolePermissions(accountId, roleId) {
         try {
-            const rolePermissionsPK = `ROLE#${tenantId}#${roleId}#PERMISSIONS`;
+            const rolePermissionsPK = `ROLE#${accountId}#${roleId}#PERMISSIONS`;
             const permissionAssignments = await RBACModel.query("PK").eq(rolePermissionsPK).exec();
             
             if (!permissionAssignments || permissionAssignments.length === 0) {
@@ -296,7 +296,7 @@ class PermissionManagement {
                 const permissionId = assignment.SK.replace('PERMISSION#', '');
                 
                 try {
-                    const permission = await this.getPermission(tenantId, permissionId);
+                    const permission = await this.getPermission(accountId, permissionId);
                     return permission;
                 } catch (error) {
                     logger.warn(`Error getting permission details for ${permissionId}:`, error);

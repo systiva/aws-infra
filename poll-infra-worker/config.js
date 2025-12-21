@@ -2,10 +2,10 @@
 const requiredEnvVars = [
   'AWS_REGION',
   'ADMIN_ACCOUNT_ID',
-  'TENANT_ACCOUNT_ID',
+  'ACCOUNT_ACCOUNT_ID',
   'CROSS_ACCOUNT_ROLE_NAME',
   'WORKSPACE',
-  'TENANT_REGISTRY_TABLE_NAME'
+  'ACCOUNT_REGISTRY_TABLE_NAME'
 ];
 
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -18,7 +18,7 @@ module.exports = {
   AWS: {
     REGION: process.env.AWS_REGION,
     ADMIN_ACCOUNT_ID: process.env.ADMIN_ACCOUNT_ID,
-    TENANT_ACCOUNT_ID: process.env.TENANT_ACCOUNT_ID
+    ACCOUNT_ACCOUNT_ID: process.env.ACCOUNT_ACCOUNT_ID
   },
   
   // Cross-account IAM Configuration
@@ -39,7 +39,7 @@ module.exports = {
   
   // DynamoDB Configuration
   DYNAMODB: {
-    TENANT_REGISTRY_TABLE: process.env.TENANT_REGISTRY_TABLE_NAME,
+    ACCOUNT_REGISTRY_TABLE: process.env.ACCOUNT_REGISTRY_TABLE_NAME,
     REGION: process.env.AWS_REGION
   }
 };

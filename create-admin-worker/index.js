@@ -3,18 +3,18 @@ const config = require('./config');
 const logger = require('./logger');
 
 /**
- * AWS Lambda handler for creating tenant admin user during onboarding
+ * AWS Lambda handler for creating account admin user during onboarding
  * 
  * Expected input from Step Functions:
  * {
  *   "operation": "CREATE_ADMIN",
- *   "tenantId": "20241031",
- *   "tenantName": "Company XYZ",
+ *   "accountId": "20241031",
+ *   "accountName": "Company XYZ",
  *   "firstName": "John",
  *   "lastName": "Doe", 
  *   "adminEmail": "john.doe@company.com",  // Admin user email
  *   "adminPassword": "optional-temp-password",  // Optional: if not provided, will be generated
- *   "tenantAdminGroupId": "uuid-of-tenant-admin-group",  // Dynamic group ID from setup-rbac-worker
+ *   "accountAdminGroupId": "uuid-of-account-admin-group",  // Dynamic group ID from setup-rbac-worker
  *   "createdBy": "system",
  *   "registeredOn": "2024-10-31T..."
  * }
@@ -33,14 +33,14 @@ exports.handler = async (event, context) => {
     // Extract and validate input
     const {
       operation,
-      tenantId,
-      tenantName,
+      accountId,
+      accountName,
       firstName,
       lastName,
       adminUsername,  // Username for Cognito login
       adminEmail,
       adminPassword,  // Optional password from frontend
-      tenantAdminGroupId,  // Dynamic group ID from setup-rbac-worker
+      accountAdminGroupId,  // Dynamic group ID from setup-rbac-worker
       createdBy,
       registeredOn
     } = event;
@@ -50,25 +50,25 @@ exports.handler = async (event, context) => {
       throw new Error(`Invalid operation: ${operation}. Expected: CREATE_ADMIN`);
     }
 
-    if (!tenantId || !firstName || !lastName || !adminUsername || !adminEmail) {
-      throw new Error('Missing required fields: tenantId, firstName, lastName, adminUsername, adminEmail are required');
+    if (!accountId || !firstName || !lastName || !adminUsername || !adminEmail) {
+      throw new Error('Missing required fields: accountId, firstName, lastName, adminUsername, adminEmail are required');
     }
 
-    // Validate tenantAdminGroupId from Step Functions
-    if (!tenantAdminGroupId) {
-      throw new Error('tenantAdminGroupId is required (should be provided by setup-rbac-worker)');
+    // Validate accountAdminGroupId from Step Functions
+    if (!accountAdminGroupId) {
+      throw new Error('accountAdminGroupId is required (should be provided by setup-rbac-worker)');
     }
 
     logger.info({
-      tenantId,
-      tenantName,
+      accountId,
+      accountName,
       firstName,
       lastName,
       adminUsername,
       adminEmail,
       hasProvidedPassword: !!adminPassword,
-      tenantAdminGroupId
-    }, 'Creating tenant admin user');
+      accountAdminGroupId
+    }, 'Creating account admin user');
 
     // Step 1: Prepare admin user data
     const adminUserData = {
@@ -77,52 +77,52 @@ exports.handler = async (event, context) => {
       userId: adminUsername, // Use adminUsername as userId for Cognito
       password: adminPassword || generateSecurePassword(), // Use provided password or generate
       status: 'ACTIVE',
-      created_by: createdBy || 'tenant-provisioning',
-      tenantId: tenantId  // Use the actual tenant ID from user input
+      created_by: createdBy || 'account-provisioning',
+      accountId: accountId  // Use the actual account ID from user input
     };
 
       logger.info({
-        tenantId,
+        accountId,
         name: adminUserData.name,
         email: adminUserData.email,
         userId: adminUserData.userId,
         status: adminUserData.status,
-        userTenantId: adminUserData.tenantId,
+        userAccountId: adminUserData.accountId,
         passwordSource: adminPassword ? 'provided' : 'generated'
       }, 'Prepared admin user data');
 
     // Initialize IMS Lambda client for direct invocation
     const imsClient = new IMSLambdaClient(config);
 
-    // Step 2: Create user in IMS service (in actual tenant, not platform)
+    // Step 2: Create user in IMS service (in actual account, not platform)
     let createdUser;
     let userCreationError = null;
     
     try {
       const userResponse = await imsClient.createUser(
         adminUserData,
-        tenantId  // Use actual tenant ID so user is stored in same tenant as RBAC data
+        accountId  // Use actual account ID so user is stored in same account as RBAC data
       );
 
       createdUser = userResponse.data.data;
       logger.info({
-        tenantId,
+        accountId,
         userId: createdUser.user_id,
         email: createdUser.email,
-        userStoredInTenant: tenantId
+        userStoredInAccount: accountId
       }, 'User created successfully in IMS');
 
     } catch (userCreationErr) {
       userCreationError = userCreationErr;
       logger.error({
-        tenantId,
+        accountId,
         error: userCreationErr.message,
         status: userCreationErr.response?.status,
         data: userCreationErr.response?.data
       }, 'Failed to create user in IMS');
     }
 
-    // Step 3: Assign user to tenant admin group (only if user creation succeeded)
+    // Step 3: Assign user to account admin group (only if user creation succeeded)
     let groupAssignmentError = null;
     
     if (createdUser) {
@@ -130,25 +130,25 @@ exports.handler = async (event, context) => {
         await imsClient.assignUserToGroup(
           createdUser.user_id,
           {
-            groupId: tenantAdminGroupId,  // Use dynamic group ID from setup-rbac-worker
-            tenantId: tenantId  // Use actual tenant ID where group was created
+            groupId: accountAdminGroupId,  // Use dynamic group ID from setup-rbac-worker
+            accountId: accountId  // Use actual account ID where group was created
           },
-          tenantId  // Query context in actual tenant
+          accountId  // Query context in actual account
         );
 
         logger.info({
-          tenantId,
+          accountId,
           userId: createdUser.user_id,
-          groupId: tenantAdminGroupId,  // Log the dynamic group ID
-          assignedToTenant: tenantId
-        }, 'User assigned to tenant admin group successfully');
+          groupId: accountAdminGroupId,  // Log the dynamic group ID
+          assignedToAccount: accountId
+        }, 'User assigned to account admin group successfully');
 
       } catch (groupAssignmentErr) {
         groupAssignmentError = groupAssignmentErr;
         logger.error({
-          tenantId,
+          accountId,
           userId: createdUser.user_id,
-          groupId: tenantAdminGroupId,  // Log the dynamic group ID
+          groupId: accountAdminGroupId,  // Log the dynamic group ID
           error: groupAssignmentErr.message,
           status: groupAssignmentErr.response?.status,
           data: groupAssignmentErr.response?.data
@@ -161,14 +161,14 @@ exports.handler = async (event, context) => {
     
     const result = {
       success: true,
-      tenantId: tenantId,
+      accountId: accountId,
       adminUser: createdUser ? {
         user_id: createdUser.user_id,
         email: createdUser.email,
         name: createdUser.name,
         status: createdUser.status,
-        tenant_id: tenantId,  // User belongs to actual tenant
-        groups: groupAssignmentError ? [] : ['tenant-admin'],
+        account_id: accountId,  // User belongs to actual account
+        groups: groupAssignmentError ? [] : ['account-admin'],
         password_status: 'TEMPORARY',
         requiresPasswordChange: true,
         created_at: new Date().toISOString()
@@ -185,14 +185,14 @@ exports.handler = async (event, context) => {
       },
       message: createdUser 
         ? (groupAssignmentError 
-            ? 'Tenant admin created but group assignment failed - manual intervention required'
-            : 'Tenant admin created successfully')
-        : 'Tenant admin creation failed - manual intervention required',
+            ? 'Account admin created but group assignment failed - manual intervention required'
+            : 'Account admin created successfully')
+        : 'Account admin creation failed - manual intervention required',
       executionTime: executionTime
     };
 
     logger.info({
-      tenantId,
+      accountId,
       userId: createdUser?.user_id,
       userCreated: !!createdUser,
       groupAssigned: !groupAssignmentError,
@@ -216,7 +216,7 @@ exports.handler = async (event, context) => {
       success: true,
       error: 'VALIDATION_FAILED',
       message: `Validation failed: ${error.message}`,
-      tenantId: event.tenantId || 'unknown',
+      accountId: event.accountId || 'unknown',
       adminUser: null,
       errors: {
         validation: {
@@ -260,8 +260,8 @@ function generateSecurePassword() {
 if (require.main === module) {
   const testEvent = {
     operation: 'CREATE_ADMIN',
-    tenantId: 'test-tenant-123',
-    tenantName: 'Test Company',
+    accountId: 'test-account-123',
+    accountName: 'Test Company',
     firstName: 'John',
     lastName: 'Doe',
     adminEmail: 'john.doe@testcompany.com',

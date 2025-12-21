@@ -4,19 +4,19 @@ const CrossAccountService = require('./src/cross-account-service');
 const DynamoDBService = require('./src/dynamodb-service');
 
 /**
- * AWS Lambda handler for creating tenant DynamoDB table/entry based on subscription tier
+ * AWS Lambda handler for creating account DynamoDB table/entry based on subscription tier
  * 
  * ARCHITECTURE:
- * 1. Cross-account role assumption: Required to create DynamoDB table/entry in tenant account
- * 2. Admin account DynamoDB: Used to update tenant registry status (no cross-account needed)
+ * 1. Cross-account role assumption: Required to create DynamoDB table/entry in account account
+ * 2. Admin account DynamoDB: Used to update account registry status (no cross-account needed)
  * 
  * Expected input from Step Functions:
  * {
  *   "operation": "CREATE",
- *   "tenantId": "tenant-12345", 
- *   "tenantName": "company-xyz",
+ *   "accountId": "account-12345", 
+ *   "accountName": "company-xyz",
  *   "subscriptionTier": "public" | "private",
- *   "tenantAccountId": "949642303066",
+ *   "accountAccountId": "949642303066",
  *   "email": "user@company.com",
  *   "createdBy": "admin",
  *   "registeredOn": "2025-09-28T..."
@@ -33,34 +33,34 @@ exports.handler = async (event, context) => {
   }, 'Create Infrastructure Worker - Lambda invoked');
 
   // Validate required environment variables
-  if (!config.DYNAMODB.TENANT_PUBLIC_TABLE) {
-    const error = new Error('Missing required environment variable: TENANT_PUBLIC_DYNAMO_DB');
+  if (!config.DYNAMODB.ACCOUNT_PUBLIC_TABLE) {
+    const error = new Error('Missing required environment variable: ACCOUNT_PUBLIC_DYNAMO_DB');
     logger.error({ error: error.message }, 'Configuration validation failed');
     throw error;
   }
 
   // Initialize services
   const crossAccountService = new CrossAccountService();
-  const adminDynamoDBService = new DynamoDBService(); // For admin account tenant registry
+  const adminDynamoDBService = new DynamoDBService(); // For admin account account registry
   const dynamoDBService = new DynamoDBService();
 
   try {
     // Extract and validate input - handle both nested and flat structures
-    let tenant, infrastructure, metadata;
+    let account, infrastructure, metadata;
     
-    if (event.tenant) {
+    if (event.account) {
       // Nested structure
-      ({ tenant, infrastructure, metadata } = event);
+      ({ account, infrastructure, metadata } = event);
     } else {
       // Flat structure from admin-portal-be
-      tenant = {
-        id: event.tenantId,
-        name: event.tenantName,
+      account = {
+        id: event.accountId,
+        name: event.accountName,
         subscriptionTier: event.subscriptionTier,
         email: event.email
       };
       infrastructure = {
-        targetAccountId: event.tenantAccountId
+        targetAccountId: event.accountAccountId
       };
       metadata = {
         requestId: context.awsRequestId,
@@ -69,16 +69,16 @@ exports.handler = async (event, context) => {
       };
     }
     
-    if (!tenant || !tenant.id) {
-      throw new Error('Invalid input: tenant ID is required');
+    if (!account || !account.id) {
+      throw new Error('Invalid input: account ID is required');
     }
 
-    if (!tenant.subscriptionTier) {
-      throw new Error('Invalid input: tenant.subscriptionTier is required');
+    if (!account.subscriptionTier) {
+      throw new Error('Invalid input: account.subscriptionTier is required');
     }
 
-    if (!['public', 'private'].includes(tenant.subscriptionTier)) {
-      throw new Error('Invalid input: tenant.subscriptionTier must be "public" or "private"');
+    if (!['public', 'private'].includes(account.subscriptionTier)) {
+      throw new Error('Invalid input: account.subscriptionTier must be "public" or "private"');
     }
 
     if (!infrastructure || !infrastructure.targetAccountId) {
@@ -86,61 +86,61 @@ exports.handler = async (event, context) => {
     }
 
     logger.info({
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-      subscriptionTier: tenant.subscriptionTier,
+      accountId: account.id,
+      accountName: account.name,
+      subscriptionTier: account.subscriptionTier,
       targetAccountId: infrastructure.targetAccountId,
       requestId: metadata?.requestId
-    }, 'Processing tenant DynamoDB creation request');
+    }, 'Processing account DynamoDB creation request');
 
-    // Step 1: Assume cross-account role to access tenant account
-    logger.info({ tenantId: tenant.id }, 'Step 1: Assuming cross-account role');
-    const credentials = await crossAccountService.assumeTenantRole(
+    // Step 1: Assume cross-account role to access account account
+    logger.info({ accountId: account.id }, 'Step 1: Assuming cross-account role');
+    const credentials = await crossAccountService.assumeAccountRole(
       infrastructure.targetAccountId,
-      tenant.id
+      account.id
     );
 
-    // Step 2: Create DynamoDB service for tenant account operations
-    logger.info({ tenantId: tenant.id }, 'Step 2: Creating tenant account DynamoDB service');
-    const tenantDynamoDBService = new DynamoDBService(credentials, infrastructure.targetAccountId);
+    // Step 2: Create DynamoDB service for account account operations
+    logger.info({ accountId: account.id }, 'Step 2: Creating account account DynamoDB service');
+    const accountDynamoDBService = new DynamoDBService(credentials, infrastructure.targetAccountId);
 
     let result;
 
-    // Step 3: Create DynamoDB table/entry based on subscription tier IN TENANT ACCOUNT
-    if (tenant.subscriptionTier === 'public') {
-      logger.info({ tenantId: tenant.id }, 'Step 3: Creating tenant entry in public shared table (in tenant account)');
+    // Step 3: Create DynamoDB table/entry based on subscription tier IN ACCOUNT ACCOUNT
+    if (account.subscriptionTier === 'public') {
+      logger.info({ accountId: account.id }, 'Step 3: Creating account entry in public shared table (in account account)');
       
-      result = await tenantDynamoDBService.createTenantEntryInPublicTable({
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        email: tenant.email,
-        tenantAccountId: infrastructure.targetAccountId,
+      result = await accountDynamoDBService.createAccountEntryInPublicTable({
+        accountId: account.id,
+        accountName: account.name,
+        email: account.email,
+        accountAccountId: infrastructure.targetAccountId,
         createdBy: metadata.initiatedBy,
         registeredOn: metadata.timestamp
       });
       
-    } else if (tenant.subscriptionTier === 'private') {
-      logger.info({ tenantId: tenant.id }, 'Step 3: Creating dedicated DynamoDB table (in tenant account)');
+    } else if (account.subscriptionTier === 'private') {
+      logger.info({ accountId: account.id }, 'Step 3: Creating dedicated DynamoDB table (in account account)');
       
-      result = await tenantDynamoDBService.createTenantDynamoDBTable({
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        email: tenant.email,
-        tenantAccountId: infrastructure.targetAccountId,
+      result = await accountDynamoDBService.createAccountDynamoDBTable({
+        accountId: account.id,
+        accountName: account.name,
+        email: account.email,
+        accountAccountId: infrastructure.targetAccountId,
         createdBy: metadata.initiatedBy,
         registeredOn: metadata.timestamp
       });
       
     } else {
-      throw new Error(`Unsupported subscription tier: ${tenant.subscriptionTier}. Must be 'public' or 'private'`);
+      throw new Error(`Unsupported subscription tier: ${account.subscriptionTier}. Must be 'public' or 'private'`);
     }
 
-    // Step 4: Update tenant registry status in admin account
-    logger.info({ tenantId: tenant.id }, 'Step 4: Updating tenant registry in admin account');
-    await adminDynamoDBService.updateTenantInfrastructure(tenant.id, {
+    // Step 4: Update account registry status in admin account
+    logger.info({ accountId: account.id }, 'Step 4: Updating account registry in admin account');
+    await adminDynamoDBService.updateAccountInfrastructure(account.id, {
       status: result.success ? 'CREATE_COMPLETE' : 'CREATE_FAILED',
       stackName: result.tableName,
-      stackId: result.stackId || null, // null for public tenants
+      stackId: result.stackId || null, // null for public accounts
       createdAt: result.createdAt || new Date().toISOString()
     });
 
@@ -149,25 +149,25 @@ exports.handler = async (event, context) => {
       ...event,
       infrastructure: {
         ...event.infrastructure,
-        stackId: result.stackId || null, // Include stackId for poll-infra-worker (null for public tenants)
+        stackId: result.stackId || null, // Include stackId for poll-infra-worker (null for public accounts)
         stackName: result.tableName,
         status: result.success ? 'CREATE_COMPLETE' : 'CREATE_FAILED'
       },
       result: {
         success: result.success,
         operation: result.operation,
-        tenantId: result.tenantId || tenant.id,
+        accountId: result.accountId || account.id,
         tableName: result.tableName,
-        stackId: result.stackId || null, // Include stackId in result as well (null for public tenants)
-        subscriptionTier: tenant.subscriptionTier,
+        stackId: result.stackId || null, // Include stackId in result as well (null for public accounts)
+        subscriptionTier: account.subscriptionTier,
         createdAt: result.createdAt,
         executionTime: Date.now() - startTime
       }
     };
 
     logger.info({
-      tenantId: tenant.id,
-      subscriptionTier: tenant.subscriptionTier,
+      accountId: account.id,
+      subscriptionTier: account.subscriptionTier,
       tableName: result.tableName,
       success: result.success,
       executionTime: response.result.executionTime
@@ -188,7 +188,7 @@ exports.handler = async (event, context) => {
       ...event,
       result: {
         success: false,
-        operation: 'CREATE_DYNAMODB_TENANT',
+        operation: 'CREATE_DYNAMODB_ACCOUNT',
         error: error.message,
         executionTime: Date.now() - startTime
       }

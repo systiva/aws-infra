@@ -50,9 +50,9 @@ class JWTService {
         email: userContext.email,
         username: userContext.username,
         
-        // Tenant context
-        'custom:tenant_id': userContext.tenantId,
-        tenant_id: userContext.tenantId,
+        // Account context
+        'custom:account_id': userContext.accountId,
+        account_id: userContext.accountId,
         
         // RBAC information - only use userRoles array
         'custom:user_roles': JSON.stringify(userContext.userRoles || []),
@@ -105,7 +105,7 @@ class JWTService {
 
       logger.info('Enhanced JWT tokens generated', {
         userId: userContext.userId || userContext.username,
-        tenantId: userContext.tenantId,
+        accountId: userContext.accountId,
         userRoles: userContext.userRoles,
         permissionsCount: userContext.permissions?.length || 0,
         groupsCount: userContext.groups?.length || 0,
@@ -177,7 +177,7 @@ class JWTService {
         userId: decoded.sub,
         username: decoded.username,
         email: decoded.email,
-        tenantId: decoded.tenant_id,
+        accountId: decoded.account_id,
         userRole: decoded.user_role,
         permissions: decoded.permissions,
         groups: decoded.groups
@@ -193,8 +193,8 @@ class JWTService {
         sub: userContext.userId || userContext.username,
         email: userContext.email,
         username: userContext.username,
-        'custom:tenant_id': userContext.tenantId,
-        tenant_id: userContext.tenantId,
+        'custom:account_id': userContext.accountId,
+        account_id: userContext.accountId,
         'custom:user_role': userContext.userRole,
         'custom:permissions': JSON.stringify(userContext.permissions || []),
         'custom:groups': JSON.stringify(userContext.groups || []),
@@ -213,7 +213,7 @@ class JWTService {
 
       logger.info('Access token refreshed', {
         userId: userContext.userId || userContext.username,
-        tenantId: userContext.tenantId
+        accountId: userContext.accountId
       });
 
       return {
@@ -241,7 +241,7 @@ class JWTService {
         userId: decoded.sub,
         username: decoded.username,
         email: decoded.email,
-        tenantId: decoded.tenant_id,
+        accountId: decoded.account_id,
         userRole: decoded.user_role,
         permissions: decoded.permissions || [],
         groups: decoded.groups || []

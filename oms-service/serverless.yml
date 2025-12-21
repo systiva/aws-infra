@@ -14,7 +14,7 @@ provider:
     NODE_ENV: ${self:provider.stage}
     AWS_ACCOUNT_ID: ${aws:accountId}
     AWS_REGION: ${self:provider.region}
-    TENANT_REGISTRY_TABLE: ${self:custom.tenantRegistryTable}
+    ACCOUNT_REGISTRY_TABLE: ${self:custom.accountRegistryTable}
     CROSS_ACCOUNT_ROLE_NAME: OMS-CrossAccountRole
     CROSS_ACCOUNT_ROLE_SESSION_NAME: oms-service-session
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
@@ -23,13 +23,13 @@ provider:
   iam:
     role:
       statements:
-        # Access to Tenant Registry DynamoDB table
+        # Access to Account Registry DynamoDB table
         - Effect: Allow
           Action:
             - dynamodb:GetItem
             - dynamodb:Query
           Resource:
-            - arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.tenantRegistryTable}
+            - arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.accountRegistryTable}
         
         # STS AssumeRole permission for cross-account access
         - Effect: Allow
@@ -48,7 +48,7 @@ provider:
             - arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-*:*
 
 custom:
-  tenantRegistryTable: TenantRegistry-${self:provider.stage}
+  accountRegistryTable: AccountRegistry-${self:provider.stage}
   
   logLevel:
     dev: debug
@@ -63,7 +63,7 @@ functions:
   api:
     handler: lambda.handler
     name: ${self:service}-${self:provider.stage}
-    description: Order Management Service API - Multi-tenant with cross-account access
+    description: Order Management Service API - Multi-account with cross-account access
     events:
       # Customer endpoints
       - http:

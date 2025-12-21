@@ -1,7 +1,7 @@
 {
   "name": "create-admin-worker",
   "version": "1.0.0",
-  "description": "Lambda function to create tenant admin user during onboarding",
+  "description": "Lambda function to create account admin user during onboarding",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -15,10 +15,10 @@
   "keywords": [
     "aws",
     "lambda",
-    "tenant",
+    "account",
     "admin",
     "user-creation"
   ],
-  "author": "Multi-Tenant Platform",
+  "author": "Multi-Account Platform",
   "license": "MIT"
 }

@@ -92,7 +92,7 @@ module "infrastructure_outputs" {
 | Name | Description | Type | Required |
 |------|-------------|------|----------|
 | workspace | Workspace name | string | yes |
-| account_type | admin or tenant | string | yes |
+| account_type | admin or account | string | yes |
 | category | bootstrap or infrastructure | string | yes |
 | outputs | Map of key-value pairs to store | map(any) | yes |
 | aws_region | AWS region | string | no |

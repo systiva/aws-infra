@@ -7,14 +7,14 @@ const logger = require('../../logger');
 
 /**
  * Check if user has write permissions
- * Required groups: tenant-user-rw, tenant-admin
+ * Required groups: account-user-rw, account-admin
  */
 const checkWritePermission = (req, res, next) => {
     try {
         const groups = req.user?.groups || [];
         const groupNames = groups.map(g => g.name || g);
         
-        const writeGroups = ['tenant-user-rw', 'tenant-admin'];
+        const writeGroups = ['account-user-rw', 'account-admin'];
         const hasWriteAccess = groupNames.some(g => writeGroups.includes(g));
         
         if (!hasWriteAccess) {
@@ -24,7 +24,7 @@ const checkWritePermission = (req, res, next) => {
             });
             return res.status(403).json({ 
                 error: 'Forbidden', 
-                message: 'Write permission denied. Requires tenant-user-rw or tenant-admin group.' 
+                message: 'Write permission denied. Requires account-user-rw or account-admin group.' 
             });
         }
         
@@ -45,7 +45,7 @@ const checkWritePermission = (req, res, next) => {
 
 /**
  * Check if user is platform admin
- * Platform admins have read-only access across all tenants
+ * Platform admins have read-only access across all accounts
  */
 const checkPlatformAdmin = (req, res, next) => {
     try {
@@ -97,7 +97,7 @@ const checkPlatformAdmin = (req, res, next) => {
 
 /**
  * Check if user has any access to OMS features
- * At least one of: tenant-user-ro, tenant-user-rw, tenant-admin
+ * At least one of: account-user-ro, account-user-rw, account-admin
  * Note: platform-admin is EXCLUDED from OMS access
  */
 const checkOMSAccess = (req, res, next) => {
@@ -111,10 +111,10 @@ const checkOMSAccess = (req, res, next) => {
             groupsCount: groups.length,
             groupsRaw: JSON.stringify(groups),
             groupNames: JSON.stringify(groupNames),
-            expectedGroups: ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin']
+            expectedGroups: ['account-user-ro', 'account-user-rw', 'account-admin']
         }, 'OMS RBAC Check');
         
-        const omsGroups = ['tenant-user-ro', 'tenant-user-rw', 'tenant-admin'];
+        const omsGroups = ['account-user-ro', 'account-user-rw', 'account-admin'];
         const hasOMSAccess = groupNames.some(g => omsGroups.includes(g));
         
         if (!hasOMSAccess) {

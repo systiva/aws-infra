@@ -21,15 +21,15 @@ provider:
         - dynamodb:DescribeTable
         - dynamodb:CreateTable
       Resource: 
-  - "arn:aws:dynamodb:${self:provider.region}:*:table/admin-portal-dev-tenant-registry*"
-  - "arn:aws:dynamodb:${self:provider.region}:*:table/admin-portal-dev-tenant-registry*/index/*"
-    # Cross-account permissions for tenant provisioning
+  - "arn:aws:dynamodb:${self:provider.region}:*:table/admin-portal-dev-account-registry*"
+  - "arn:aws:dynamodb:${self:provider.region}:*:table/admin-portal-dev-account-registry*/index/*"
+    # Cross-account permissions for account provisioning
     - Effect: Allow
       Action:
         - sts:AssumeRole
       Resource: 
-        - "arn:aws:iam::560261045252:role/CrossAccountTenantRole"
-    # CloudFormation permissions for creating tenant resources
+        - "arn:aws:iam::560261045252:role/CrossAccountAccountRole"
+    # CloudFormation permissions for creating account resources
     - Effect: Allow
       Action:
         - cloudformation:CreateStack
@@ -41,7 +41,7 @@ provider:
         - cloudformation:ListStacks
         - cloudformation:GetTemplate
       Resource: 
-        - "arn:aws:cloudformation:${self:provider.region}:560261045252:stack/tenant-*/*"
+        - "arn:aws:cloudformation:${self:provider.region}:560261045252:stack/account-*/*"
 
 functions:
   app:

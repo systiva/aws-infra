@@ -5,7 +5,7 @@ const config = require('./config');
 
 // Middleware imports
 const authenticateUser = require('./src/middlewares/auth');
-const validateTenant = require('./src/middlewares/tenant');
+const validateAccount = require('./src/middlewares/account');
 const assumeRole = require('./src/middlewares/assume-role');
 const { errorHandler, notFoundHandler } = require('./src/middlewares/error-handler');
 
@@ -47,11 +47,11 @@ app.get('/health', (req, res) => {
     });
 });
 
-// API routes with authentication and tenant middleware
+// API routes with authentication and account middleware
 app.use(
     `${config.API_PREFIX}/customers`,
     authenticateUser,
-    validateTenant,
+    validateAccount,
     assumeRole,
     customerRoutes
 );
@@ -59,7 +59,7 @@ app.use(
 app.use(
     `${config.API_PREFIX}/products`,
     authenticateUser,
-    validateTenant,
+    validateAccount,
     assumeRole,
     productRoutes
 );
@@ -67,7 +67,7 @@ app.use(
 app.use(
     `${config.API_PREFIX}/orders`,
     authenticateUser,
-    validateTenant,
+    validateAccount,
     assumeRole,
     orderRoutes
 );
@@ -75,7 +75,7 @@ app.use(
 app.use(
     `${config.API_PREFIX}/inventory`,
     authenticateUser,
-    validateTenant,
+    validateAccount,
     assumeRole,
     inventoryRoutes
 );

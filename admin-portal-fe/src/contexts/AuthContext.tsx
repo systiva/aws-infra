@@ -7,7 +7,7 @@ export interface User {
   username: string;
   email: string;
   userRoles: string[]; // All user roles
-  tenantId: string;
+  accountId: string;
   permissions: string[];
   groups: Group[];
 }
@@ -137,7 +137,7 @@ export interface SignupData {
   password: string;
   firstName: string;
   lastName: string;
-  tenantId?: string;
+  accountId?: string;
   userRole?: string;
 }
 

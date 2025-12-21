@@ -30,7 +30,7 @@ async function testStatusCodes() {
       console.log(`   Message: ${error.response.data.message}`);
     }
 
-    console.log('\n3. Testing signup with missing Tenant-ID (should return 400)...');
+    console.log('\n3. Testing signup with missing Account-ID (should return 400)...');
     try {
       await axios.post(`${BASE_URL}/auth/signup`, {
         username: 'newuser@example.com',
@@ -38,10 +38,10 @@ async function testStatusCodes() {
         password: 'TestPassword123!',
         firstName: 'Test',
         lastName: 'User'
-        // Missing tenantId - should be mandatory
+        // Missing accountId - should be mandatory
       });
     } catch (error) {
-      console.log(`✅ Signup without Tenant-ID: ${error.response.status} ${error.response.statusText}`);
+      console.log(`✅ Signup without Account-ID: ${error.response.status} ${error.response.statusText}`);
       console.log(`   Message: ${error.response.data.message}`);
     }
 
@@ -53,7 +53,7 @@ async function testStatusCodes() {
         password: 'TestPassword123!',
         firstName: 'Test',
         lastName: 'User',
-        tenantId: 'test-tenant-123',
+        accountId: 'test-account-123',
         userRole: 'viewer'
       });
       console.log(`✅ Valid signup: ${response.status} ${response.statusText}`);

@@ -14,21 +14,21 @@ const sts = new AWS.STS({
 class STSService {
     
     /**
-     * Assume cross-account role in tenant AWS account
-     * @param {string} tenantAwsAccountId - Tenant's AWS account ID
-     * @param {string} tenantId - Tenant identifier (for session naming)
+     * Assume cross-account role in account AWS account
+     * @param {string} accountAwsAccountId - Account's AWS account ID
+     * @param {string} accountId - Account identifier (for session naming)
      * @returns {Promise<Object>} Temporary AWS credentials
      */
-    async assumeTenantRole(tenantAwsAccountId, tenantId) {
+    async assumeAccountRole(accountAwsAccountId, accountId) {
         try {
-            const roleArn = `arn:aws:iam::${tenantAwsAccountId}:role/${config.CROSS_ACCOUNT_ROLE_NAME}`;
-            const sessionName = `oms-${tenantId}-${Date.now()}`;
+            const roleArn = `arn:aws:iam::${accountAwsAccountId}:role/${config.CROSS_ACCOUNT_ROLE_NAME}`;
+            const sessionName = `oms-${accountId}-${Date.now()}`;
             
             logger.debug('Assuming cross-account role', { 
                 roleArn, 
                 sessionName,
-                tenantId,
-                tenantAwsAccountId
+                accountId,
+                accountAwsAccountId
             });
             
             const params = {
@@ -45,7 +45,7 @@ class STSService {
             }
             
             logger.debug('Cross-account role assumed successfully', { 
-                tenantId,
+                accountId,
                 expiration: result.Credentials.Expiration
             });
             
@@ -57,14 +57,14 @@ class STSService {
             };
             
         } catch (error) {
-            const roleArn = `arn:aws:iam::${tenantAwsAccountId}:role/${config.CROSS_ACCOUNT_ROLE_NAME}`;
+            const roleArn = `arn:aws:iam::${accountAwsAccountId}:role/${config.CROSS_ACCOUNT_ROLE_NAME}`;
             logger.error({
                 msg: 'Error assuming cross-account role',
                 errorMessage: error.message,
                 errorCode: error.code,
                 errorName: error.name,
-                tenantId,
-                tenantAwsAccountId,
+                accountId,
+                accountAwsAccountId,
                 roleArn,
                 externalId: config.CROSS_ACCOUNT_EXTERNAL_ID,
                 roleName: config.CROSS_ACCOUNT_ROLE_NAME,
@@ -73,7 +73,7 @@ class STSService {
             
             // Re-throw with more context
             if (error.code === 'AccessDenied') {
-                const enhancedError = new Error(`Cross-account access denied for tenant ${tenantId}`);
+                const enhancedError = new Error(`Cross-account access denied for account ${accountId}`);
                 enhancedError.code = 'AccessDenied';
                 throw enhancedError;
             }

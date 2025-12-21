@@ -145,7 +145,7 @@
   max-width: 140px; /* Limit width to prevent button misalignment */
 }
 
-.tenant-id {
+.account-id {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.6);
   white-space: nowrap;
@@ -155,13 +155,13 @@
   font-style: italic;
 }
 
-.tenant-id.clickable {
+.account-id.clickable {
   cursor: pointer;
   text-decoration: underline;
   transition: color 0.2s ease;
 }
 
-.tenant-id.clickable:hover {
+.account-id.clickable:hover {
   color: rgba(255, 255, 255, 0.9);
   text-decoration: underline;
 }

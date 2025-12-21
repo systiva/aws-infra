@@ -112,12 +112,12 @@ variable "jwt_signing_key" {
 }
 
 # DynamoDB Configuration
-variable "tenant_registry_table_name" {
-  description = "DynamoDB table name for tenant registry"
+variable "account_registry_table_name" {
+  description = "DynamoDB table name for account registry"
   type        = string
 }
 
-variable "tenant_registry_table_arn" {
-  description = "DynamoDB table ARN for tenant registry"
+variable "account_registry_table_arn" {
+  description = "DynamoDB table ARN for account registry"
   type        = string
 }

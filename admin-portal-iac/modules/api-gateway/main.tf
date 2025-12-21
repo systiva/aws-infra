@@ -8,12 +8,12 @@ data "aws_region" "current" {}
 # Local values
 locals {
   api_name = "${var.project_name}-${var.environment}-api"
-  
+
   common_tags = merge(var.common_tags, {
     Name = local.api_name
     Type = "APIGateway"
   })
-  
+
   # Generate OpenAPI spec from template
   openapi_spec = templatefile("${path.module}/swagger.yml.tpl", {
     api_name                  = local.api_name
@@ -21,6 +21,8 @@ locals {
     admin_backend_lambda_uri  = var.admin_backend_lambda_invoke_arn
     ims_service_lambda_uri    = var.ims_service_lambda_invoke_arn
     oms_service_lambda_uri    = var.oms_service_lambda_invoke_arn
+    app_frontend_lambda_uri   = var.app_frontend_lambda_invoke_arn
+    app_backend_lambda_uri    = var.app_backend_lambda_invoke_arn
     jwt_authorizer_uri        = var.enable_jwt_authorizer ? var.jwt_authorizer_lambda_invoke_arn : ""
     jwt_authorizer_enabled    = var.enable_jwt_authorizer
   })
@@ -30,14 +32,24 @@ locals {
 resource "aws_api_gateway_rest_api" "admin_api" {
   name        = local.api_name
   description = var.api_gateway_type == "PRIVATE" ? "Private API Gateway for Admin Portal - No internet access required" : "Regional API Gateway for Admin Portal - Internet accessible"
-  
+
   body = local.openapi_spec
-  
+
+  # Binary media types for serving images, fonts, etc.
+  binary_media_types = [
+    "image/*",
+    "font/*",
+    "application/octet-stream",
+    "application/font-woff",
+    "application/font-woff2",
+    "*/*"
+  ]
+
   endpoint_configuration {
     types            = [var.api_gateway_type]
     vpc_endpoint_ids = var.api_gateway_type == "PRIVATE" ? [var.vpc_endpoint_id] : null
   }
-  
+
   # Policy: VPC-only for PRIVATE, no policy for REGIONAL (allows all access)
   policy = var.api_gateway_type == "PRIVATE" ? jsonencode({
     Version = "2012-10-17"
@@ -62,7 +74,7 @@ resource "aws_api_gateway_rest_api" "admin_api" {
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "admin_api" {
   rest_api_id = aws_api_gateway_rest_api.admin_api.id
-  
+
   triggers = {
     # Redeploy when OpenAPI spec changes
     redeployment = sha1(jsonencode([
@@ -129,61 +141,61 @@ resource "aws_lambda_permission" "admin_portal_frontend" {
 }
 
 # ==============================================
-# Admin Backend Lambda - Tenant Management APIs
+# Admin Backend Lambda - Account Management APIs
 # ==============================================
 
-# Permission 1: GET /api/v1/tenants
-resource "aws_lambda_permission" "admin_backend_get_tenants" {
-  statement_id  = "AllowAPIGateway-GetTenants"
+# Permission 1: GET /api/v1/accounts
+resource "aws_lambda_permission" "admin_backend_get_accounts" {
+  statement_id  = "AllowAPIGateway-GetAccounts"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/GET/api/v1/tenants"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/GET/api/v1/accounts"
 }
 
-# Permission 2: GET /api/v1/tenants/{tenantId}
-resource "aws_lambda_permission" "admin_backend_get_tenant_by_id" {
-  statement_id  = "AllowAPIGateway-GetTenantById"
+# Permission 2: GET /api/v1/accounts/{accountId}
+resource "aws_lambda_permission" "admin_backend_get_account_by_id" {
+  statement_id  = "AllowAPIGateway-GetAccountById"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/GET/api/v1/tenants/*"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/GET/api/v1/accounts/*"
 }
 
-# Permission 3: POST /api/v1/tenants/onboard
+# Permission 3: POST /api/v1/accounts/onboard
 resource "aws_lambda_permission" "admin_backend_post_onboard" {
   statement_id  = "AllowAPIGateway-PostOnboard"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/POST/api/v1/tenants/onboard"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/POST/api/v1/accounts/onboard"
 }
 
-# Permission 4: PUT /api/v1/tenants/onboard
+# Permission 4: PUT /api/v1/accounts/onboard
 resource "aws_lambda_permission" "admin_backend_put_onboard" {
   statement_id  = "AllowAPIGateway-PutOnboard"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/PUT/api/v1/tenants/onboard"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/PUT/api/v1/accounts/onboard"
 }
 
-# Permission 5: DELETE /api/v1/tenants/offboard
+# Permission 5: DELETE /api/v1/accounts/offboard
 resource "aws_lambda_permission" "admin_backend_delete_offboard" {
   statement_id  = "AllowAPIGateway-DeleteOffboard"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/DELETE/api/v1/tenants/offboard"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/DELETE/api/v1/accounts/offboard"
 }
 
-# Permission 6: PUT /api/v1/tenants/suspend
+# Permission 6: PUT /api/v1/accounts/suspend
 resource "aws_lambda_permission" "admin_backend_put_suspend" {
   statement_id  = "AllowAPIGateway-PutSuspend"
   action        = "lambda:InvokeFunction"
   function_name = var.admin_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/PUT/api/v1/tenants/suspend"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/PUT/api/v1/accounts/suspend"
 }
 
 # ==============================================
@@ -362,6 +374,95 @@ resource "aws_lambda_permission" "oms_inventory_endpoints" {
   function_name = var.oms_service_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/oms/inventory/*"
+}
+
+# ==============================================
+# Sys App Frontend Lambda Permissions
+# ==============================================
+
+# Permission for /ui, /images, /fonts and all subpaths
+resource "aws_lambda_permission" "app_frontend" {
+  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppFrontend"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_frontend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
+}
+
+# Permission for /images path (assets without /ui prefix)
+resource "aws_lambda_permission" "app_frontend_images" {
+  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppFrontend-Images"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_frontend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/images/*"
+}
+
+# Permission for /fonts path (assets without /ui prefix)
+resource "aws_lambda_permission" "app_frontend_fonts" {
+  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppFrontend-Fonts"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_frontend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/fonts/*"
+}
+
+# ==============================================
+# Sys App Backend Lambda Permissions (Workflow 10)
+# Routes: /api/v1/app/* - Sys App API endpoints
+# ==============================================
+
+# Permission 1: /api/v1/app (base endpoint)
+resource "aws_lambda_permission" "app_backend_base" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app"
+}
+
+# Permission 2: /api/v1/app/* (all sub-paths)
+resource "aws_lambda_permission" "app_backend_all" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendAll"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/*"
+}
+
+# Permission 3: /api/v1/app/enterprises (enterprise management)
+resource "aws_lambda_permission" "app_backend_enterprises" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendEnterprises"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/enterprises/*"
+}
+
+# Permission 4: /api/v1/app/pipelines (pipeline management)
+resource "aws_lambda_permission" "app_backend_pipelines" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendPipelines"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/pipelines/*"
+}
+
+# Permission 5: /api/v1/app/templates (template management)
+resource "aws_lambda_permission" "app_backend_templates" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppBackendTemplates"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/templates/*"
 }
 
 # ==============================================

@@ -15,8 +15,8 @@ export const findGroupIdByName = (groups: Group[], groupName: string): string | 
 export const COMMON_GROUPS = {
   SUPER_ADMIN: 'super-admin',
   PLATFORM_ADMIN: 'platform-admin',
-  TENANT_GOV: 'tenant-gov',
-  TENANT_SUPER_ADMIN: 'tenant-super-admin'
+  ACCOUNT_GOV: 'account-gov',
+  ACCOUNT_SUPER_ADMIN: 'account-super-admin'
 } as const;
 
 /**

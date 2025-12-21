@@ -1,6 +1,6 @@
 /**
- * Default RBAC schema for new tenants
- * This defines the base permissions, roles, and groups for each tenant
+ * Default RBAC schema for new accounts
+ * This defines the base permissions, roles, and groups for each account
  */
 
 const DEFAULT_PERMISSIONS = [
@@ -28,16 +28,16 @@ const DEFAULT_PERMISSIONS = [
   
   // Permission Management Permissions (5)
   { name: "create-user-permission", resource: "user-permission", action: "create", description: "Create permissions" },
-  { name: "get-tenant-permission", resource: "tenant-permission", action: "get", description: "View tenant permissions" },
-  { name: "delete-tenant-permission", resource: "tenant-permission", action: "delete", description: "Delete permissions" },
-  { name: "update-tenant-permission", resource: "tenant-permission", action: "update", description: "Update permissions" },
+  { name: "get-account-permission", resource: "account-permission", action: "get", description: "View account permissions" },
+  { name: "delete-account-permission", resource: "account-permission", action: "delete", description: "Delete permissions" },
+  { name: "update-account-permission", resource: "account-permission", action: "update", description: "Update permissions" },
   { name: "assign-permission-assign", resource: "permission-assign", action: "assign", description: "Assign permissions to roles" }
 ];
 
 const DEFAULT_ROLES = [
   {
     name: "user-manager",
-    description: "Manage users in the tenant",
+    description: "Manage users in the account",
     permissions: [
       "create-user",
       "update-user",
@@ -49,7 +49,7 @@ const DEFAULT_ROLES = [
   },
   {
     name: "user-group-manager",
-    description: "Manage user groups in the tenant",
+    description: "Manage user groups in the account",
     permissions: [
       "create-user-group",
       "get-user-group",
@@ -60,7 +60,7 @@ const DEFAULT_ROLES = [
   },
   {
     name: "user-role-manager",
-    description: "Manage user roles in the tenant",
+    description: "Manage user roles in the account",
     permissions: [
       "create-user-role",
       "get-user-role",
@@ -71,12 +71,12 @@ const DEFAULT_ROLES = [
   },
   {
     name: "user-permission-manager",
-    description: "Manage permissions in the tenant",
+    description: "Manage permissions in the account",
     permissions: [
       "create-user-permission",
-      "get-tenant-permission",
-      "delete-tenant-permission",
-      "update-tenant-permission",
+      "get-account-permission",
+      "delete-account-permission",
+      "update-account-permission",
       "assign-permission-assign"
     ]
   }
@@ -84,8 +84,8 @@ const DEFAULT_ROLES = [
 
 const DEFAULT_GROUPS = [
   {
-    name: "tenant-admin",
-    description: "Tenant administrator with full administrative access",
+    name: "account-admin",
+    description: "Account administrator with full administrative access",
     roles: [
       "user-manager",
       "user-group-manager",

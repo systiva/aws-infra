@@ -28,8 +28,8 @@ variable "memory_size" {
   default     = 512
 }
 
-variable "tenant_registry_table_name" {
-  description = "Name of the DynamoDB table for tenant registry (optional)"
+variable "account_registry_table_name" {
+  description = "Name of the DynamoDB table for account registry (optional)"
   type        = string
   default     = ""
 }
@@ -40,14 +40,14 @@ variable "step_functions_arn" {
   default     = ""
 }
 
-variable "create_tenant_step_function_arn" {
-  description = "ARN of the Create Tenant Step Functions state machine"
+variable "create_account_step_function_arn" {
+  description = "ARN of the Create Account Step Functions state machine"
   type        = string
   default     = ""
 }
 
-variable "delete_tenant_step_function_arn" {
-  description = "ARN of the Delete Tenant Step Functions state machine"
+variable "delete_account_step_function_arn" {
+  description = "ARN of the Delete Account Step Functions state machine"
   type        = string
   default     = ""
 }
@@ -57,13 +57,13 @@ variable "admin_account_id" {
   type        = string
 }
 
-variable "tenant_account_id" {
-  description = "Tenant account ID (detected from workflow)"
+variable "account_account_id" {
+  description = "Account account ID (detected from workflow)"
   type        = string
 }
 
 variable "cross_account_role_name" {
-  description = "Cross-account role name (e.g., qa-CrossAccountTenantRole)"
+  description = "Cross-account role name (e.g., qa-CrossAccountAccountRole)"
   type        = string
 }
 
@@ -77,8 +77,8 @@ variable "aws_region" {
   type        = string
 }
 
-variable "trusted_tenant_account_ids" {
-  description = "List of trusted tenant account IDs for cross-account access"
+variable "trusted_account_account_ids" {
+  description = "List of trusted account account IDs for cross-account access"
   type        = list(string)
   default     = []
 }

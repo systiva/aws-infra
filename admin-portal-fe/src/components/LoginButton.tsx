@@ -39,8 +39,8 @@ const LoginButton: React.FC = () => {
         {state.isAuthenticated && state.user && (
           <div className="user-info">
             <div className="user-email">{state.user.email}</div>
-            {state.user.tenantId && (
-              <div className="user-tenant">Tenant: {state.user.tenantId}</div>
+            {state.user.accountId && (
+              <div className="user-account">Account: {state.user.accountId}</div>
             )}
             {state.user.userRoles && state.user.userRoles.length > 0 && (
               <div className="user-role">Roles: {state.user.userRoles.join(', ')}</div>
