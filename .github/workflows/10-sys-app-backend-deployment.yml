@@ -212,6 +212,45 @@ jobs:
 
           echo "✅ Lambda deployment complete"
 
+      - name: Update Lambda Environment Variables
+        run: |
+          FUNCTION_NAME="${{ needs.get-config.outputs.lambda_function_name }}"
+          WORKSPACE="${{ inputs.workspace }}"
+
+          echo "Updating Lambda environment variables..."
+
+          # Get current environment variables
+          CURRENT_ENV=$(aws lambda get-function-configuration \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}" \
+            --query 'Environment.Variables' \
+            --output json 2>/dev/null || echo '{}')
+
+          # Merge with new environment variables for DynamoDB
+          # Primary table: systiva-admin-{workspace}
+          NEW_ENV=$(echo "$CURRENT_ENV" | jq --arg table "systiva-admin-${WORKSPACE}" \
+            --arg workspace "${WORKSPACE}" \
+            '. + {
+              "DYNAMODB_SYSTIVA_TABLE": $table,
+              "WORKSPACE": $workspace,
+              "NODE_ENV": $workspace
+            }')
+
+          # Update Lambda configuration
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION_NAME" \
+            --environment "Variables=$NEW_ENV" \
+            --region "${{ inputs.aws_region }}"
+
+          # Wait for update to complete
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}"
+
+          echo "✅ Lambda environment variables updated"
+          echo "  DYNAMODB_SYSTIVA_TABLE: systiva-admin-${WORKSPACE}"
+          echo "  WORKSPACE: ${WORKSPACE}"
+
       - name: Verify Deployment
         run: |
           FUNCTION_NAME="${{ needs.get-config.outputs.lambda_function_name }}"
