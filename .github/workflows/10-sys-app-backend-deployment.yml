@@ -219,12 +219,14 @@ jobs:
 
           echo "Updating Lambda environment variables..."
 
-          # Get current environment variables
+          # Get current environment variables as JSON
           CURRENT_ENV=$(aws lambda get-function-configuration \
             --function-name "$FUNCTION_NAME" \
             --region "${{ inputs.aws_region }}" \
             --query 'Environment.Variables' \
             --output json 2>/dev/null || echo '{}')
+
+          echo "Current env vars: $CURRENT_ENV"
 
           # Merge with new environment variables for DynamoDB
           # Primary table: systiva-admin-{workspace}
@@ -236,16 +238,24 @@ jobs:
               "NODE_ENV": $workspace
             }')
 
-          # Update Lambda configuration
+          echo "New env vars: $NEW_ENV"
+
+          # Write to temp file for AWS CLI (avoids shell escaping issues)
+          echo "{\"Variables\": $NEW_ENV}" > /tmp/env-vars.json
+
+          # Update Lambda configuration using file input
           aws lambda update-function-configuration \
             --function-name "$FUNCTION_NAME" \
-            --environment "Variables=$NEW_ENV" \
+            --environment file:///tmp/env-vars.json \
             --region "${{ inputs.aws_region }}"
 
           # Wait for update to complete
           aws lambda wait function-updated \
             --function-name "$FUNCTION_NAME" \
             --region "${{ inputs.aws_region }}"
+
+          # Cleanup
+          rm -f /tmp/env-vars.json
 
           echo "✅ Lambda environment variables updated"
           echo "  DYNAMODB_SYSTIVA_TABLE: systiva-admin-${WORKSPACE}"
