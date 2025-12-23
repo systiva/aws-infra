@@ -252,12 +252,17 @@ jobs:
           # Primary table: systiva-admin-{workspace}
           NEW_ENV=$(echo "$CURRENT_ENV" | jq --arg table "systiva-admin-${WORKSPACE}" \
             --arg workspace "${WORKSPACE}" \
+            --arg region "${{ inputs.aws_region }}" \
             '. + {
               "DYNAMODB_SYSTIVA_TABLE": $table,
               "ACCOUNT_REGISTRY_TABLE_NAME": $table,
+              "DYNAMODB_RBAC_TABLE": "AccessControl",
               "STORAGE_MODE": "dynamodb",
               "WORKSPACE": $workspace,
-              "NODE_ENV": $workspace
+              "NODE_ENV": $workspace,
+              "AWS_REGION_NAME": $region,
+              "LOG_LEVEL": "info",
+              "PORT": "4000"
             }')
 
           echo "New env vars: $NEW_ENV"
