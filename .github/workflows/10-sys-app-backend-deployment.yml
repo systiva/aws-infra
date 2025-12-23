@@ -212,6 +212,26 @@ jobs:
 
           echo "✅ Lambda deployment complete"
 
+      - name: Configure Lambda Handler
+        run: |
+          FUNCTION_NAME="${{ needs.get-config.outputs.lambda_function_name }}"
+
+          echo "Configuring Lambda handler to dist/index.handler..."
+
+          # Update Lambda handler configuration
+          # Compiled TypeScript goes to dist/, so handler is dist/index.handler
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION_NAME" \
+            --handler "dist/index.handler" \
+            --region "${{ inputs.aws_region }}"
+
+          # Wait for update to complete
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME" \
+            --region "${{ inputs.aws_region }}"
+
+          echo "✅ Lambda handler configured: dist/index.handler"
+
       - name: Update Lambda Environment Variables
         run: |
           FUNCTION_NAME="${{ needs.get-config.outputs.lambda_function_name }}"
@@ -234,6 +254,8 @@ jobs:
             --arg workspace "${WORKSPACE}" \
             '. + {
               "DYNAMODB_SYSTIVA_TABLE": $table,
+              "ACCOUNT_REGISTRY_TABLE_NAME": $table,
+              "STORAGE_MODE": "dynamodb",
               "WORKSPACE": $workspace,
               "NODE_ENV": $workspace
             }')
