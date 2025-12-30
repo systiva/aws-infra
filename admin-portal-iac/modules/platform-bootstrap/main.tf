@@ -37,6 +37,12 @@ resource "random_uuid" "systiva_address_id" {}
 resource "random_uuid" "systiva_technical_user_id" {}
 resource "random_uuid" "systiva_license_id" {}
 
+# Generate UUIDs for default Enterprise, Product, Service entities
+resource "random_uuid" "global_enterprise_id" {}
+resource "random_uuid" "platform_product_id" {}
+resource "random_uuid" "all_services_service_id" {}
+resource "random_uuid" "enterprise_product_service_linkage_id" {}
+
 # Generate UUIDs for permissions
 resource "random_uuid" "permission_ids" {
   for_each = {
@@ -114,13 +120,16 @@ locals {
 # Cognito User Creation
 # ==============================================
 
-# Create platform admin user in Cognito
+# Create platform admin user in Cognito with email attribute
 resource "aws_cognito_user" "platform_admin" {
   user_pool_id = var.user_pool_id
   username     = local.platform_admin_username
 
-  # Don't set attributes here to avoid provider inconsistency bug
-  # Attributes will be set via null_resource provisioner below
+  # Set email attribute directly - this is the proper way to link email
+  attributes = {
+    email          = local.platform_admin_email
+    email_verified = "true"
+  }
 
   # Set temporary password from variable (passed from GitHub secret)
   temporary_password = var.temporary_password
@@ -135,8 +144,9 @@ resource "aws_cognito_user" "platform_admin" {
   }
 }
 
-# Set user attributes via AWS CLI to avoid provider bug
-resource "null_resource" "set_platform_admin_attributes" {
+# Set additional custom user attributes via AWS CLI (custom:account_id)
+# Note: Email is now set directly in aws_cognito_user resource above
+resource "null_resource" "set_platform_admin_custom_attributes" {
   triggers = {
     user_pool_id = var.user_pool_id
     username     = local.platform_admin_username
@@ -149,8 +159,6 @@ resource "null_resource" "set_platform_admin_attributes" {
         --user-pool-id ${var.user_pool_id} \
         --username ${local.platform_admin_username} \
         --user-attributes \
-          Name=email,Value=${local.platform_admin_email} \
-          Name=email_verified,Value=true \
           Name=custom:account_id,Value=${local.platform_id}
     EOT
   }
@@ -477,6 +485,303 @@ resource "aws_dynamodb_table_item" "systiva_license" {
   })
 
   depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# ==============================================
+# Default Enterprise, Product, Service & Linkage
+# ==============================================
+# These entities will appear in the Enterprise Configuration screen
+
+# Create "Global" Enterprise entity
+resource "aws_dynamodb_table_item" "global_enterprise" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.global_enterprise_id.result}"
+    }
+    SK = {
+      S = "ENTERPRISE#${random_uuid.global_enterprise_id.result}"
+    }
+    id = {
+      S = random_uuid.global_enterprise_id.result
+    }
+    enterprise_name = {
+      S = "Global"
+    }
+    name = {
+      S = "Global"
+    }
+    entity_type = {
+      S = "enterprise"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create "Platform" Product entity
+resource "aws_dynamodb_table_item" "platform_product" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.platform_product_id.result}"
+    }
+    SK = {
+      S = "PRODUCT#${random_uuid.platform_product_id.result}"
+    }
+    id = {
+      S = random_uuid.platform_product_id.result
+    }
+    product_name = {
+      S = "Platform"
+    }
+    name = {
+      S = "Platform"
+    }
+    entity_type = {
+      S = "product"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create "All Services" Service entity
+resource "aws_dynamodb_table_item" "all_services_service" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.all_services_service_id.result}"
+    }
+    SK = {
+      S = "SERVICE#${random_uuid.all_services_service_id.result}"
+    }
+    id = {
+      S = random_uuid.all_services_service_id.result
+    }
+    service_name = {
+      S = "All Services"
+    }
+    name = {
+      S = "All Services"
+    }
+    entity_type = {
+      S = "service"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create Enterprise-Product-Service Linkage (main linkage record)
+resource "aws_dynamodb_table_item" "enterprise_product_service_linkage" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.enterprise_product_service_linkage_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
+    }
+    id = {
+      S = random_uuid.enterprise_product_service_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.global_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.platform_product_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.all_services_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "enterprise_product_service"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [
+    aws_dynamodb_table_item.global_enterprise,
+    aws_dynamodb_table_item.platform_product,
+    aws_dynamodb_table_item.all_services_service
+  ]
+}
+
+# Enterprise lookup record for easier querying
+resource "aws_dynamodb_table_item" "enterprise_linkage_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.global_enterprise_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.enterprise_product_service_linkage_id.result
+    }
+    product_id = {
+      S = random_uuid.platform_product_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.all_services_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "enterprise_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.enterprise_product_service_linkage]
+}
+
+# Product lookup record for easier querying
+resource "aws_dynamodb_table_item" "product_linkage_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.platform_product_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.enterprise_product_service_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.global_enterprise_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.all_services_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "product_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.enterprise_product_service_linkage]
+}
+
+# Service lookup record for easier querying
+resource "aws_dynamodb_table_item" "service_linkage_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.all_services_service_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.enterprise_product_service_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.global_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.platform_product_id.result
+    }
+    entity_type = {
+      S = "service_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.enterprise_product_service_linkage]
 }
 
 # Legacy platform account entry (for backward compatibility with IMS)
