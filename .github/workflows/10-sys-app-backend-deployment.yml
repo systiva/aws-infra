@@ -26,6 +26,7 @@ jobs:
       api_url: ${{ steps.config.outputs.api_url }}
       lambda_function_name: ${{ steps.config.outputs.lambda_function_name }}
       backend_api_url: ${{ steps.config.outputs.backend_api_url }}
+      infra_provisioning_api_url: ${{ steps.config.outputs.infra_provisioning_api_url }}
 
     steps:
       - name: Configure AWS Credentials
@@ -82,14 +83,20 @@ jobs:
           # Backend API URL
           BACKEND_API_URL="${API_URL%/api/v1}/api/v1/app"
 
+          # Infrastructure Provisioning API URL (for account onboarding/offboarding)
+          # This is the base URL for the onboard/offboard endpoints
+          INFRA_PROVISIONING_API_URL="${API_URL}/accounts"
+
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
           echo "lambda_function_name=$LAMBDA_FUNCTION_NAME" >> $GITHUB_OUTPUT
           echo "backend_api_url=$BACKEND_API_URL" >> $GITHUB_OUTPUT
+          echo "infra_provisioning_api_url=$INFRA_PROVISIONING_API_URL" >> $GITHUB_OUTPUT
 
           echo "✅ Configuration retrieved successfully"
           echo "  API URL: $API_URL"
           echo "  Lambda Function: $LAMBDA_FUNCTION_NAME"
           echo "  Backend API URL: $BACKEND_API_URL"
+          echo "  Infra Provisioning API URL: $INFRA_PROVISIONING_API_URL"
 
   build-and-deploy:
     name: Build and Deploy Sys App Backend
@@ -236,6 +243,7 @@ jobs:
         run: |
           FUNCTION_NAME="${{ needs.get-config.outputs.lambda_function_name }}"
           WORKSPACE="${{ inputs.workspace }}"
+          INFRA_PROVISIONING_API_URL="${{ needs.get-config.outputs.infra_provisioning_api_url }}"
 
           echo "Updating Lambda environment variables..."
 
@@ -250,9 +258,11 @@ jobs:
 
           # Merge with new environment variables for DynamoDB
           # Primary table: systiva-admin-{workspace}
+          # INFRA_PROVISIONING_API_URL: Dynamic URL for account onboarding/offboarding infrastructure
           NEW_ENV=$(echo "$CURRENT_ENV" | jq --arg table "systiva-admin-${WORKSPACE}" \
             --arg workspace "${WORKSPACE}" \
             --arg region "${{ inputs.aws_region }}" \
+            --arg infra_api_url "${INFRA_PROVISIONING_API_URL}" \
             '. + {
               "DYNAMODB_SYSTIVA_TABLE": $table,
               "ACCOUNT_REGISTRY_TABLE_NAME": $table,
@@ -262,7 +272,8 @@ jobs:
               "NODE_ENV": $workspace,
               "AWS_REGION_NAME": $region,
               "LOG_LEVEL": "info",
-              "PORT": "4000"
+              "PORT": "4000",
+              "INFRA_PROVISIONING_API_URL": $infra_api_url
             }')
 
           echo "New env vars: $NEW_ENV"
@@ -287,6 +298,7 @@ jobs:
           echo "✅ Lambda environment variables updated"
           echo "  DYNAMODB_SYSTIVA_TABLE: systiva-admin-${WORKSPACE}"
           echo "  WORKSPACE: ${WORKSPACE}"
+          echo "  INFRA_PROVISIONING_API_URL: ${INFRA_PROVISIONING_API_URL}"
 
       - name: Verify Deployment
         run: |
@@ -372,6 +384,13 @@ jobs:
             --overwrite \
             --region "${{ inputs.aws_region }}" || true
 
+          aws ssm put-parameter \
+            --name "/sys-app/${{ inputs.workspace }}/backend/infra-provisioning-api-url" \
+            --value "${{ needs.get-config.outputs.infra_provisioning_api_url }}" \
+            --type "String" \
+            --overwrite \
+            --region "${{ inputs.aws_region }}" || true
+
           echo "✅ SSM metadata updated"
 
       - name: Display Deployment Summary
@@ -386,6 +405,7 @@ jobs:
           echo ""
           echo "Lambda Function: ${{ needs.get-config.outputs.lambda_function_name }}"
           echo "Backend API URL: ${{ needs.get-config.outputs.backend_api_url }}"
+          echo "Infra Provisioning API: ${{ needs.get-config.outputs.infra_provisioning_api_url }}"
           echo "Region: ${{ inputs.aws_region }}"
           echo ""
           echo "API Endpoints Available:"
@@ -393,6 +413,10 @@ jobs:
           echo "  - GET/POST/PUT/DELETE /api/v1/app/enterprises/*"
           echo "  - GET/POST/PUT/DELETE /api/v1/app/pipelines/*"
           echo "  - GET/POST/PUT/DELETE /api/v1/app/templates/*"
+          echo ""
+          echo "Account Onboard/Offboard Integration:"
+          echo "  - POST /api/v1/app/api/accounts/onboard -> triggers infra provisioning"
+          echo "  - DELETE /api/v1/app/api/accounts/offboard -> triggers infra deprovisioning"
           echo ""
           echo "Sys App Frontend (Workflow 09) can now interact"
           echo "with this backend via the above API endpoints."
