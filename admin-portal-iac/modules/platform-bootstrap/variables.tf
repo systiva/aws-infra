@@ -69,3 +69,88 @@ variable "temporary_password" {
   type        = string
   sensitive   = true
 }
+
+# ==============================================
+# Default Systiva Account Configuration
+# ==============================================
+
+variable "default_account_name" {
+  description = "Default account name"
+  type        = string
+  default     = "Systiva"
+}
+
+variable "default_master_account_name" {
+  description = "Default master account name"
+  type        = string
+  default     = "Systiva Labs Private Limited"
+}
+
+variable "default_cloud_type" {
+  description = "Default cloud type (Public Cloud or Private Cloud)"
+  type        = string
+  default     = "Public Cloud"
+}
+
+variable "default_subscription_tier" {
+  description = "Default subscription tier (public or private)"
+  type        = string
+  default     = "public"
+}
+
+# Default Address Configuration
+variable "default_address_line1" {
+  description = "Default address line 1"
+  type        = string
+  default     = "Hn J128 First Floor, Mayfield Gardens Sector 51, DLF Phase II, Gurgaon"
+}
+
+variable "default_address_line2" {
+  description = "Default address line 2"
+  type        = string
+  default     = "Haryana, India, 122008"
+}
+
+variable "default_city" {
+  description = "Default city"
+  type        = string
+  default     = "Gurgaon"
+}
+
+variable "default_state" {
+  description = "Default state"
+  type        = string
+  default     = "Haryana"
+}
+
+variable "default_zip_code" {
+  description = "Default ZIP code"
+  type        = string
+  default     = "122008"
+}
+
+variable "default_country" {
+  description = "Default country"
+  type        = string
+  default     = "India"
+}
+
+# Default Technical User Configuration
+variable "technical_user_first_name" {
+  description = "Technical user first name"
+  type        = string
+  default     = "Admin"
+}
+
+variable "technical_user_last_name" {
+  description = "Technical user last name"
+  type        = string
+  default     = "User"
+}
+
+# License Duration Configuration
+variable "license_duration_years" {
+  description = "License duration in years from creation date"
+  type        = number
+  default     = 2
+}

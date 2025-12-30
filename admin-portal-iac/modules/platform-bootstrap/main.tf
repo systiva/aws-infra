@@ -32,6 +32,11 @@ resource "random_uuid" "user_group_manager_role_id" {}
 resource "random_uuid" "user_role_manager_role_id" {}
 resource "random_uuid" "user_permission_manager_role_id" {}
 
+# Generate UUIDs for Systiva account entities
+resource "random_uuid" "systiva_address_id" {}
+resource "random_uuid" "systiva_technical_user_id" {}
+resource "random_uuid" "systiva_license_id" {}
+
 # Generate UUIDs for permissions
 resource "random_uuid" "permission_ids" {
   for_each = {
@@ -89,6 +94,20 @@ locals {
   platform_admin_first_name = var.platform_admin_first_name
   platform_admin_last_name = var.platform_admin_last_name
   current_timestamp = formatdate("YYYY-MM-DD'T'hh:mm:ss.000Z", timestamp())
+
+  # License dates: start = now, end = now + license_duration_years
+  license_start_date = formatdate("YYYY-MM-DD", timestamp())
+  license_end_date = formatdate("YYYY-MM-DD", timeadd(timestamp(), "${var.license_duration_years * 365 * 24}h"))
+
+  # Technical user configuration
+  technical_user_first_name = var.technical_user_first_name
+  technical_user_last_name = var.technical_user_last_name
+
+  # Default account configuration
+  default_account_name = var.default_account_name
+  default_master_account_name = var.default_master_account_name
+  default_cloud_type = var.default_cloud_type
+  default_subscription_tier = var.default_subscription_tier
 }
 
 # ==============================================
@@ -99,17 +118,17 @@ locals {
 resource "aws_cognito_user" "platform_admin" {
   user_pool_id = var.user_pool_id
   username     = local.platform_admin_username
-  
+
   # Don't set attributes here to avoid provider inconsistency bug
   # Attributes will be set via null_resource provisioner below
-  
+
   # Set temporary password from variable (passed from GitHub secret)
   temporary_password = var.temporary_password
   message_action     = "SUPPRESS"  # Don't send welcome email
-  
+
   # Ensure the platform ID is generated first
   depends_on = [random_integer.platform_id]
-  
+
   # CRITICAL: Prevent Terraform from modifying user after creation
   lifecycle {
     ignore_changes = all  # Ignore all changes after initial creation
@@ -123,7 +142,7 @@ resource "null_resource" "set_platform_admin_attributes" {
     username     = local.platform_admin_username
     platform_id  = local.platform_id
   }
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       aws cognito-idp admin-update-user-attributes \
@@ -135,7 +154,7 @@ resource "null_resource" "set_platform_admin_attributes" {
           Name=custom:account_id,Value=${local.platform_id}
     EOT
   }
-  
+
   depends_on = [aws_cognito_user.platform_admin]
 }
 
@@ -143,12 +162,329 @@ resource "null_resource" "set_platform_admin_attributes" {
 # DynamoDB RBAC Entries
 # ==============================================
 
-# Create platform account entity
+# ==============================================
+# Systiva Default Account (Main Account Entry)
+# ==============================================
+# This creates the complete Systiva account with all details
+# that will be displayed on the Manage Accounts screen in ppp-fe
+
+# Create Systiva account entity (ppp-be compatible format)
+resource "aws_dynamodb_table_item" "systiva_account" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "ACCOUNT#${local.platform_id}"
+    }
+    SK = {
+      S = "ACCOUNT#${local.platform_id}"
+    }
+    entityType = {
+      S = "ACCOUNT"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    accountName = {
+      S = local.default_account_name
+    }
+    masterAccount = {
+      S = local.default_master_account_name
+    }
+    cloudType = {
+      S = local.default_cloud_type
+    }
+    subscriptionTier = {
+      S = local.default_subscription_tier
+    }
+    email = {
+      S = local.platform_admin_email
+    }
+    firstName = {
+      S = local.technical_user_first_name
+    }
+    lastName = {
+      S = local.technical_user_last_name
+    }
+    status = {
+      S = "Active"
+    }
+    provisioningState = {
+      S = "active"
+    }
+    # Address details
+    addressLine1 = {
+      S = var.default_address_line1
+    }
+    addressLine2 = {
+      S = var.default_address_line2
+    }
+    city = {
+      S = var.default_city
+    }
+    state = {
+      S = var.default_state
+    }
+    country = {
+      S = var.default_country
+    }
+    pincode = {
+      S = var.default_zip_code
+    }
+    # Embedded address details for frontend
+    addressDetails = {
+      M = {
+        addressLine1 = { S = var.default_address_line1 }
+        addressLine2 = { S = var.default_address_line2 }
+        city = { S = var.default_city }
+        state = { S = var.default_state }
+        zipCode = { S = var.default_zip_code }
+        country = { S = var.default_country }
+      }
+    }
+    # Embedded technical user for frontend
+    technicalUser = {
+      M = {
+        firstName = { S = local.technical_user_first_name }
+        lastName = { S = local.technical_user_last_name }
+        adminUsername = { S = local.platform_admin_username }
+        adminEmail = { S = local.platform_admin_email }
+        status = { S = "Active" }
+        assignedUserGroup = { S = "platform-admin" }
+        assignedRole = { S = "infra-manager" }
+        assignmentStartDate = { S = local.license_start_date }
+        assignmentEndDate = { S = local.license_end_date }
+      }
+    }
+    # Embedded licenses array for frontend
+    licenses = {
+      L = [
+        {
+          M = {
+            id = { S = random_uuid.systiva_license_id.result }
+            enterprise = { S = "Global" }
+            product = { S = "Platform" }
+            service = { S = "All Services" }
+            licenseStart = { S = local.license_start_date }
+            licenseEnd = { S = local.license_end_date }
+            users = { N = "100" }
+            renewalNotice = { BOOL = true }
+            noticePeriod = { N = "30" }
+          }
+        }
+      ]
+    }
+    adminUsername = {
+      S = local.platform_admin_username
+    }
+    registeredOn = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    lastModified = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+    created_by = {
+      S = "terraform"
+    }
+  })
+
+  # Ensure the platform ID is generated first
+  depends_on = [random_integer.platform_id]
+}
+
+# Create address entity for Systiva account
+resource "aws_dynamodb_table_item" "systiva_address" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "ACCOUNT#${local.platform_id}"
+    }
+    SK = {
+      S = "ADDRESS#${random_uuid.systiva_address_id.result}"
+    }
+    entityType = {
+      S = "ADDRESS"
+    }
+    id = {
+      S = random_uuid.systiva_address_id.result
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    addressLine1 = {
+      S = var.default_address_line1
+    }
+    addressLine2 = {
+      S = var.default_address_line2
+    }
+    city = {
+      S = var.default_city
+    }
+    state = {
+      S = var.default_state
+    }
+    zipCode = {
+      S = var.default_zip_code
+    }
+    country = {
+      S = var.default_country
+    }
+    isPrimary = {
+      BOOL = true
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create technical user entity for Systiva account
+resource "aws_dynamodb_table_item" "systiva_technical_user" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "ACCOUNT#${local.platform_id}"
+    }
+    SK = {
+      S = "TECHNICAL_USER#${random_uuid.systiva_technical_user_id.result}"
+    }
+    entityType = {
+      S = "TECHNICAL_USER"
+    }
+    id = {
+      S = random_uuid.systiva_technical_user_id.result
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    firstName = {
+      S = local.technical_user_first_name
+    }
+    lastName = {
+      S = local.technical_user_last_name
+    }
+    adminUsername = {
+      S = local.platform_admin_username
+    }
+    adminEmail = {
+      S = local.platform_admin_email
+    }
+    status = {
+      S = "Active"
+    }
+    assignedUserGroup = {
+      S = "platform-admin"
+    }
+    assignedRole = {
+      S = "infra-manager"
+    }
+    assignmentStartDate = {
+      S = local.license_start_date
+    }
+    assignmentEndDate = {
+      S = local.license_end_date
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create license entity for Systiva account
+resource "aws_dynamodb_table_item" "systiva_license" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "ACCOUNT#${local.platform_id}"
+    }
+    SK = {
+      S = "LICENSE#${random_uuid.systiva_license_id.result}"
+    }
+    entityType = {
+      S = "LICENSE"
+    }
+    id = {
+      S = random_uuid.systiva_license_id.result
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    enterprise = {
+      S = "Global"
+    }
+    product = {
+      S = "Platform"
+    }
+    service = {
+      S = "All Services"
+    }
+    licenseStart = {
+      S = local.license_start_date
+    }
+    licenseEnd = {
+      S = local.license_end_date
+    }
+    users = {
+      N = "100"
+    }
+    renewalNotice = {
+      BOOL = true
+    }
+    noticePeriod = {
+      N = "30"
+    }
+    contactDetails = {
+      M = {
+        firstName = { S = local.technical_user_first_name }
+        lastName = { S = local.technical_user_last_name }
+        email = { S = local.platform_admin_email }
+        company = { S = local.default_master_account_name }
+      }
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Legacy platform account entry (for backward compatibility with IMS)
 resource "aws_dynamodb_table_item" "platform_account" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -163,7 +499,7 @@ resource "aws_dynamodb_table_item" "platform_account" {
       S = local.platform_id
     }
     accountName = {
-      S = "Platform"
+      S = local.default_account_name
     }
     email = {
       S = local.platform_admin_email
@@ -172,7 +508,7 @@ resource "aws_dynamodb_table_item" "platform_account" {
       S = "ACTIVE"
     }
     subscriptionTier = {
-      S = "platform"
+      S = local.default_subscription_tier
     }
     createdAt = {
       S = local.current_timestamp
@@ -184,7 +520,7 @@ resource "aws_dynamodb_table_item" "platform_account" {
       S = "terraform"
     }
   })
-  
+
   # Ensure the platform ID is generated first
   depends_on = [random_integer.platform_id]
 }
@@ -194,7 +530,7 @@ resource "aws_dynamodb_table_item" "platform_admin_group" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -234,7 +570,7 @@ resource "aws_dynamodb_table_item" "account_admin_group" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -274,7 +610,7 @@ resource "aws_dynamodb_table_item" "infra_manager_role" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -317,7 +653,7 @@ resource "aws_dynamodb_table_item" "platform_admin_manager_role" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -360,7 +696,7 @@ resource "aws_dynamodb_table_item" "account_admin_manager_role" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -403,7 +739,7 @@ resource "aws_dynamodb_table_item" "user_manager_role" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -446,7 +782,7 @@ resource "aws_dynamodb_table_item" "user_group_manager_role" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -489,7 +825,7 @@ resource "aws_dynamodb_table_item" "user_role_manager_role" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -532,7 +868,7 @@ resource "aws_dynamodb_table_item" "user_permission_manager_role" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -761,11 +1097,11 @@ resource "aws_dynamodb_table_item" "permissions" {
       action      = "assign"
     }
   }
-  
+
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -811,7 +1147,7 @@ resource "aws_dynamodb_table_item" "platform_admin_user" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ACCOUNT#${local.platform_id}"
@@ -874,11 +1210,11 @@ resource "aws_dynamodb_table_item" "platform_admin_user" {
 # Group -> Roles mappings (platform-admin group to roles)
 resource "aws_dynamodb_table_item" "platform_admin_group_role_mappings" {
   for_each = toset(["infra-manager", "platform-admin-manager", "account-admin-manager"])
-  
+
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "GROUP#${local.platform_id}#${random_uuid.platform_admin_group_id.result}#ROLES"
@@ -907,11 +1243,11 @@ resource "aws_dynamodb_table_item" "platform_admin_group_role_mappings" {
 # Account-admin group -> roles mapping
 resource "aws_dynamodb_table_item" "account_admin_group_role_mappings" {
   for_each = toset(["user-manager", "user-group-manager", "user-role-manager", "user-permission-manager"])
-  
+
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "GROUP#${local.platform_id}#${random_uuid.account_admin_group_id.result}#ROLES"
@@ -940,11 +1276,11 @@ resource "aws_dynamodb_table_item" "account_admin_group_role_mappings" {
 # Role -> Groups mappings (roles to platform-admin group)
 resource "aws_dynamodb_table_item" "platform_admin_role_group_mappings" {
   for_each = toset(["infra-manager", "platform-admin-manager", "account-admin-manager"])
-  
+
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ROLE#${local.platform_id}#${each.value == "infra-manager" ? random_uuid.infra_manager_role_id.result : (each.value == "platform-admin-manager" ? random_uuid.platform_admin_manager_role_id.result : random_uuid.account_admin_manager_role_id.result)}#GROUPS"
@@ -973,11 +1309,11 @@ resource "aws_dynamodb_table_item" "platform_admin_role_group_mappings" {
 # Roles -> account-admin group mappings
 resource "aws_dynamodb_table_item" "account_admin_role_group_mappings" {
   for_each = toset(["user-manager", "user-group-manager", "user-role-manager", "user-permission-manager"])
-  
+
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ROLE#${local.platform_id}#${each.value == "user-manager" ? random_uuid.user_manager_role_id.result : (each.value == "user-group-manager" ? random_uuid.user_group_manager_role_id.result : (each.value == "user-role-manager" ? random_uuid.user_role_manager_role_id.result : random_uuid.user_permission_manager_role_id.result))}#GROUPS"
@@ -1084,11 +1420,11 @@ resource "aws_dynamodb_table_item" "role_permission_mappings" {
       ]
     ]) : "${item.role}-${item.permission}" => item
   }
-  
+
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "ROLE#${local.platform_id}#${each.value.role_id}#PERMISSIONS"
@@ -1136,11 +1472,11 @@ resource "aws_dynamodb_table_item" "permission_role_mappings" {
       ]
     ]) : "${item.permission}-${item.role}" => item
   }
-  
+
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "PERMISSION#${local.platform_id}#${each.value.permission_id}#ROLES"
@@ -1175,7 +1511,7 @@ resource "aws_dynamodb_table_item" "user_group_mapping" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "USER#${local.platform_id}#${aws_cognito_user.platform_admin.sub}#GROUPS"
@@ -1206,7 +1542,7 @@ resource "aws_dynamodb_table_item" "group_user_mapping" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
   range_key  = var.rbac_table_range_key
-  
+
   item = jsonencode({
     PK = {
       S = "GROUP#${local.platform_id}#${random_uuid.platform_admin_group_id.result}#USERS"

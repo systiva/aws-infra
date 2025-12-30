@@ -66,7 +66,7 @@ output "rbac_setup_summary" {
     roles_created  = ["account-gov", "account-super-admin", "account-admin"]
     permissions_created = [
       "account-onboarding",
-      "account-suspension", 
+      "account-suspension",
       "account-offboarding",
       "account-super-admin-create",
       "account-super-admin-update",
@@ -105,4 +105,40 @@ output "account_admin_group_id" {
 output "platform_account_id" {
   description = "Platform account ID for admin users"
   value       = local.platform_id
+}
+
+# ==============================================
+# Systiva Default Account Outputs
+# ==============================================
+
+output "systiva_account_details" {
+  description = "Systiva default account details created during bootstrap"
+  value = {
+    account_id             = local.platform_id
+    account_name           = local.default_account_name
+    master_account_name    = local.default_master_account_name
+    cloud_type             = local.default_cloud_type
+    subscription_tier      = local.default_subscription_tier
+    admin_email            = local.platform_admin_email
+    admin_username         = local.platform_admin_username
+    address_id             = random_uuid.systiva_address_id.result
+    technical_user_id      = random_uuid.systiva_technical_user_id.result
+    license_id             = random_uuid.systiva_license_id.result
+    license_start_date     = local.license_start_date
+    license_end_date       = local.license_end_date
+    assigned_group         = "platform-admin"
+    assigned_role          = "infra-manager"
+  }
+}
+
+output "systiva_address" {
+  description = "Address details for Systiva account"
+  value = {
+    address_line1 = var.default_address_line1
+    address_line2 = var.default_address_line2
+    city          = var.default_city
+    state         = var.default_state
+    zip_code      = var.default_zip_code
+    country       = var.default_country
+  }
 }
