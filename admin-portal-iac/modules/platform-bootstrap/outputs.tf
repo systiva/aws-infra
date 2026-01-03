@@ -153,9 +153,9 @@ output "default_enterprise_config" {
     enterprise_id   = random_uuid.global_enterprise_id.result
     enterprise_name = "Global"
     product_id      = random_uuid.platform_product_id.result
-    product_name    = "Platform"
+    product_name    = "All"
     service_id      = random_uuid.all_services_service_id.result
-    service_name    = "All Services"
+    service_name    = "All"
     linkage_id      = random_uuid.enterprise_product_service_linkage_id.result
   }
 }
