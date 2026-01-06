@@ -483,63 +483,92 @@ class AccountService {
       });
       Logger.debug({ accountId }, 'AccountService.deleteAccount - Account status updated to deleting');
 
-      // Start Step Functions workflow for account deletion
+      // Check if Step Functions is configured
+      const stepFunctionsConfigured = config.STEP_FUNCTIONS && config.STEP_FUNCTIONS.DELETE_ACCOUNT_STATE_MACHINE_ARN;
+
+      if (stepFunctionsConfigured) {
+        // Start Step Functions workflow for account deletion
+        try {
+          const accountAccountId = config.CROSS_ACCOUNT.ACCOUNT_ACCOUNT_ID;
+
+          // Start Step Functions execution for account deletion
+          const stepFunctionsResult = await this.startAccountDeletionWorkflow(existingAccount, accountAccountId);
+
+          // Update account with Step Functions execution info
+          const updateData = {
+            stepFunctionExecutionArn: stepFunctionsResult.executionArn,
+            provisioningState: 'deleting',
+            stepFunctionStatus: {
+              executionStatus: 'RUNNING',
+              lastChecked: moment().toISOString()
+            },
+            lastModified: moment().toISOString(),
+            deletionSubmittedAt: moment().toISOString()
+          };
+
+          await Mapping.updateAccount(accountId, updateData);
+
+          Logger.debug({
+            accountId,
+            subscriptionTier: existingAccount.subscriptionTier,
+            executionArn: stepFunctionsResult.executionArn
+          }, 'AccountService.deleteAccount - Step Functions deletion workflow started successfully');
+
+          return Commons.getRes(
+            Constants.HTTP_STATUS.OK,
+            'Account deletion initiated successfully',
+            {
+              accountId,
+              subscriptionTier: existingAccount.subscriptionTier,
+              deletedAt: moment().toISOString(),
+              executionArn: stepFunctionsResult.executionArn,
+              organizationName: existingAccount.organizationName,
+              note: 'Step Functions deletion workflow initiated asynchronously'
+            }
+          );
+
+        } catch (deletionError) {
+          Logger.error(deletionError, 'AccountService.deleteAccount - Error starting Step Functions deletion workflow');
+
+          // Step Functions failed - fall through to direct deletion
+          Logger.info({ accountId }, 'AccountService.deleteAccount - Falling back to direct DynamoDB deletion');
+        }
+      }
+
+      // No Step Functions configured or Step Functions failed - delete directly from DynamoDB
+      Logger.info({ accountId }, 'AccountService.deleteAccount - Deleting account directly from DynamoDB (no Step Functions)');
+
       try {
-        const accountAccountId = config.CROSS_ACCOUNT.ACCOUNT_ACCOUNT_ID;
-
-        // Start Step Functions execution for account deletion
-        const stepFunctionsResult = await this.startAccountDeletionWorkflow(existingAccount, accountAccountId);
-
-        // Update account with Step Functions execution info
-        const updateData = {
-          stepFunctionExecutionArn: stepFunctionsResult.executionArn,
-          provisioningState: 'deleting',
-          stepFunctionStatus: {
-            executionStatus: 'RUNNING',
-            lastChecked: moment().toISOString()
-          },
-          lastModified: moment().toISOString(),
-          deletionSubmittedAt: moment().toISOString()
-        };
-
-        await Mapping.updateAccount(accountId, updateData);
-
-        Logger.debug({
-          accountId,
-          subscriptionTier: existingAccount.subscriptionTier,
-          executionArn: stepFunctionsResult.executionArn
-        }, 'AccountService.deleteAccount - Step Functions deletion workflow started successfully');
+        await Mapping.deleteAccount(accountId);
+        Logger.debug({ accountId }, 'AccountService.deleteAccount - Account deleted successfully from DynamoDB');
 
         return Commons.getRes(
           Constants.HTTP_STATUS.OK,
-          'Account deletion initiated successfully',
+          'Account deleted successfully',
           {
             accountId,
             subscriptionTier: existingAccount.subscriptionTier,
             deletedAt: moment().toISOString(),
-            executionArn: stepFunctionsResult.executionArn,
             organizationName: existingAccount.organizationName,
-            note: 'Step Functions deletion workflow initiated asynchronously'
+            note: 'Account deleted directly (infrastructure cleanup may be required manually if any was provisioned)'
           }
         );
+      } catch (deleteError) {
+        Logger.error(deleteError, 'AccountService.deleteAccount - Error deleting account from DynamoDB');
 
-      } catch (deletionError) {
-        Logger.error(deletionError, 'AccountService.deleteAccount - Error starting Step Functions deletion workflow');
-
-        // Update account status to 'deletion_failed' if Step Functions fails
+        // Update account status to 'deletion_failed'
         await Mapping.updateAccount(accountId, {
           provisioningState: 'deletion_failed',
-          provisioningError: deletionError.message,
+          provisioningError: deleteError.message,
           lastModified: moment().toISOString()
         });
 
-        // Return error status rather than throwing exception
         return Commons.getRes(
           Constants.HTTP_STATUS.INTERNAL_SERVER_ERROR,
-          'Account deletion workflow failed to start',
+          'Account deletion failed',
           {
             accountId,
-            error: deletionError.message,
+            error: deleteError.message,
             deletionFailedAt: moment().toISOString()
           }
         );

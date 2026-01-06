@@ -441,6 +441,9 @@ module "app_backend" {
   # the Lambda env vars are updated by the null_resource below.
   ims_api_url = var.ims_api_url
 
+  # Password encryption key for user operations
+  password_encryption_key = var.password_encryption_key
+
   # Tags
   common_tags = local.common_tags
 

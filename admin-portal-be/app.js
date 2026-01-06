@@ -23,8 +23,9 @@ app.use(bodyParser.json());
 // logger middleware
 app.use(httpLogger);
 
-// set routes
+// set routes - support both /api/v1/accounts and /api/accounts
 app.use('/api/v1/accounts', accountRoutes);
+app.use('/api/accounts', accountRoutes);
 
 // Error Handling
 // catch 404

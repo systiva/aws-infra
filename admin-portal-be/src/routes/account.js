@@ -60,6 +60,24 @@ router.put('/onboard', async (req, res, next) => {
   }
 });
 
+// PUT / - Update existing account (alternative endpoint)
+router.put('/', async (req, res, next) => {
+  try {
+    // Support both 'id' and 'accountId' in request body
+    const accountData = {
+      ...req.body,
+      accountId: req.body.accountId || req.body.id
+    };
+    Logger.debug(accountData, 'PUT / - Updating account with data');
+    const serviceRes = await AccountService.updateAccount(accountData);
+    Logger.debug(serviceRes, 'PUT / - Service response');
+    res.status(serviceRes.status).json(serviceRes.json);
+  } catch (error) {
+    Logger.error(error, 'PUT / - Error occurred');
+    next(error);
+  }
+});
+
 // DELETE /offboard - Delete account
 router.delete('/offboard', async (req, res, next) => {
   try {

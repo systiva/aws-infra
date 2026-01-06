@@ -34,11 +34,16 @@ resource "aws_lambda_function" "app_backend" {
     variables = {
       NODE_ENV                         = var.environment
       LOG_LEVEL                        = var.log_level
-      ACCOUNT_REGISTRY_TABLE_NAME       = var.account_registry_table_name
+
+      # DynamoDB table names - use same table for all operations
+      ACCOUNT_REGISTRY_TABLE_NAME      = var.account_registry_table_name
+      DYNAMODB_SYSTIVA_TABLE           = var.account_registry_table_name
+      DYNAMODB_ENTERPRISE_TABLE        = var.account_registry_table_name
+      DYNAMODB_SYS_ACCOUNTS_TABLE      = var.account_registry_table_name
 
       # Cross-account access configuration
       ADMIN_ACCOUNT_ID                 = var.admin_account_id
-      ACCOUNT_ACCOUNT_ID                = var.account_account_id
+      ACCOUNT_ACCOUNT_ID               = var.account_account_id
       CROSS_ACCOUNT_ROLE_NAME          = var.cross_account_role_name
       WORKSPACE                        = var.workspace_prefix
       AWS_REGION_NAME                  = var.aws_region
@@ -47,6 +52,9 @@ resource "aws_lambda_function" "app_backend" {
       # This allows the backend to proxy auth requests to the IMS service
       IMS_API_URL                      = var.ims_api_url
       STORAGE_MODE                     = "dynamodb"
+
+      # Password encryption key for user operations
+      PASSWORD_ENCRYPTION_KEY          = var.password_encryption_key
     }
   }
 

@@ -121,3 +121,10 @@ variable "ims_api_url" {
   type        = string
   default     = ""
 }
+
+variable "password_encryption_key" {
+  description = "Password encryption key for user operations (min 32 chars)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

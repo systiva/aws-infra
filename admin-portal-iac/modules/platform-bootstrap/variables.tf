@@ -139,13 +139,13 @@ variable "default_country" {
 variable "technical_user_first_name" {
   description = "Technical user first name"
   type        = string
-  default     = "Admin"
+  default     = "Nihar"
 }
 
 variable "technical_user_last_name" {
   description = "Technical user last name"
   type        = string
-  default     = "User"
+  default     = "Sharma"
 }
 
 # License Duration Configuration
