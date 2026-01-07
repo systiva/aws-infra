@@ -38,10 +38,26 @@ resource "random_uuid" "systiva_technical_user_id" {}
 resource "random_uuid" "systiva_license_id" {}
 
 # Generate UUIDs for default Enterprise, Product, Service entities
+# Enterprises
 resource "random_uuid" "global_enterprise_id" {}
-resource "random_uuid" "platform_product_id" {}
+resource "random_uuid" "sap_enterprise_id" {}
+resource "random_uuid" "oracle_enterprise_id" {}
+
+# Products
+resource "random_uuid" "platform_product_id" {}  # All Products
+resource "random_uuid" "devops_product_id" {}
+resource "random_uuid" "integration_factory_product_id" {}
+
+# Services
 resource "random_uuid" "all_services_service_id" {}
-resource "random_uuid" "enterprise_product_service_linkage_id" {}
+resource "random_uuid" "integration_service_id" {}
+resource "random_uuid" "extension_service_id" {}
+
+# Linkages
+resource "random_uuid" "enterprise_product_service_linkage_id" {}  # Global -> All Products -> All Services
+resource "random_uuid" "sap_devops_linkage_id" {}                  # SAP -> DevOps -> Integration, Extension
+resource "random_uuid" "sap_integration_factory_linkage_id" {}     # SAP -> Integration Factory -> Integration, Extension
+resource "random_uuid" "oracle_devops_linkage_id" {}               # Oracle -> DevOps -> Integration
 
 # Generate UUIDs for permissions
 resource "random_uuid" "permission_ids" {
@@ -273,7 +289,7 @@ resource "aws_dynamodb_table_item" "systiva_account" {
           M = {
             id = { S = random_uuid.systiva_license_id.result }
             enterprise = { S = "Global" }
-            product = { S = "Platform" }
+            product = { S = "All Products" }
             service = { S = "All Services" }
             licenseStart = { S = local.license_start_date }
             licenseEnd = { S = local.license_end_date }
@@ -448,7 +464,7 @@ resource "aws_dynamodb_table_item" "systiva_license" {
       S = "Global"
     }
     product = {
-      S = "Platform"
+      S = "All Products"
     }
     service = {
       S = "All Services"
@@ -537,7 +553,97 @@ resource "aws_dynamodb_table_item" "global_enterprise" {
   depends_on = [aws_dynamodb_table_item.systiva_account]
 }
 
-# Create "Platform" Product entity
+# Create "SAP" Enterprise entity
+resource "aws_dynamodb_table_item" "sap_enterprise" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.sap_enterprise_id.result}"
+    }
+    SK = {
+      S = "ENTERPRISE#${random_uuid.sap_enterprise_id.result}"
+    }
+    id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    enterprise_name = {
+      S = "SAP"
+    }
+    name = {
+      S = "SAP"
+    }
+    entity_type = {
+      S = "enterprise"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create "Oracle" Enterprise entity
+resource "aws_dynamodb_table_item" "oracle_enterprise" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.oracle_enterprise_id.result}"
+    }
+    SK = {
+      S = "ENTERPRISE#${random_uuid.oracle_enterprise_id.result}"
+    }
+    id = {
+      S = random_uuid.oracle_enterprise_id.result
+    }
+    enterprise_name = {
+      S = "Oracle"
+    }
+    name = {
+      S = "Oracle"
+    }
+    entity_type = {
+      S = "enterprise"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create "All Products" Product entity
 resource "aws_dynamodb_table_item" "platform_product" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
@@ -554,10 +660,100 @@ resource "aws_dynamodb_table_item" "platform_product" {
       S = random_uuid.platform_product_id.result
     }
     product_name = {
-      S = "Platform"
+      S = "All Products"
     }
     name = {
-      S = "Platform"
+      S = "All Products"
+    }
+    entity_type = {
+      S = "product"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create "DevOps" Product entity
+resource "aws_dynamodb_table_item" "devops_product" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.devops_product_id.result}"
+    }
+    SK = {
+      S = "PRODUCT#${random_uuid.devops_product_id.result}"
+    }
+    id = {
+      S = random_uuid.devops_product_id.result
+    }
+    product_name = {
+      S = "DevOps"
+    }
+    name = {
+      S = "DevOps"
+    }
+    entity_type = {
+      S = "product"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create "Integration Factory" Product entity
+resource "aws_dynamodb_table_item" "integration_factory_product" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.integration_factory_product_id.result}"
+    }
+    SK = {
+      S = "PRODUCT#${random_uuid.integration_factory_product_id.result}"
+    }
+    id = {
+      S = random_uuid.integration_factory_product_id.result
+    }
+    product_name = {
+      S = "Integration Factory"
+    }
+    name = {
+      S = "Integration Factory"
     }
     entity_type = {
       S = "product"
@@ -627,7 +823,101 @@ resource "aws_dynamodb_table_item" "all_services_service" {
   depends_on = [aws_dynamodb_table_item.systiva_account]
 }
 
-# Create Enterprise-Product-Service Linkage (main linkage record)
+# Create "Integration" Service entity
+resource "aws_dynamodb_table_item" "integration_service" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.integration_service_id.result}"
+    }
+    SK = {
+      S = "SERVICE#${random_uuid.integration_service_id.result}"
+    }
+    id = {
+      S = random_uuid.integration_service_id.result
+    }
+    service_name = {
+      S = "Integration"
+    }
+    name = {
+      S = "Integration"
+    }
+    entity_type = {
+      S = "service"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# Create "Extension" Service entity
+resource "aws_dynamodb_table_item" "extension_service" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.extension_service_id.result}"
+    }
+    SK = {
+      S = "SERVICE#${random_uuid.extension_service_id.result}"
+    }
+    id = {
+      S = random_uuid.extension_service_id.result
+    }
+    service_name = {
+      S = "Extension"
+    }
+    name = {
+      S = "Extension"
+    }
+    entity_type = {
+      S = "service"
+    }
+    accountId = {
+      S = local.platform_id
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.systiva_account]
+}
+
+# ===========================================
+# LINKAGES
+# ===========================================
+
+# Linkage 1: Global -> All Products -> All Services
 resource "aws_dynamodb_table_item" "enterprise_product_service_linkage" {
   table_name = var.rbac_table_name
   hash_key   = var.rbac_table_hash_key
@@ -782,6 +1072,551 @@ resource "aws_dynamodb_table_item" "service_linkage_lookup" {
   })
 
   depends_on = [aws_dynamodb_table_item.enterprise_product_service_linkage]
+}
+
+# ===========================================
+# Linkage 2: SAP -> DevOps -> Integration, Extension
+# ===========================================
+
+resource "aws_dynamodb_table_item" "sap_devops_linkage" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.sap_devops_linkage_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
+    }
+    id = {
+      S = random_uuid.sap_devops_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.devops_product_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result },
+        { S = random_uuid.extension_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "enterprise_product_service"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [
+    aws_dynamodb_table_item.sap_enterprise,
+    aws_dynamodb_table_item.devops_product,
+    aws_dynamodb_table_item.integration_service,
+    aws_dynamodb_table_item.extension_service
+  ]
+}
+
+# SAP-DevOps Enterprise lookup
+resource "aws_dynamodb_table_item" "sap_devops_enterprise_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.sap_enterprise_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.sap_devops_linkage_id.result
+    }
+    product_id = {
+      S = random_uuid.devops_product_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result },
+        { S = random_uuid.extension_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "enterprise_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.sap_devops_linkage]
+}
+
+# SAP-DevOps Product lookup
+resource "aws_dynamodb_table_item" "sap_devops_product_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.devops_product_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.sap_devops_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result },
+        { S = random_uuid.extension_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "product_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.sap_devops_linkage]
+}
+
+# SAP-DevOps Integration service lookup
+resource "aws_dynamodb_table_item" "sap_devops_integration_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.integration_service_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.sap_devops_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.devops_product_id.result
+    }
+    entity_type = {
+      S = "service_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.sap_devops_linkage]
+}
+
+# SAP-DevOps Extension service lookup
+resource "aws_dynamodb_table_item" "sap_devops_extension_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.extension_service_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.sap_devops_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.devops_product_id.result
+    }
+    entity_type = {
+      S = "service_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.sap_devops_linkage]
+}
+
+# ===========================================
+# Linkage 3: SAP -> Integration Factory -> Integration, Extension
+# ===========================================
+
+resource "aws_dynamodb_table_item" "sap_integration_factory_linkage" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.sap_integration_factory_linkage_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
+    }
+    id = {
+      S = random_uuid.sap_integration_factory_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.integration_factory_product_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result },
+        { S = random_uuid.extension_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "enterprise_product_service"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [
+    aws_dynamodb_table_item.sap_enterprise,
+    aws_dynamodb_table_item.integration_factory_product,
+    aws_dynamodb_table_item.integration_service,
+    aws_dynamodb_table_item.extension_service
+  ]
+}
+
+# SAP-IntegrationFactory Enterprise lookup
+resource "aws_dynamodb_table_item" "sap_if_enterprise_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.sap_enterprise_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.sap_integration_factory_linkage_id.result
+    }
+    product_id = {
+      S = random_uuid.integration_factory_product_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result },
+        { S = random_uuid.extension_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "enterprise_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.sap_integration_factory_linkage]
+}
+
+# SAP-IntegrationFactory Product lookup
+resource "aws_dynamodb_table_item" "sap_if_product_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.integration_factory_product_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.sap_integration_factory_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result },
+        { S = random_uuid.extension_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "product_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.sap_integration_factory_linkage]
+}
+
+# SAP-IntegrationFactory Integration service lookup
+resource "aws_dynamodb_table_item" "sap_if_integration_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.integration_service_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.sap_integration_factory_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.integration_factory_product_id.result
+    }
+    entity_type = {
+      S = "service_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.sap_integration_factory_linkage]
+}
+
+# SAP-IntegrationFactory Extension service lookup
+resource "aws_dynamodb_table_item" "sap_if_extension_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.extension_service_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.sap_integration_factory_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.sap_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.integration_factory_product_id.result
+    }
+    entity_type = {
+      S = "service_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.sap_integration_factory_linkage]
+}
+
+# ===========================================
+# Linkage 4: Oracle -> DevOps -> Integration
+# ===========================================
+
+resource "aws_dynamodb_table_item" "oracle_devops_linkage" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.oracle_devops_linkage_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
+    }
+    id = {
+      S = random_uuid.oracle_devops_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.oracle_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.devops_product_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "enterprise_product_service"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    createdAt = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+    updatedAt = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [
+    aws_dynamodb_table_item.oracle_enterprise,
+    aws_dynamodb_table_item.devops_product,
+    aws_dynamodb_table_item.integration_service
+  ]
+}
+
+# Oracle-DevOps Enterprise lookup
+resource "aws_dynamodb_table_item" "oracle_devops_enterprise_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.oracle_enterprise_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.oracle_devops_linkage_id.result
+    }
+    product_id = {
+      S = random_uuid.devops_product_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "enterprise_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.oracle_devops_linkage]
+}
+
+# Oracle-DevOps Product lookup
+resource "aws_dynamodb_table_item" "oracle_devops_product_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.devops_product_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.oracle_devops_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.oracle_enterprise_id.result
+    }
+    service_ids = {
+      L = [
+        { S = random_uuid.integration_service_id.result }
+      ]
+    }
+    entity_type = {
+      S = "product_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.oracle_devops_linkage]
+}
+
+# Oracle-DevOps Integration service lookup
+resource "aws_dynamodb_table_item" "oracle_devops_integration_lookup" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "SYSTIVA#${random_uuid.integration_service_id.result}"
+    }
+    SK = {
+      S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
+    }
+    linkage_id = {
+      S = random_uuid.oracle_devops_linkage_id.result
+    }
+    enterprise_id = {
+      S = random_uuid.oracle_enterprise_id.result
+    }
+    product_id = {
+      S = random_uuid.devops_product_id.result
+    }
+    entity_type = {
+      S = "service_linkage"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [aws_dynamodb_table_item.oracle_devops_linkage]
 }
 
 # Legacy platform account entry (for backward compatibility with IMS)

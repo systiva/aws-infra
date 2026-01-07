@@ -49,19 +49,19 @@ variable "platform_admin_email" {
 variable "platform_admin_username" {
   description = "Username for the platform admin user"
   type        = string
-  default     = "admin"
+  default     = "Nihar"
 }
 
 variable "platform_admin_first_name" {
   description = "First name for the platform admin user"
   type        = string
-  default     = "Demo"
+  default     = "Nihar"
 }
 
 variable "platform_admin_last_name" {
   description = "Last name for the platform admin user"
   type        = string
-  default     = "Platform Admin"
+  default     = "Sharma"
 }
 
 variable "temporary_password" {
