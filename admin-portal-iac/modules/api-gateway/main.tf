@@ -466,6 +466,91 @@ resource "aws_lambda_permission" "app_backend_templates" {
 }
 
 # ==============================================
+# User Management Routes (Sys App Backend)
+# Routes: /api/v1/user-management/* - Users, Groups, Roles APIs
+# ==============================================
+
+# Permission 6: /api/v1/user-management (base endpoint)
+resource "aws_lambda_permission" "app_backend_user_management_base" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementBase"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/user-management"
+}
+
+# Permission 7: /api/v1/user-management/* (all user management endpoints)
+resource "aws_lambda_permission" "app_backend_user_management_all" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementAll"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/user-management/*"
+}
+
+# Permission 8: /api/v1/user-management/users (users endpoint)
+resource "aws_lambda_permission" "app_backend_users" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementUsers"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/user-management/users"
+}
+
+# Permission 9: /api/v1/user-management/users/* (users with path params)
+resource "aws_lambda_permission" "app_backend_users_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementUsersProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/user-management/users/*"
+}
+
+# Permission 10: /api/v1/user-management/groups (groups endpoint)
+resource "aws_lambda_permission" "app_backend_groups" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementGroups"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/user-management/groups"
+}
+
+# Permission 11: /api/v1/user-management/groups/* (groups with path params)
+resource "aws_lambda_permission" "app_backend_groups_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementGroupsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/user-management/groups/*"
+}
+
+# Permission 12: /api/v1/user-management/roles (roles endpoint)
+resource "aws_lambda_permission" "app_backend_roles" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementRoles"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/user-management/roles"
+}
+
+# Permission 13: /api/v1/user-management/roles/* (roles with path params)
+resource "aws_lambda_permission" "app_backend_roles_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementRolesProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/user-management/roles/*"
+}
+
+# ==============================================
 # JWT Authorizer Lambda
 # ==============================================
 
