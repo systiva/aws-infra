@@ -44,6 +44,34 @@ resource "random_password" "jwt_signing_key" {
   special = true
 }
 
+# Generate random password encryption key for user operations
+# This key is used to encrypt/decrypt user passwords in DynamoDB
+resource "random_password" "password_encryption_key" {
+  length           = 48
+  special          = true
+  override_special = "!@#$%^&*()_+-=[]{}|"
+}
+
+# Store password encryption key in SSM Parameter Store (SecureString)
+# This ensures the key is encrypted at rest and access is audited
+resource "aws_ssm_parameter" "password_encryption_key" {
+  name        = "/admin-portal/${var.workspace_prefix}/sys-app/password-encryption-key"
+  description = "Password encryption key for user operations in Sys App backend"
+  type        = "SecureString"
+  value       = random_password.password_encryption_key.result
+
+  tags = merge(var.common_tags, {
+    Name      = "password-encryption-key"
+    Purpose   = "UserPasswordEncryption"
+    Component = "SysAppBackend"
+  })
+
+  lifecycle {
+    # Prevent accidental key rotation which would invalidate existing encrypted passwords
+    ignore_changes = [value]
+  }
+}
+
 # Data sources
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -442,7 +470,8 @@ module "app_backend" {
   ims_api_url = var.ims_api_url
 
   # Password encryption key for user operations
-  password_encryption_key = var.password_encryption_key
+  # Uses the auto-generated key stored in SSM (falls back to variable if provided)
+  password_encryption_key = var.password_encryption_key != "" ? var.password_encryption_key : random_password.password_encryption_key.result
 
   # Tags
   common_tags = local.common_tags

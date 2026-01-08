@@ -483,7 +483,7 @@ variable "ims_api_url" {
 }
 
 variable "password_encryption_key" {
-  description = "Password encryption key for user operations (min 32 chars). Should be set via TF_VAR_password_encryption_key or secrets manager."
+  description = "Password encryption key for user operations (min 32 chars). AUTO-GENERATED at bootstrap if not provided. Override via TF_VAR_password_encryption_key if needed."
   type        = string
   default     = ""
   sensitive   = true
