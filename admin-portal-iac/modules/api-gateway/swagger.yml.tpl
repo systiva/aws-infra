@@ -786,6 +786,47 @@ paths:
         passthroughBehavior: "when_no_match"
 
   # ==============================================
+  # Global Settings Routes (Sys App Backend)
+  # Routes: /api/v1/app/api/global-settings - Global settings APIs
+  # ==============================================
+  /api/v1/app/api/global-settings:
+    x-amazon-apigateway-any-method:
+      summary: "Global settings base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/api/global-settings/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Global settings endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # ==============================================
   # Sys App Frontend Routes
   # Serves React/Next.js UI from S3 via Lambda
   # ==============================================
