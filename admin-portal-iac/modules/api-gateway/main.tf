@@ -601,9 +601,9 @@ resource "aws_lambda_permission" "app_backend_global_settings_legacy_proxy" {
 # ==============================================
 
 # Permission 18: /api/v1/pipelines
-resource "aws_lambda_permission" "app_backend_pipelines" {
+resource "aws_lambda_permission" "app_backend_v1_pipelines" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-Pipelines"
+  statement_id  = "AllowAPIGateway-V1Pipelines"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
