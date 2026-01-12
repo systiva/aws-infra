@@ -787,9 +787,9 @@ paths:
 
   # ==============================================
   # Global Settings Routes (Sys App Backend)
-  # Routes: /api/v1/app/api/global-settings - Global settings APIs
+  # Routes: /api/v1/global-settings - Global settings APIs
   # ==============================================
-  /api/v1/app/api/global-settings:
+  /api/v1/global-settings:
     x-amazon-apigateway-any-method:
       summary: "Global settings base endpoint (protected)"
       produces:
@@ -805,9 +805,47 @@ paths:
         httpMethod: "POST"
         passthroughBehavior: "when_no_match"
 
-  /api/v1/app/api/global-settings/{proxy+}:
+  /api/v1/global-settings/{proxy+}:
     x-amazon-apigateway-any-method:
       summary: "Global settings endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # Also support /api/v1/app/api/global-settings for backward compatibility
+  /api/v1/app/api/global-settings:
+    x-amazon-apigateway-any-method:
+      summary: "Global settings base endpoint (protected) - legacy path"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/api/global-settings/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Global settings endpoints (protected) - legacy path"
       produces:
         - "application/json"
       security:

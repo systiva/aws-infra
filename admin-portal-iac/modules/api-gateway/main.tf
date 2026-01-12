@@ -552,23 +552,43 @@ resource "aws_lambda_permission" "app_backend_roles_proxy" {
 
 # ==============================================
 # Global Settings Routes (Sys App Backend)
-# Routes: /api/v1/app/api/global-settings - Global Settings APIs
+# Routes: /api/v1/global-settings - Global Settings APIs
 # ==============================================
 
-# Permission 14: /api/v1/app/api/global-settings (base endpoint)
+# Permission 14: /api/v1/global-settings (base endpoint)
 resource "aws_lambda_permission" "app_backend_global_settings" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-GlobalSettings"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/global-settings"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/global-settings"
 }
 
-# Permission 15: /api/v1/app/api/global-settings/* (with path params)
+# Permission 15: /api/v1/global-settings/* (with path params)
 resource "aws_lambda_permission" "app_backend_global_settings_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-GlobalSettingsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/global-settings/*"
+}
+
+# Permission 16: /api/v1/app/api/global-settings (legacy path)
+resource "aws_lambda_permission" "app_backend_global_settings_legacy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-GlobalSettingsLegacy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/global-settings"
+}
+
+# Permission 17: /api/v1/app/api/global-settings/* (legacy path with path params)
+resource "aws_lambda_permission" "app_backend_global_settings_legacy_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-GlobalSettingsLegacyProxy"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
