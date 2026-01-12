@@ -865,6 +865,199 @@ paths:
         passthroughBehavior: "when_no_match"
 
   # ==============================================
+  # Pipeline Routes (Sys App Backend)
+  # Routes: /api/v1/pipelines, /api/v1/pipeline-canvas, etc.
+  # ==============================================
+  /api/v1/pipelines:
+    x-amazon-apigateway-any-method:
+      summary: "Pipelines base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/pipelines/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Pipelines endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/pipeline-canvas:
+    x-amazon-apigateway-any-method:
+      summary: "Pipeline canvas base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/pipeline-canvas/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Pipeline canvas endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/pipeline-details:
+    x-amazon-apigateway-any-method:
+      summary: "Pipeline details base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/pipeline-details/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Pipeline details endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/pipeline-services:
+    x-amazon-apigateway-any-method:
+      summary: "Pipeline services base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/pipeline-services/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Pipeline services endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # ==============================================
+  # AI Routes (Sys App Backend)
+  # Routes: /api/v1/ai - AI insights and suggestions
+  # ==============================================
+  /api/v1/ai:
+    x-amazon-apigateway-any-method:
+      summary: "AI base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/ai/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "AI endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # ==============================================
   # Sys App Frontend Routes
   # Serves React/Next.js UI from S3 via Lambda
   # ==============================================
