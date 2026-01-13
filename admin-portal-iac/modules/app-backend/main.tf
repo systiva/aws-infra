@@ -190,7 +190,8 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
         Action = [
           "sts:AssumeRole"
         ]
-        Resource = "arn:aws:iam::${var.account_account_id}:role/${var.cross_account_role_name}"
+        # Allow assuming cross-account role in ANY customer AWS account
+        Resource = "arn:aws:iam::*:role/${var.cross_account_role_name}"
       }],
       [{
         Effect = "Allow"
