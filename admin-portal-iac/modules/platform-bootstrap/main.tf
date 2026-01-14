@@ -516,7 +516,7 @@ resource "aws_dynamodb_table_item" "global_enterprise" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.global_enterprise_id.result}"
+      S = "ENTERPRISE#${random_uuid.global_enterprise_id.result}"
     }
     SK = {
       S = "ENTERPRISE#${random_uuid.global_enterprise_id.result}"
@@ -561,7 +561,7 @@ resource "aws_dynamodb_table_item" "sap_enterprise" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.sap_enterprise_id.result}"
+      S = "ENTERPRISE#${random_uuid.sap_enterprise_id.result}"
     }
     SK = {
       S = "ENTERPRISE#${random_uuid.sap_enterprise_id.result}"
@@ -606,7 +606,7 @@ resource "aws_dynamodb_table_item" "oracle_enterprise" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.oracle_enterprise_id.result}"
+      S = "ENTERPRISE#${random_uuid.oracle_enterprise_id.result}"
     }
     SK = {
       S = "ENTERPRISE#${random_uuid.oracle_enterprise_id.result}"
@@ -651,7 +651,7 @@ resource "aws_dynamodb_table_item" "platform_product" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.platform_product_id.result}"
+      S = "PRODUCT#${random_uuid.platform_product_id.result}"
     }
     SK = {
       S = "PRODUCT#${random_uuid.platform_product_id.result}"
@@ -696,7 +696,7 @@ resource "aws_dynamodb_table_item" "devops_product" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.devops_product_id.result}"
+      S = "PRODUCT#${random_uuid.devops_product_id.result}"
     }
     SK = {
       S = "PRODUCT#${random_uuid.devops_product_id.result}"
@@ -741,7 +741,7 @@ resource "aws_dynamodb_table_item" "integration_factory_product" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.integration_factory_product_id.result}"
+      S = "PRODUCT#${random_uuid.integration_factory_product_id.result}"
     }
     SK = {
       S = "PRODUCT#${random_uuid.integration_factory_product_id.result}"
@@ -786,7 +786,7 @@ resource "aws_dynamodb_table_item" "all_services_service" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.all_services_service_id.result}"
+      S = "SERVICE#${random_uuid.all_services_service_id.result}"
     }
     SK = {
       S = "SERVICE#${random_uuid.all_services_service_id.result}"
@@ -831,7 +831,7 @@ resource "aws_dynamodb_table_item" "integration_service" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.integration_service_id.result}"
+      S = "SERVICE#${random_uuid.integration_service_id.result}"
     }
     SK = {
       S = "SERVICE#${random_uuid.integration_service_id.result}"
@@ -876,7 +876,7 @@ resource "aws_dynamodb_table_item" "extension_service" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.extension_service_id.result}"
+      S = "SERVICE#${random_uuid.extension_service_id.result}"
     }
     SK = {
       S = "SERVICE#${random_uuid.extension_service_id.result}"
@@ -925,7 +925,7 @@ resource "aws_dynamodb_table_item" "enterprise_product_service_linkage" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.enterprise_product_service_linkage_id.result}"
+      S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
@@ -979,7 +979,7 @@ resource "aws_dynamodb_table_item" "enterprise_linkage_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.global_enterprise_id.result}"
+      S = "ENTERPRISE#${random_uuid.global_enterprise_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
@@ -1014,7 +1014,7 @@ resource "aws_dynamodb_table_item" "product_linkage_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.platform_product_id.result}"
+      S = "PRODUCT#${random_uuid.platform_product_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
@@ -1049,7 +1049,7 @@ resource "aws_dynamodb_table_item" "service_linkage_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.all_services_service_id.result}"
+      S = "SERVICE#${random_uuid.all_services_service_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.enterprise_product_service_linkage_id.result}"
@@ -1085,7 +1085,7 @@ resource "aws_dynamodb_table_item" "sap_devops_linkage" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.sap_devops_linkage_id.result}"
+      S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
@@ -1138,7 +1138,7 @@ resource "aws_dynamodb_table_item" "sap_devops_enterprise_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.sap_enterprise_id.result}"
+      S = "ENTERPRISE#${random_uuid.sap_enterprise_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
@@ -1174,7 +1174,7 @@ resource "aws_dynamodb_table_item" "sap_devops_product_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.devops_product_id.result}"
+      S = "PRODUCT#${random_uuid.devops_product_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
@@ -1210,7 +1210,7 @@ resource "aws_dynamodb_table_item" "sap_devops_integration_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.integration_service_id.result}"
+      S = "SERVICE#${random_uuid.integration_service_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
@@ -1243,7 +1243,7 @@ resource "aws_dynamodb_table_item" "sap_devops_extension_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.extension_service_id.result}"
+      S = "SERVICE#${random_uuid.extension_service_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_devops_linkage_id.result}"
@@ -1279,7 +1279,7 @@ resource "aws_dynamodb_table_item" "sap_integration_factory_linkage" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.sap_integration_factory_linkage_id.result}"
+      S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
@@ -1332,7 +1332,7 @@ resource "aws_dynamodb_table_item" "sap_if_enterprise_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.sap_enterprise_id.result}"
+      S = "ENTERPRISE#${random_uuid.sap_enterprise_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
@@ -1368,7 +1368,7 @@ resource "aws_dynamodb_table_item" "sap_if_product_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.integration_factory_product_id.result}"
+      S = "PRODUCT#${random_uuid.integration_factory_product_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
@@ -1404,7 +1404,7 @@ resource "aws_dynamodb_table_item" "sap_if_integration_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.integration_service_id.result}"
+      S = "SERVICE#${random_uuid.integration_service_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
@@ -1437,7 +1437,7 @@ resource "aws_dynamodb_table_item" "sap_if_extension_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.extension_service_id.result}"
+      S = "SERVICE#${random_uuid.extension_service_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.sap_integration_factory_linkage_id.result}"
@@ -1473,7 +1473,7 @@ resource "aws_dynamodb_table_item" "oracle_devops_linkage" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.oracle_devops_linkage_id.result}"
+      S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
@@ -1524,7 +1524,7 @@ resource "aws_dynamodb_table_item" "oracle_devops_enterprise_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.oracle_enterprise_id.result}"
+      S = "ENTERPRISE#${random_uuid.oracle_enterprise_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
@@ -1559,7 +1559,7 @@ resource "aws_dynamodb_table_item" "oracle_devops_product_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.devops_product_id.result}"
+      S = "PRODUCT#${random_uuid.devops_product_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
@@ -1594,7 +1594,7 @@ resource "aws_dynamodb_table_item" "oracle_devops_integration_lookup" {
 
   item = jsonencode({
     PK = {
-      S = "SYSTIVA#${random_uuid.integration_service_id.result}"
+      S = "SERVICE#${random_uuid.integration_service_id.result}"
     }
     SK = {
       S = "LINKAGE#${random_uuid.oracle_devops_linkage_id.result}"
