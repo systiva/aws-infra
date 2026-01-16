@@ -596,11 +596,36 @@ resource "aws_lambda_permission" "app_backend_global_settings_legacy_proxy" {
 }
 
 # ==============================================
+# Credentials Routes (Sys App Backend)
+# Routes: /api/v1/app/api/credentials - Credentials Management
+# ==============================================
+
+# Permission 18: /api/v1/app/api/credentials (credentials base endpoint)
+resource "aws_lambda_permission" "app_backend_credentials" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Credentials"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/credentials"
+}
+
+# Permission 19: /api/v1/app/api/credentials/* (credentials with path params)
+resource "aws_lambda_permission" "app_backend_credentials_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-CredentialsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/credentials/*"
+}
+
+# ==============================================
 # Pipeline Routes (Sys App Backend)
 # Routes: /api/v1/pipelines, /api/v1/pipeline-canvas, etc.
 # ==============================================
 
-# Permission 18: /api/v1/pipelines
+# Permission 20: /api/v1/pipelines
 resource "aws_lambda_permission" "app_backend_v1_pipelines" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-V1Pipelines"
@@ -610,7 +635,7 @@ resource "aws_lambda_permission" "app_backend_v1_pipelines" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/pipelines"
 }
 
-# Permission 19: /api/v1/pipelines/*
+# Permission 21: /api/v1/pipelines/*
 resource "aws_lambda_permission" "app_backend_pipelines_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-PipelinesProxy"
@@ -620,7 +645,7 @@ resource "aws_lambda_permission" "app_backend_pipelines_proxy" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/pipelines/*"
 }
 
-# Permission 20: /api/v1/pipeline-canvas
+# Permission 22: /api/v1/pipeline-canvas
 resource "aws_lambda_permission" "app_backend_pipeline_canvas" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-PipelineCanvas"
@@ -630,7 +655,7 @@ resource "aws_lambda_permission" "app_backend_pipeline_canvas" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/pipeline-canvas"
 }
 
-# Permission 21: /api/v1/pipeline-canvas/*
+# Permission 23: /api/v1/pipeline-canvas/*
 resource "aws_lambda_permission" "app_backend_pipeline_canvas_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-PipelineCanvasProxy"
@@ -640,7 +665,7 @@ resource "aws_lambda_permission" "app_backend_pipeline_canvas_proxy" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/pipeline-canvas/*"
 }
 
-# Permission 22: /api/v1/pipeline-details
+# Permission 24: /api/v1/pipeline-details
 resource "aws_lambda_permission" "app_backend_pipeline_details" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-PipelineDetails"
@@ -650,7 +675,7 @@ resource "aws_lambda_permission" "app_backend_pipeline_details" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/pipeline-details"
 }
 
-# Permission 23: /api/v1/pipeline-details/*
+# Permission 25: /api/v1/pipeline-details/*
 resource "aws_lambda_permission" "app_backend_pipeline_details_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-PipelineDetailsProxy"
@@ -660,7 +685,7 @@ resource "aws_lambda_permission" "app_backend_pipeline_details_proxy" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/pipeline-details/*"
 }
 
-# Permission 24: /api/v1/pipeline-services
+# Permission 26: /api/v1/pipeline-services
 resource "aws_lambda_permission" "app_backend_pipeline_services" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-PipelineServices"
@@ -670,7 +695,7 @@ resource "aws_lambda_permission" "app_backend_pipeline_services" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/pipeline-services"
 }
 
-# Permission 25: /api/v1/pipeline-services/*
+# Permission 27: /api/v1/pipeline-services/*
 resource "aws_lambda_permission" "app_backend_pipeline_services_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-PipelineServicesProxy"
@@ -685,7 +710,7 @@ resource "aws_lambda_permission" "app_backend_pipeline_services_proxy" {
 # Routes: /api/v1/ai - AI insights and suggestions
 # ==============================================
 
-# Permission 26: /api/v1/ai
+# Permission 28: /api/v1/ai
 resource "aws_lambda_permission" "app_backend_ai" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-AI"
@@ -695,7 +720,7 @@ resource "aws_lambda_permission" "app_backend_ai" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/ai"
 }
 
-# Permission 27: /api/v1/ai/*
+# Permission 29: /api/v1/ai/*
 resource "aws_lambda_permission" "app_backend_ai_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
   statement_id  = "AllowAPIGateway-AIProxy"

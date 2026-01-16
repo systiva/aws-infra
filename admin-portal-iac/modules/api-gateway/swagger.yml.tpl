@@ -865,6 +865,47 @@ paths:
         passthroughBehavior: "when_no_match"
 
   # ==============================================
+  # Credentials Routes (Sys App Backend)
+  # Routes: /api/v1/app/api/credentials - Credentials Management
+  # ==============================================
+  /api/v1/app/api/credentials:
+    x-amazon-apigateway-any-method:
+      summary: "Credentials base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/api/credentials/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Credentials endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # ==============================================
   # Pipeline Routes (Sys App Backend)
   # Routes: /api/v1/pipelines, /api/v1/pipeline-canvas, etc.
   # ==============================================
