@@ -906,6 +906,90 @@ paths:
         passthroughBehavior: "when_no_match"
 
   # ==============================================
+  # Environments Routes (Sys App Backend)
+  # Routes: /api/v1/app/api/environments - Environment Management
+  # Frontend: /security-governance/environments
+  # ==============================================
+  /api/v1/app/api/environments:
+    x-amazon-apigateway-any-method:
+      summary: "Environments base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/api/environments/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Environments endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # ==============================================
+  # Connectors Routes (Sys App Backend)
+  # Routes: /api/v1/app/api/connectors - Connector Management
+  # Frontend: /security-governance/connectors
+  # ==============================================
+  /api/v1/app/api/connectors:
+    x-amazon-apigateway-any-method:
+      summary: "Connectors base endpoint (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  /api/v1/app/api/connectors/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: "Connectors endpoints (protected)"
+      produces:
+        - "application/json"
+      security:
+        - jwt-authorizer: []
+      parameters:
+        - name: "proxy"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        "200":
+          description: "200 response"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        uri: "${app_backend_lambda_uri}"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+
+  # ==============================================
   # Pipeline Routes (Sys App Backend)
   # Routes: /api/v1/pipelines, /api/v1/pipeline-canvas, etc.
   # ==============================================
