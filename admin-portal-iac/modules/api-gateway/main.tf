@@ -390,25 +390,8 @@ resource "aws_lambda_permission" "app_frontend" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
 }
 
-# Permission for /images path (assets without /ui prefix)
-resource "aws_lambda_permission" "app_frontend_images" {
-  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-AppFrontend-Images"
-  action        = "lambda:InvokeFunction"
-  function_name = var.app_frontend_lambda_function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/images/*"
-}
-
-# Permission for /fonts path (assets without /ui prefix)
-resource "aws_lambda_permission" "app_frontend_fonts" {
-  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-AppFrontend-Fonts"
-  action        = "lambda:InvokeFunction"
-  function_name = var.app_frontend_lambda_function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/fonts/*"
-}
+# NOTE: /images/* and /fonts/* are handled by the catch-all /{proxy+} route
+# which uses the admin_portal_frontend permission above (/*/*/*)
 
 # ==============================================
 # Sys App Backend Lambda Permissions (Workflow 10)
@@ -618,6 +601,56 @@ resource "aws_lambda_permission" "app_backend_credentials_proxy" {
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/credentials/*"
+}
+
+# ==============================================
+# Environments Routes (Sys App Backend)
+# Routes: /api/v1/app/api/environments - Environment Management
+# ==============================================
+
+# Permission 18a: /api/v1/app/api/environments (environments base endpoint)
+resource "aws_lambda_permission" "app_backend_environments" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Environments"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/environments"
+}
+
+# Permission 18b: /api/v1/app/api/environments/* (environments with path params)
+resource "aws_lambda_permission" "app_backend_environments_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-EnvironmentsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/environments/*"
+}
+
+# ==============================================
+# Connectors Routes (Sys App Backend)
+# Routes: /api/v1/app/api/connectors - Connector Management
+# ==============================================
+
+# Permission 19a: /api/v1/app/api/connectors (connectors base endpoint)
+resource "aws_lambda_permission" "app_backend_connectors" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Connectors"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/connectors"
+}
+
+# Permission 19b: /api/v1/app/api/connectors/* (connectors with path params)
+resource "aws_lambda_permission" "app_backend_connectors_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-ConnectorsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/connectors/*"
 }
 
 # ==============================================
