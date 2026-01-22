@@ -390,8 +390,25 @@ resource "aws_lambda_permission" "app_frontend" {
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/*"
 }
 
-# NOTE: /images/* and /fonts/* are handled by the catch-all /{proxy+} route
-# which uses the admin_portal_frontend permission above (/*/*/*)
+# Permission for /images path (static assets served by app frontend Lambda - workflow 09)
+resource "aws_lambda_permission" "app_frontend_images" {
+  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppFrontend-Images"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_frontend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/images/*"
+}
+
+# Permission for /fonts path (static assets served by app frontend Lambda - workflow 09)
+resource "aws_lambda_permission" "app_frontend_fonts" {
+  count         = var.app_frontend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AppFrontend-Fonts"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_frontend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/fonts/*"
+}
 
 # ==============================================
 # Sys App Backend Lambda Permissions (Workflow 10)
