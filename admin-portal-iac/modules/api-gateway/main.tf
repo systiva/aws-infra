@@ -717,18 +717,18 @@ resource "aws_lambda_permission" "app_backend_services_proxy" {
 # Routes: /api/v1/app/api/users - User Management
 # ==============================================
 
-resource "aws_lambda_permission" "app_backend_users" {
+resource "aws_lambda_permission" "app_backend_app_users" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-Users"
+  statement_id  = "AllowAPIGateway-AppUsers"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/users"
 }
 
-resource "aws_lambda_permission" "app_backend_users_proxy" {
+resource "aws_lambda_permission" "app_backend_app_users_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-UsersProxy"
+  statement_id  = "AllowAPIGateway-AppUsersProxy"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
@@ -763,18 +763,18 @@ resource "aws_lambda_permission" "app_backend_user_groups_proxy" {
 # Routes: /api/v1/app/api/groups - Group Management
 # ==============================================
 
-resource "aws_lambda_permission" "app_backend_groups" {
+resource "aws_lambda_permission" "app_backend_app_groups" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-Groups"
+  statement_id  = "AllowAPIGateway-AppGroups"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/groups"
 }
 
-resource "aws_lambda_permission" "app_backend_groups_proxy" {
+resource "aws_lambda_permission" "app_backend_app_groups_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-GroupsProxy"
+  statement_id  = "AllowAPIGateway-AppGroupsProxy"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
@@ -786,18 +786,18 @@ resource "aws_lambda_permission" "app_backend_groups_proxy" {
 # Routes: /api/v1/app/api/roles - Role Management
 # ==============================================
 
-resource "aws_lambda_permission" "app_backend_roles" {
+resource "aws_lambda_permission" "app_backend_app_roles" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-Roles"
+  statement_id  = "AllowAPIGateway-AppRoles"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/roles"
 }
 
-resource "aws_lambda_permission" "app_backend_roles_proxy" {
+resource "aws_lambda_permission" "app_backend_app_roles_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-RolesProxy"
+  statement_id  = "AllowAPIGateway-AppRolesProxy"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
@@ -1176,9 +1176,9 @@ resource "aws_lambda_permission" "app_backend_pipelines_proxy" {
 }
 
 # Permission 22: /api/v1/pipeline-canvas
-resource "aws_lambda_permission" "app_backend_pipeline_canvas" {
+resource "aws_lambda_permission" "app_backend_v1_pipeline_canvas" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-PipelineCanvas"
+  statement_id  = "AllowAPIGateway-V1PipelineCanvas"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
@@ -1186,9 +1186,9 @@ resource "aws_lambda_permission" "app_backend_pipeline_canvas" {
 }
 
 # Permission 23: /api/v1/pipeline-canvas/*
-resource "aws_lambda_permission" "app_backend_pipeline_canvas_proxy" {
+resource "aws_lambda_permission" "app_backend_v1_pipeline_canvas_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-PipelineCanvasProxy"
+  statement_id  = "AllowAPIGateway-V1PipelineCanvasProxy"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
@@ -1196,9 +1196,9 @@ resource "aws_lambda_permission" "app_backend_pipeline_canvas_proxy" {
 }
 
 # Permission 24: /api/v1/pipeline-details
-resource "aws_lambda_permission" "app_backend_pipeline_details" {
+resource "aws_lambda_permission" "app_backend_v1_pipeline_details" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-PipelineDetails"
+  statement_id  = "AllowAPIGateway-V1PipelineDetails"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
@@ -1206,9 +1206,9 @@ resource "aws_lambda_permission" "app_backend_pipeline_details" {
 }
 
 # Permission 25: /api/v1/pipeline-details/*
-resource "aws_lambda_permission" "app_backend_pipeline_details_proxy" {
+resource "aws_lambda_permission" "app_backend_v1_pipeline_details_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-PipelineDetailsProxy"
+  statement_id  = "AllowAPIGateway-V1PipelineDetailsProxy"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
@@ -1216,9 +1216,9 @@ resource "aws_lambda_permission" "app_backend_pipeline_details_proxy" {
 }
 
 # Permission 26: /api/v1/pipeline-services
-resource "aws_lambda_permission" "app_backend_pipeline_services" {
+resource "aws_lambda_permission" "app_backend_v1_pipeline_services" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-PipelineServices"
+  statement_id  = "AllowAPIGateway-V1PipelineServices"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
@@ -1226,9 +1226,9 @@ resource "aws_lambda_permission" "app_backend_pipeline_services" {
 }
 
 # Permission 27: /api/v1/pipeline-services/*
-resource "aws_lambda_permission" "app_backend_pipeline_services_proxy" {
+resource "aws_lambda_permission" "app_backend_v1_pipeline_services_proxy" {
   count         = var.app_backend_lambda_function_name != "" ? 1 : 0
-  statement_id  = "AllowAPIGateway-PipelineServicesProxy"
+  statement_id  = "AllowAPIGateway-V1PipelineServicesProxy"
   action        = "lambda:InvokeFunction"
   function_name = var.app_backend_lambda_function_name
   principal     = "apigateway.amazonaws.com"
