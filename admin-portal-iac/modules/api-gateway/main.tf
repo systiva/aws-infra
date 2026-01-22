@@ -621,6 +621,323 @@ resource "aws_lambda_permission" "app_backend_credentials_proxy" {
 }
 
 # ==============================================
+# Accounts Routes (Sys App Backend)
+# Routes: /api/v1/app/api/accounts - Account Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_accounts" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Accounts"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/accounts"
+}
+
+resource "aws_lambda_permission" "app_backend_accounts_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AccountsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/accounts/*"
+}
+
+# ==============================================
+# Enterprises Routes (Sys App Backend)
+# Routes: /api/v1/app/api/enterprises - Enterprise Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_enterprises_api" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-EnterprisesApi"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/enterprises"
+}
+
+resource "aws_lambda_permission" "app_backend_enterprises_api_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-EnterprisesApiProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/enterprises/*"
+}
+
+# ==============================================
+# Products Routes (Sys App Backend)
+# Routes: /api/v1/app/api/products - Product Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_products" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Products"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/products"
+}
+
+resource "aws_lambda_permission" "app_backend_products_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-ProductsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/products/*"
+}
+
+# ==============================================
+# Services Routes (Sys App Backend)
+# Routes: /api/v1/app/api/services - Service Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_services" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Services"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/services"
+}
+
+resource "aws_lambda_permission" "app_backend_services_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-ServicesProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/services/*"
+}
+
+# ==============================================
+# Users Routes (Sys App Backend)
+# Routes: /api/v1/app/api/users - User Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_users" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Users"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/users"
+}
+
+resource "aws_lambda_permission" "app_backend_users_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UsersProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/users/*"
+}
+
+# ==============================================
+# User Groups Routes (Sys App Backend)
+# Routes: /api/v1/app/api/user-groups - User Group Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_user_groups" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserGroups"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/user-groups"
+}
+
+resource "aws_lambda_permission" "app_backend_user_groups_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserGroupsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/user-groups/*"
+}
+
+# ==============================================
+# Groups Routes (Sys App Backend)
+# Routes: /api/v1/app/api/groups - Group Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_groups" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Groups"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/groups"
+}
+
+resource "aws_lambda_permission" "app_backend_groups_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-GroupsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/groups/*"
+}
+
+# ==============================================
+# Roles Routes (Sys App Backend)
+# Routes: /api/v1/app/api/roles - Role Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_roles" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Roles"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/roles"
+}
+
+resource "aws_lambda_permission" "app_backend_roles_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-RolesProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/roles/*"
+}
+
+# ==============================================
+# Entities Routes (Sys App Backend)
+# Routes: /api/v1/app/api/entities - Entity Management
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_entities" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-Entities"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/entities"
+}
+
+resource "aws_lambda_permission" "app_backend_entities_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-EntitiesProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/entities/*"
+}
+
+# ==============================================
+# Enterprise Products Services Routes (Sys App Backend)
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_eps" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-EPS"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/enterprise-products-services"
+}
+
+resource "aws_lambda_permission" "app_backend_eps_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-EPSProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/enterprise-products-services/*"
+}
+
+# ==============================================
+# Pipeline Canvas Routes (Sys App Backend)
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_pipeline_canvas" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineCanvas"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-canvas"
+}
+
+resource "aws_lambda_permission" "app_backend_pipeline_canvas_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineCanvasProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-canvas/*"
+}
+
+# ==============================================
+# Account Licenses Routes (Sys App Backend)
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_account_licenses" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AccountLicenses"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/account-licenses"
+}
+
+resource "aws_lambda_permission" "app_backend_account_licenses_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-AccountLicensesProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/account-licenses/*"
+}
+
+# ==============================================
+# User Management Routes (Sys App Backend)
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_user_management" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagement"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/user-management"
+}
+
+resource "aws_lambda_permission" "app_backend_user_management_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserManagementProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/user-management/*"
+}
+
+# ==============================================
+# User Preferences Routes (Sys App Backend)
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_user_preferences" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserPreferences"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/user-preferences"
+}
+
+resource "aws_lambda_permission" "app_backend_user_preferences_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-UserPreferencesProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/user-preferences/*"
+}
+
+# ==============================================
 # Environments Routes (Sys App Backend)
 # Routes: /api/v1/app/api/environments - Environment Management
 # ==============================================
@@ -671,7 +988,170 @@ resource "aws_lambda_permission" "app_backend_connectors_proxy" {
 }
 
 # ==============================================
-# Pipeline Routes (Sys App Backend)
+# Build Integrations Routes (Sys App Backend)
+# Routes: /api/v1/app/api/builds/integrations - Build Integrations Management
+# ==============================================
+
+# Permission 19c: /api/v1/app/api/builds/integrations (builds/integrations base endpoint)
+resource "aws_lambda_permission" "app_backend_builds_integrations" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-BuildsIntegrations"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/builds/integrations"
+}
+
+# Permission 19d: /api/v1/app/api/builds/integrations/* (builds/integrations with path params)
+resource "aws_lambda_permission" "app_backend_builds_integrations_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-BuildsIntegrationsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/builds/integrations/*"
+}
+
+# ==============================================
+# Build Executions Routes (Sys App Backend)
+# Routes: /api/v1/app/api/build-executions
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_build_executions" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-BuildExecutions"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/build-executions"
+}
+
+resource "aws_lambda_permission" "app_backend_build_executions_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-BuildExecutionsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/build-executions/*"
+}
+
+# ==============================================
+# Pipelines Routes (Sys App Backend)
+# Routes: /api/v1/app/api/pipelines
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_pipelines_api" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelinesApi"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipelines"
+}
+
+resource "aws_lambda_permission" "app_backend_pipelines_api_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelinesApiProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipelines/*"
+}
+
+# ==============================================
+# Pipeline Details Routes (Sys App Backend)
+# Routes: /api/v1/app/api/pipeline-details
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_pipeline_details" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineDetails"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-details"
+}
+
+resource "aws_lambda_permission" "app_backend_pipeline_details_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineDetailsProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-details/*"
+}
+
+# ==============================================
+# Pipeline Services Routes (Sys App Backend)
+# Routes: /api/v1/app/api/pipeline-services
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_pipeline_services" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineServices"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-services"
+}
+
+resource "aws_lambda_permission" "app_backend_pipeline_services_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineServicesProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-services/*"
+}
+
+# ==============================================
+# Pipeline YAML Routes (Sys App Backend)
+# Routes: /api/v1/app/api/pipeline-yaml
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_pipeline_yaml" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineYaml"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-yaml"
+}
+
+resource "aws_lambda_permission" "app_backend_pipeline_yaml_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineYamlProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-yaml/*"
+}
+
+# ==============================================
+# Pipeline Config Routes (Sys App Backend)
+# Routes: /api/v1/app/api/pipeline-config
+# ==============================================
+
+resource "aws_lambda_permission" "app_backend_pipeline_config" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineConfig"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-config"
+}
+
+resource "aws_lambda_permission" "app_backend_pipeline_config_proxy" {
+  count         = var.app_backend_lambda_function_name != "" ? 1 : 0
+  statement_id  = "AllowAPIGateway-PipelineConfigProxy"
+  action        = "lambda:InvokeFunction"
+  function_name = var.app_backend_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.admin_api.execution_arn}/*/*/api/v1/app/api/pipeline-config/*"
+}
+
+# ==============================================
+# Pipeline Routes (Sys App Backend) - Legacy
 # Routes: /api/v1/pipelines, /api/v1/pipeline-canvas, etc.
 # ==============================================
 
