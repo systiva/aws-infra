@@ -43,14 +43,14 @@ output "entity_uuids" {
   value = {
     # Groups
     platform_admin_group_id = random_uuid.platform_admin_group_id.result
-    account_admin_group_id = random_uuid.account_admin_group_id.result
+    account_admin_group_id  = random_uuid.account_admin_group_id.result
     # Roles
-    infra_manager_role_id = random_uuid.infra_manager_role_id.result
-    platform_admin_manager_role_id = random_uuid.platform_admin_manager_role_id.result
-    account_admin_manager_role_id = random_uuid.account_admin_manager_role_id.result
-    user_manager_role_id = random_uuid.user_manager_role_id.result
-    user_group_manager_role_id = random_uuid.user_group_manager_role_id.result
-    user_role_manager_role_id = random_uuid.user_role_manager_role_id.result
+    infra_manager_role_id           = random_uuid.infra_manager_role_id.result
+    platform_admin_manager_role_id  = random_uuid.platform_admin_manager_role_id.result
+    account_admin_manager_role_id   = random_uuid.account_admin_manager_role_id.result
+    user_manager_role_id            = random_uuid.user_manager_role_id.result
+    user_group_manager_role_id      = random_uuid.user_group_manager_role_id.result
+    user_role_manager_role_id       = random_uuid.user_role_manager_role_id.result
     user_permission_manager_role_id = random_uuid.user_permission_manager_role_id.result
     # Permissions
     permission_ids = {
@@ -89,10 +89,10 @@ output "rbac_setup_summary" {
       "account-permission-assign"
     ]
     user_assigned_to_group = "platform-admin"
-    access_pattern = "ACCOUNT#PLATFORM with UUID-based SKs"
-    storage_approach = "Single-table design with proper access patterns"
-    entity_types = ["USER", "GROUP", "ROLE", "PERMISSION"]
-    relationship_types = ["USER_GROUP_MEMBERSHIP", "GROUP_ROLE_MEMBERSHIP", "ROLE_PERMISSION_MEMBERSHIP"]
+    access_pattern         = "ACCOUNT#PLATFORM with UUID-based SKs"
+    storage_approach       = "Single-table design with proper access patterns"
+    entity_types           = ["USER", "GROUP", "ROLE", "PERMISSION"]
+    relationship_types     = ["USER_GROUP_MEMBERSHIP", "GROUP_ROLE_MEMBERSHIP", "ROLE_PERMISSION_MEMBERSHIP"]
   }
 }
 
@@ -114,20 +114,20 @@ output "platform_account_id" {
 output "systiva_account_details" {
   description = "Systiva default account details created during bootstrap"
   value = {
-    account_id             = local.platform_id
-    account_name           = local.default_account_name
-    master_account_name    = local.default_master_account_name
-    cloud_type             = local.default_cloud_type
-    subscription_tier      = local.default_subscription_tier
-    admin_email            = local.platform_admin_email
-    admin_username         = local.platform_admin_username
-    address_id             = random_uuid.systiva_address_id.result
-    technical_user_id      = random_uuid.systiva_technical_user_id.result
-    license_id             = random_uuid.systiva_license_id.result
-    license_start_date     = local.license_start_date
-    license_end_date       = local.license_end_date
-    assigned_group         = "platform-admin"
-    assigned_role          = "infra-manager"
+    account_id          = local.platform_id
+    account_name        = local.default_account_name
+    master_account_name = local.default_master_account_name
+    cloud_type          = local.default_cloud_type
+    subscription_tier   = local.default_subscription_tier
+    admin_email         = local.platform_admin_email
+    admin_username      = local.platform_admin_username
+    address_id          = random_uuid.systiva_address_id.result
+    technical_user_id   = random_uuid.systiva_technical_user_id.result
+    license_id          = random_uuid.systiva_license_id.result
+    license_start_date  = local.license_start_date
+    license_end_date    = local.license_end_date
+    assigned_group      = "platform-admin"
+    assigned_role       = "infra-manager"
   }
 }
 
@@ -157,5 +157,21 @@ output "default_enterprise_config" {
     service_id      = random_uuid.all_services_service_id.result
     service_name    = "All"
     linkage_id      = random_uuid.enterprise_product_service_linkage_id.result
+  }
+}
+
+# ==============================================
+# Default Global Settings Outputs
+# ==============================================
+
+output "default_global_settings" {
+  description = "Default global settings workstream created during bootstrap"
+  value = {
+    entity_id       = random_uuid.global_settings_entity_id.result
+    account_id      = local.platform_id
+    account_name    = local.default_account_name
+    enterprise_id   = random_uuid.global_enterprise_id.result
+    enterprise_name = "Global"
+    workstream_name = "Global"
   }
 }

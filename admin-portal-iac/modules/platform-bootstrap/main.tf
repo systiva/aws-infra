@@ -17,8 +17,8 @@ terraform {
 # Generate random password for platform admin
 # Generate unique 8-character platform ID
 resource "random_integer" "platform_id" {
-  min = 10000000  # 8-digit minimum
-  max = 99999999  # 8-digit maximum
+  min = 10000000 # 8-digit minimum
+  max = 99999999 # 8-digit maximum
 }
 
 # Generate UUIDs for entities
@@ -44,7 +44,7 @@ resource "random_uuid" "sap_enterprise_id" {}
 resource "random_uuid" "oracle_enterprise_id" {}
 
 # Products
-resource "random_uuid" "platform_product_id" {}  # All Products
+resource "random_uuid" "platform_product_id" {} # All Products
 resource "random_uuid" "devops_product_id" {}
 resource "random_uuid" "integration_factory_product_id" {}
 
@@ -54,82 +54,85 @@ resource "random_uuid" "integration_service_id" {}
 resource "random_uuid" "extension_service_id" {}
 
 # Linkages
-resource "random_uuid" "enterprise_product_service_linkage_id" {}  # Global -> All Products -> All Services
-resource "random_uuid" "sap_devops_linkage_id" {}                  # SAP -> DevOps -> Integration, Extension
-resource "random_uuid" "sap_integration_factory_linkage_id" {}     # SAP -> Integration Factory -> Integration, Extension
-resource "random_uuid" "oracle_devops_linkage_id" {}               # Oracle -> DevOps -> Integration
+resource "random_uuid" "enterprise_product_service_linkage_id" {} # Global -> All Products -> All Services
+resource "random_uuid" "sap_devops_linkage_id" {}                 # SAP -> DevOps -> Integration, Extension
+resource "random_uuid" "sap_integration_factory_linkage_id" {}    # SAP -> Integration Factory -> Integration, Extension
+resource "random_uuid" "oracle_devops_linkage_id" {}              # Oracle -> DevOps -> Integration
+
+# Global Settings
+resource "random_uuid" "global_settings_entity_id" {} # Default Global Settings workstream
 
 # Generate UUIDs for permissions
 resource "random_uuid" "permission_ids" {
   for_each = {
     # Infrastructure management permissions (4)
-    "onboard-account" = {}
-    "suspend-account" = {}
-    "resume-account" = {}
+    "onboard-account"  = {}
+    "suspend-account"  = {}
+    "resume-account"   = {}
     "offboard-account" = {}
     # Platform admin management permissions (6)
-    "create-platform-admin" = {}
-    "get-platform-admin" = {}
-    "update-platform-admin" = {}
-    "delete-platform-admin" = {}
-    "resume-platform-admin" = {}
+    "create-platform-admin"  = {}
+    "get-platform-admin"     = {}
+    "update-platform-admin"  = {}
+    "delete-platform-admin"  = {}
+    "resume-platform-admin"  = {}
     "suspend-platform-admin" = {}
     # Account admin management permissions (5)
-    "create-account-admin" = {}
-    "update-account-admin" = {}
-    "delete-account-admin" = {}
+    "create-account-admin"  = {}
+    "update-account-admin"  = {}
+    "delete-account-admin"  = {}
     "suspend-account-admin" = {}
-    "resume-account-admin" = {}
+    "resume-account-admin"  = {}
     # User management permissions (6)
-    "create-user" = {}
-    "update-user" = {}
-    "get-user" = {}
-    "delete-user" = {}
-    "resume-user" = {}
+    "create-user"  = {}
+    "update-user"  = {}
+    "get-user"     = {}
+    "delete-user"  = {}
+    "resume-user"  = {}
     "suspend-user" = {}
     # User group management permissions (5)
     "create-user-group" = {}
-    "get-user-group" = {}
+    "get-user-group"    = {}
     "delete-user-group" = {}
     "update-user-group" = {}
     "assign-user-group" = {}
     # User role management permissions (5)
     "create-user-role" = {}
-    "get-user-role" = {}
+    "get-user-role"    = {}
     "delete-user-role" = {}
     "update-user-role" = {}
     "assign-user-role" = {}
     # User permission management permissions (4)
-    "create-user-permission" = {}
-    "get-account-permission" = {}
+    "create-user-permission"    = {}
+    "get-account-permission"    = {}
     "delete-account-permission" = {}
     "update-account-permission" = {}
-    "assign-permission-assign" = {}
+    "assign-permission-assign"  = {}
   }
 }
 
 # Local values
 locals {
-  platform_id = tostring(random_integer.platform_id.result)
-  platform_admin_username = var.platform_admin_username
-  platform_admin_email = var.platform_admin_email
+  platform_id               = tostring(random_integer.platform_id.result)
+  platform_admin_username   = var.platform_admin_username
+  platform_admin_email      = var.platform_admin_email
   platform_admin_first_name = var.platform_admin_first_name
-  platform_admin_last_name = var.platform_admin_last_name
-  current_timestamp = formatdate("YYYY-MM-DD'T'hh:mm:ss.000Z", timestamp())
+  platform_admin_last_name  = var.platform_admin_last_name
+  current_timestamp         = formatdate("YYYY-MM-DD'T'hh:mm:ss.000Z", timestamp())
 
   # License dates: start = now, end = now + license_duration_years
   license_start_date = formatdate("YYYY-MM-DD", timestamp())
-  license_end_date = formatdate("YYYY-MM-DD", timeadd(timestamp(), "${var.license_duration_years * 365 * 24}h"))
+  license_end_date   = formatdate("YYYY-MM-DD", timeadd(timestamp(), "${var.license_duration_years * 365 * 24}h"))
 
   # Technical user configuration
   technical_user_first_name = var.technical_user_first_name
-  technical_user_last_name = var.technical_user_last_name
+  technical_user_last_name  = var.technical_user_last_name
 
   # Default account configuration
-  default_account_name = var.default_account_name
+  default_account_name        = var.default_account_name
   default_master_account_name = var.default_master_account_name
-  default_cloud_type = var.default_cloud_type
-  default_subscription_tier = var.default_subscription_tier
+  default_cloud_type          = var.default_cloud_type
+  default_subscription_tier   = var.default_subscription_tier
 }
 
 # ==============================================
@@ -149,14 +152,14 @@ resource "aws_cognito_user" "platform_admin" {
 
   # Set temporary password from variable (passed from GitHub secret)
   temporary_password = var.temporary_password
-  message_action     = "SUPPRESS"  # Don't send welcome email
+  message_action     = "SUPPRESS" # Don't send welcome email
 
   # Ensure the platform ID is generated first
   depends_on = [random_integer.platform_id]
 
   # CRITICAL: Prevent Terraform from modifying user after creation
   lifecycle {
-    ignore_changes = all  # Ignore all changes after initial creation
+    ignore_changes = all # Ignore all changes after initial creation
   }
 }
 
@@ -262,24 +265,24 @@ resource "aws_dynamodb_table_item" "systiva_account" {
       M = {
         addressLine1 = { S = var.default_address_line1 }
         addressLine2 = { S = var.default_address_line2 }
-        city = { S = var.default_city }
-        state = { S = var.default_state }
-        zipCode = { S = var.default_zip_code }
-        country = { S = var.default_country }
+        city         = { S = var.default_city }
+        state        = { S = var.default_state }
+        zipCode      = { S = var.default_zip_code }
+        country      = { S = var.default_country }
       }
     }
     # Embedded technical user for frontend
     technicalUser = {
       M = {
-        firstName = { S = local.technical_user_first_name }
-        lastName = { S = local.technical_user_last_name }
-        adminUsername = { S = local.platform_admin_username }
-        adminEmail = { S = local.platform_admin_email }
-        status = { S = "Active" }
-        assignedUserGroup = { S = "platform-admin" }
-        assignedRole = { S = "infra-manager" }
+        firstName           = { S = local.technical_user_first_name }
+        lastName            = { S = local.technical_user_last_name }
+        adminUsername       = { S = local.platform_admin_username }
+        adminEmail          = { S = local.platform_admin_email }
+        status              = { S = "Active" }
+        assignedUserGroup   = { S = "platform-admin" }
+        assignedRole        = { S = "infra-manager" }
         assignmentStartDate = { S = local.license_start_date }
-        assignmentEndDate = { S = local.license_end_date }
+        assignmentEndDate   = { S = local.license_end_date }
       }
     }
     # Embedded licenses array for frontend
@@ -287,15 +290,15 @@ resource "aws_dynamodb_table_item" "systiva_account" {
       L = [
         {
           M = {
-            id = { S = random_uuid.systiva_license_id.result }
-            enterprise = { S = "Global" }
-            product = { S = "All Products" }
-            service = { S = "All Services" }
-            licenseStart = { S = local.license_start_date }
-            licenseEnd = { S = local.license_end_date }
-            users = { N = "100" }
+            id            = { S = random_uuid.systiva_license_id.result }
+            enterprise    = { S = "Global" }
+            product       = { S = "All Products" }
+            service       = { S = "All Services" }
+            licenseStart  = { S = local.license_start_date }
+            licenseEnd    = { S = local.license_end_date }
+            users         = { N = "100" }
             renewalNotice = { BOOL = true }
-            noticePeriod = { N = "30" }
+            noticePeriod  = { N = "30" }
           }
         }
       ]
@@ -487,9 +490,9 @@ resource "aws_dynamodb_table_item" "systiva_license" {
     contactDetails = {
       M = {
         firstName = { S = local.technical_user_first_name }
-        lastName = { S = local.technical_user_last_name }
-        email = { S = local.platform_admin_email }
-        company = { S = local.default_master_account_name }
+        lastName  = { S = local.technical_user_last_name }
+        email     = { S = local.platform_admin_email }
+        company   = { S = local.default_master_account_name }
       }
     }
     createdAt = {
@@ -1617,6 +1620,73 @@ resource "aws_dynamodb_table_item" "oracle_devops_integration_lookup" {
   })
 
   depends_on = [aws_dynamodb_table_item.oracle_devops_linkage]
+}
+
+# ==============================================
+# Default Global Settings
+# ==============================================
+# Creates a default global settings workstream for the Systiva account
+# This will appear in the Global Settings screen (http://localhost:3000/account-settings/global-settings)
+
+resource "aws_dynamodb_table_item" "default_global_settings" {
+  table_name = var.rbac_table_name
+  hash_key   = var.rbac_table_hash_key
+  range_key  = var.rbac_table_range_key
+
+  item = jsonencode({
+    PK = {
+      S = "${local.default_account_name}#${local.platform_id}#GLOBAL-SETTINGS"
+    }
+    SK = {
+      S = "ENTERPRISE#${random_uuid.global_enterprise_id.result}#WORKSTREAM#Global"
+    }
+    id = {
+      S = random_uuid.global_settings_entity_id.result
+    }
+    entity_id = {
+      S = random_uuid.global_settings_entity_id.result
+    }
+    account_id = {
+      S = local.platform_id
+    }
+    account_name = {
+      S = local.default_account_name
+    }
+    enterprise_id = {
+      S = random_uuid.global_enterprise_id.result
+    }
+    enterprise_name = {
+      S = "Global"
+    }
+    workstream_name = {
+      S = "Global"
+    }
+    configuration = {
+      M = {
+        plan    = { L = [] }
+        code    = { L = [] }
+        build   = { L = [] }
+        test    = { L = [] }
+        release = { L = [] }
+        deploy  = { L = [] }
+        others  = { L = [] }
+      }
+    }
+    entity_type = {
+      S = "GLOBAL_SETTING_ENTITY"
+    }
+    created_date = {
+      S = local.current_timestamp
+    }
+    updated_date = {
+      S = local.current_timestamp
+    }
+  })
+
+  depends_on = [
+    aws_dynamodb_table_item.systiva_account,
+    aws_dynamodb_table_item.global_enterprise
+  ]
 }
 
 # Legacy platform account entry (for backward compatibility with IMS)
