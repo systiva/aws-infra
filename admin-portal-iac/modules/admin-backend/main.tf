@@ -1,4 +1,4 @@
-# Admin Backend Lambda Module  
+# Admin Backend Lambda Module
 # Handles API requests and business logic
 
 # Data sources
@@ -24,7 +24,7 @@ resource "aws_lambda_function" "admin_backend" {
   runtime      = var.runtime
   timeout      = var.timeout
   memory_size  = var.memory_size
-  
+
   # Use local file for deployment package (temporary for infrastructure setup)
   filename         = "${path.root}/lambda-packages/admin-portal-be.zip"
   source_code_hash = filebase64sha256("${path.root}/lambda-packages/admin-portal-be.zip")
@@ -34,11 +34,11 @@ resource "aws_lambda_function" "admin_backend" {
       NODE_ENV                         = var.environment
       LOG_LEVEL                        = "info"
       ACCOUNT_REGISTRY_TABLE_NAME       = var.account_registry_table_name
-      
+
       # Step Functions Configuration
       CREATE_ACCOUNT_STATE_MACHINE_ARN  = var.create_account_step_function_arn
       DELETE_ACCOUNT_STATE_MACHINE_ARN  = var.delete_account_step_function_arn
-      
+
       # Cross-account access configuration
       ADMIN_ACCOUNT_ID                 = var.admin_account_id
       ACCOUNT_ACCOUNT_ID                = var.account_account_id
@@ -154,10 +154,18 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
           "dynamodb:*"  # Full DynamoDB access for all operations
         ]
         Resource = [
+          # Admin registry table (systiva-admin-*)
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}",
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}/index/*",
+          # Legacy platform-admin tables
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/platform-admin*",
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/platform-admin*/index/*"
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/platform-admin*/index/*",
+          # Account-specific tables for public cloud (builds, connectors, credentials, environments, pipelines)
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/account-admin-public-*",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/account-admin-public-*/index/*",
+          # Account-specific tables for private cloud
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/account-*-admin-private-*",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/account-*-admin-private-*/index/*"
         ]
       },
       {

@@ -172,10 +172,18 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
           "dynamodb:*"  # Full DynamoDB access for all operations
         ]
         Resource = [
+          # Admin registry table (systiva-admin-*)
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}",
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.account_registry_table_name}/index/*",
+          # Legacy sys-app tables
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/sys-app*",
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/sys-app*/index/*"
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/sys-app*/index/*",
+          # Account-specific tables for public cloud (builds, connectors, credentials, environments, pipelines)
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/account-admin-public-*",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/account-admin-public-*/index/*",
+          # Account-specific tables for private cloud (accessed via cross-account role, but also need local fallback)
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/account-*-admin-private-*",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/account-*-admin-private-*/index/*"
         ]
       },
       {
@@ -190,7 +198,9 @@ resource "aws_iam_role_policy" "lambda_custom_policy" {
         Action = [
           "sts:AssumeRole"
         ]
-        # Allow assuming cross-account role in ANY customer AWS account
+        # Allow assuming cross-account role in any customer AWS account
+        # Security: Customer's trust policy must explicitly allow this Lambda's role ARN
+        # Role name is specific (not wildcarded) - only account ID is dynamic
         Resource = "arn:aws:iam::*:role/${var.cross_account_role_name}"
       }],
       [{
